@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* ── Brand colors (Kente Modern) ── */
+  --terra:        #C94B2C;
+  --terra-light:  #EF6B4A;
+  --terra-bg:     #FDF1EE;
+  --teal:         #005548;
+  --teal-light:   #007A64;
+  --teal-bg:      #EBF5F3;
+  --amber:        #C78D0A;
+  --amber-light:  #E8A01E;
+  --amber-bg:     #FDF6E3;
+  --brown:        #7B4F20;
+  --brown-light:  #A07040;
+  --brown-bg:     #F5EFE6;
+
+  /* ── Team slot colors ── */
+  --c-ember:        var(--terra);
+  --c-ember-light:  var(--terra-light);
+  --c-ember-bg:     var(--terra-bg);
+  --c-gold:         var(--amber);
+  --c-gold-light:   var(--amber-light);
+  --c-gold-bg:      var(--amber-bg);
+  --c-forest:       var(--teal);
+  --c-forest-light: var(--teal-light);
+  --c-forest-bg:    var(--teal-bg);
+  --c-earth:        var(--brown);
+  --c-earth-light:  var(--brown-light);
+  --c-earth-bg:     var(--brown-bg);
+
+  /* ── Neutrals ── */
+  --bg:           #F3F1EC;
+  --bg-card:      #FFFFFF;
+  --text:         #1A1814;
+  --text-muted:   #6B6560;
+  --border:       #E4E0D8;
+  --shadow-sm:    0 1px 4px rgba(0,0,0,0.07), 0 2px 8px rgba(0,0,0,0.05);
+  --shadow-md:    0 4px 12px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06);
+  --shadow-lg:    0 8px 24px rgba(0,0,0,0.1),  0 20px 48px rgba(0,0,0,0.08);
+
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+  font-size: 16px;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: var(--bg);
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+input {
+  font-family: inherit;
+}
