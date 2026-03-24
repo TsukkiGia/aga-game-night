@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react'
 
 export default function QuestionView({
-  round, questionIndex,
+  rounds, roundIndex, questionIndex, doneQuestions,
   teams, buzzWinner, armed,
   isDone, onAdjust, onArm, onDismiss,
-  onToggleDone, onBack, onNext, onPrev,
+  onToggleDone, onNavigate, onBack, onNext, onPrev,
 }) {
+  const round = rounds[roundIndex]
   const question = round.questions[questionIndex]
   const total = round.questions.length
   const [revealed, setRevealed] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   useEffect(() => { setRevealed(false) }, [questionIndex])
 
@@ -62,10 +64,44 @@ export default function QuestionView({
       {/* ── Buzz banner ──────────────────────────────── */}
       {buzzWinner && (
         <div className={`qv-buzz-banner color-${buzzWinner.team.color}`}>
-          <span>🔔 <strong>{buzzWinner.team.name}</strong> buzzed in!</span>
+          <span>🔔 {buzzWinner.memberName
+            ? <><strong>{buzzWinner.memberName}</strong> just buzzed in for {buzzWinner.team.name}!</>
+            : <><strong>{buzzWinner.team.name}</strong> buzzed in!</>}
+          </span>
           <button className="qv-buzz-reset" onClick={onDismiss}>Reset Buzzers</button>
         </div>
       )}
+
+      {/* ── Main area: sidebar + body ───────────────── */}
+      <div className="qv-main">
+
+      {/* Sidebar */}
+      <div className={`qv-sidebar${sidebarOpen ? '' : ' collapsed'}`}>
+        <button className="qv-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)}>
+          {sidebarOpen ? '‹' : '›'}
+        </button>
+        {sidebarOpen && rounds.map((r, ri) => {
+          const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis' }
+          return (
+            <div key={ri} className="qv-sidebar-group">
+              <div className="qv-sidebar-round-label">{r.label}</div>
+              {r.questions.map((q, qi) => {
+                const done = doneQuestions?.has(`${ri}-${qi}`)
+                const active = ri === roundIndex && qi === questionIndex
+                return (
+                  <button
+                    key={qi}
+                    className={`qv-sidebar-item${active ? ' active' : ''}${done ? ' done' : ''}`}
+                    onClick={() => onNavigate(ri, qi)}
+                  >
+                    {done ? '✓ ' : ''}{typeLabel[r.type]} {qi + 1}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
 
       {/* ── Question body ────────────────────────────── */}
       <div className="qv-body">
@@ -75,13 +111,17 @@ export default function QuestionView({
         {round.type === 'slang' && (
           <SlangBody key={question.id} question={question} revealed={revealed} onReveal={() => setRevealed(true)} />
         )}
+        {round.type === 'charades' && (
+          <CharadesBody key={question.id} question={question} />
+        )}
         {round.type === 'thesis' && (
           <ThesisBody key={question.id} question={question} />
         )}
       </div>
+      </div> {/* end qv-main */}
 
       {/* ── Arm row (hidden for thesis) ──────────────── */}
-      {round.type !== 'thesis' && (
+      {round.type !== 'thesis' && round.type !== 'charades' && (
         <div className="qv-arm-row arm-row">
           <button
             className={`arm-btn ${armed ? 'armed' : ''}`}
@@ -135,6 +175,15 @@ function SlangBody({ question, revealed, onReveal }) {
           <div className="qv-answer-text">{question.meaning}</div>
         </div>
       )}
+    </div>
+  )
+}
+
+function CharadesBody({ question }) {
+  return (
+    <div className="qv-charades-wrap">
+      <div className="qv-charades-label">Act this out</div>
+      <div className="qv-charades-phrase">{question.phrase}</div>
     </div>
   )
 }

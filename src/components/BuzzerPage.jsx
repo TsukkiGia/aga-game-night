@@ -5,6 +5,7 @@ import { socket } from '../socket'
 
 export default function BuzzerPage() {
   const [code, setCode] = useState('')
+  const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [team, setTeam] = useState(null)       // { name, color, code }
   const [status, setStatus] = useState('join')
@@ -38,15 +39,15 @@ export default function BuzzerPage() {
   // Effect 2: rejoin on reconnect — only registered once team is known
   useEffect(() => {
     if (!team) return
-    function rejoin() { socket.emit('member:join', team.code, () => {}) }
+    function rejoin() { socket.emit('member:join', team.code, name, () => {}) }
     socket.on('connect', rejoin)
     return () => socket.off('connect', rejoin)
-  }, [team])
+  }, [team, name])
 
   function handleJoin(e) {
     e.preventDefault()
     setError('')
-    socket.emit('member:join', code, (res) => {
+    socket.emit('member:join', code, name, (res) => {
       if (res.error) {
         setError(res.error)
         return
@@ -83,8 +84,16 @@ export default function BuzzerPage() {
               autoComplete="off"
               autoCapitalize="characters"
             />
+            <input
+              className="buzzer-name-input"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Your name"
+              maxLength={24}
+              autoComplete="off"
+            />
             {error && <p className="buzzer-error">{error}</p>}
-            <button className="buzzer-join-btn" type="submit" disabled={code.length < 4}>
+            <button className="buzzer-join-btn" type="submit" disabled={code.length < 4 || !name.trim()}>
               Join Team →
             </button>
           </form>
@@ -106,7 +115,10 @@ export default function BuzzerPage() {
     <div className={`buzzer-page buzzer-active color-${team.color}`}>
       <div className="buzzer-team-header">
         <div className={`buzzer-team-dot color-${team.color}`} />
-        <span className="buzzer-team-label">{team.name}</span>
+        <div className="buzzer-team-info">
+          <span className="buzzer-team-label">{team.name}</span>
+          {name && <span className="buzzer-member-name">{name}</span>}
+        </div>
       </div>
 
       <div className="buzzer-status-label">{cfg.label}</div>

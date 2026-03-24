@@ -15,6 +15,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
   const [activeQuestion, setActiveQuestion] = useState(null)  // [roundIdx, qIdx] | null
   const [questionsOpen, setQuestionsOpen] = useState(false)
   const [doneQuestions, setDoneQuestions] = useState(new Set())
+  const [members, setMembers] = useState([])  // [[names for team 0], [names for team 1], ...]
 
   function toggleDone(rIdx, qIdx) {
     const key = `${rIdx}-${qIdx}`
@@ -32,15 +33,17 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
     socket.on('connect', setup)   // register BEFORE connect() so we never miss the event
     socket.connect()
 
-    socket.on('buzz:armed',  () => setArmed(true))
-    socket.on('buzz:reset',  () => { setArmed(false); setBuzzWinner(null) })
-    socket.on('buzz:winner', (data) => { setArmed(false); setBuzzWinner(data) })
+    socket.on('buzz:armed',   () => setArmed(true))
+    socket.on('buzz:reset',   () => { setArmed(false); setBuzzWinner(null) })
+    socket.on('buzz:winner',  (data) => { setArmed(false); setBuzzWinner(data) })
+    socket.on('host:members', (data) => setMembers(data))
 
     return () => {
       socket.off('connect', setup)
       socket.off('buzz:armed')
       socket.off('buzz:reset')
       socket.off('buzz:winner')
+      socket.off('host:members')
       socket.disconnect()
     }
   }, [])
@@ -74,8 +77,10 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
     const [rIdx, qIdx] = activeQuestion
     return (
       <QuestionView
-        round={rounds[rIdx]}
+        rounds={rounds}
+        roundIndex={rIdx}
         questionIndex={qIdx}
+        doneQuestions={doneQuestions}
         teams={teams}
         buzzWinner={buzzWinner}
         armed={armed}
@@ -84,6 +89,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
         onArm={handleArm}
         onDismiss={handleDismiss}
         onToggleDone={() => toggleDone(rIdx, qIdx)}
+        onNavigate={(ri, qi) => setActiveQuestion([ri, qi])}
         onBack={() => setActiveQuestion(null)}
         onNext={() => setActiveQuestion([rIdx, qIdx + 1])}
         onPrev={() => setActiveQuestion([rIdx, qIdx - 1])}
@@ -105,7 +111,11 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
             onClick={e => e.stopPropagation()}
           >
             <div className="buzz-popup-label">BUZZED IN!</div>
-            <div className="buzz-popup-name">{buzzWinner.team.name}</div>
+            <div className="buzz-popup-name">
+              {buzzWinner.memberName
+                ? `${buzzWinner.memberName} just buzzed in for ${buzzWinner.team.name}!`
+                : `${buzzWinner.team.name} buzzed in!`}
+            </div>
             <div className="buzz-popup-icon">🔔</div>
             <button className="buzz-dismiss-btn" onClick={handleDismiss}>
               Reset Buzzers
@@ -132,10 +142,13 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
                   Team members go to <strong>{buzzerUrl}</strong> and enter their code to buzz in
                 </p>
                 <div className="codes-grid">
-                  {teams.map(t => (
+                  {teams.map((t, i) => (
                     <div key={t.code} className={`code-chip color-${t.color}`}>
                       <span className="code-team-name">{t.name}</span>
                       <span className="code-value">{t.code}</span>
+                      {members[i]?.length > 0 && (
+                        <span className="code-members">{members[i].join(', ')}</span>
+                      )}
                     </div>
                   ))}
                 </div>
