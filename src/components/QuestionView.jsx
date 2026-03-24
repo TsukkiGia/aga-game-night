@@ -84,7 +84,12 @@ export default function QuestionView({
           const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis' }
           return (
             <div key={ri} className="qv-sidebar-group">
-              <div className="qv-sidebar-round-label">{r.label}</div>
+              <button
+                className="qv-sidebar-round-label clickable"
+                onClick={() => onNavigate(ri, null)}
+              >
+                {r.label}
+              </button>
               {r.questions.map((q, qi) => {
                 const done = doneQuestions?.has(`${ri}-${qi}`)
                 const active = ri === roundIndex && qi === questionIndex

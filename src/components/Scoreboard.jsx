@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import TeamCard from './TeamCard'
 import Leaderboard from './Leaderboard'
 import QuestionView from './QuestionView'
+import RoundIntroView from './RoundIntroView'
 import { socket } from '../socket'
 import { ENDPOINT } from '../config'
 import rounds from '../rounds'
@@ -75,6 +76,19 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
 
   if (activeQuestion !== null) {
     const [rIdx, qIdx] = activeQuestion
+
+    if (qIdx === null) {
+      return (
+        <RoundIntroView
+          rounds={rounds}
+          roundIndex={rIdx}
+          doneQuestions={doneQuestions}
+          onNavigate={(ri, qi) => setActiveQuestion([ri, qi])}
+          onBack={() => setActiveQuestion(null)}
+        />
+      )
+    }
+
     return (
       <QuestionView
         rounds={rounds}
@@ -211,13 +225,19 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
             <div className="questions-panel-body">
               {rounds.map((round, rIdx) => (
                 <div key={rIdx} className="qp-round">
-                  <div className="qp-round-header">{round.label} — {round.name}</div>
+                  <button
+                    className="qp-round-header"
+                    onClick={() => { setActiveQuestion([rIdx, null]); setQuestionsOpen(false) }}
+                  >
+                    {round.label} — {round.name}
+                  </button>
                   <div className="qp-questions-list">
                     {round.questions.map((q, qIdx) => {
                       const label =
-                        round.type === 'video'  ? `Video ${qIdx + 1}` :
-                        round.type === 'slang'  ? `Slang ${qIdx + 1}` :
-                                                  `Thesis ${qIdx + 1}`
+                        round.type === 'video'    ? `Video ${qIdx + 1}` :
+                        round.type === 'slang'    ? `Slang ${qIdx + 1}` :
+                        round.type === 'charades' ? `Charades ${qIdx + 1}` :
+                                                    `Thesis ${qIdx + 1}`
                       const done = doneQuestions.has(`${rIdx}-${qIdx}`)
                       return (
                         <button

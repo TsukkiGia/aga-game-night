@@ -1627,3 +1627,146 @@
   color: var(--terra);
   padding: 4px 10px 2px;
 }
+
+/* ── Sidebar round label as button ── */
+.qv-sidebar-round-label.clickable {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  padding: 4px 10px 2px;
+  border-radius: 6px;
+  transition: all 0.12s;
+}
+.qv-sidebar-round-label.clickable:hover { background: var(--terra-bg); }
+.qv-sidebar-round-label.active-round { background: var(--terra-bg); }
+
+/* ── Round intro page ── */
+.round-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 600px;
+  width: 100%;
+}
+
+.round-intro-tag {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--terra);
+}
+
+.round-intro-name {
+  font-size: clamp(32px, 6vw, 52px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  line-height: 1.1;
+  margin: 0;
+}
+
+.round-intro-blurb {
+  font-size: 17px;
+  color: var(--text-muted);
+  line-height: 1.7;
+  margin: 0;
+}
+
+.round-intro-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.round-intro-section-label {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--teal);
+}
+
+.round-intro-rules {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.round-intro-rules li {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.5;
+  padding-left: 20px;
+  position: relative;
+}
+.round-intro-rules li::before {
+  content: '◈';
+  position: absolute;
+  left: 0;
+  color: var(--terra);
+  font-size: 10px;
+  top: 4px;
+}
+
+.round-intro-scoring {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.round-intro-score-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.round-intro-score-pts {
+  font-size: 18px;
+  font-weight: 900;
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.round-intro-score-row.pos .round-intro-score-pts { color: var(--teal); }
+.round-intro-score-row.neg .round-intro-score-pts { color: var(--terra); }
+
+.round-intro-score-label {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.round-intro-start-btn {
+  align-self: flex-start;
+  background: var(--terra);
+  color: white;
+  border-radius: 12px;
+  padding: 13px 32px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  border: none;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s;
+}
+.round-intro-start-btn:hover {
+  background: var(--terra-light);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* qp-round-header as button */
+.qp-round-header {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 4px 0;
+  transition: color 0.15s;
+}
+.qp-round-header:hover { color: var(--terra-light); }

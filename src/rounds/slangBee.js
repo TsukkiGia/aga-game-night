@@ -2,10 +2,18 @@ export default {
   label: 'Round 3',
   name: 'Slang Bee',
   type: 'slang',
+  intro: 'The host reads a slang term, an example sentence, and its country of origin. Guess the meaning and use it in a sentence.',
+  rules: [
+    'Buzz in to answer — like a spelling bee, but for slang',
+    'Give (1) the meaning and (2) use it in a new sentence',
+    'Each team may ask one clarifying question before answering',
+    'Allowed: "positive or negative?", "person, action, or situation?", "casual or formal?"',
+    'Not allowed: "What language is it?", "What\'s the translation?", "Use it in a sentence for us"',
+    'If you miss, one steal is allowed',
+  ],
   scoring: [
-    { label: 'Correct meaning',  points: 2 },
-    { label: 'Correct sentence', points: 2 },
-    { label: 'Funny bonus',      points: 1 },
+    { label: 'Correct meaning', points: 2 },
+    { label: 'Funny bonus',     points: 1 },
   ],
   questions: [
     {

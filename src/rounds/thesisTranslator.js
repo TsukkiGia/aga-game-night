@@ -4,10 +4,15 @@ export default {
   label: 'Round 4',
   name: 'Thesis Translator',
   type: 'thesis',
+  intro: 'Teams translate a real thesis title into a chosen register. Crowd votes on the best translation.',
+  rules: [
+    'Round robin — each team picks a translation style for their turn',
+    'Choose from: Family-friendly English, Slang register, or Exaggerated academic jargon',
+    'Crowd votes on the best translation',
+    'Host awards points based on crowd reaction',
+  ],
   scoring: [
-    { label: '+1', points: 1 },
-    { label: '+2', points: 2 },
-    { label: '+3', points: 3 },
+    { label: 'Majority vote', points: 3 },
   ],
   questions: [
     {

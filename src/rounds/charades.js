@@ -2,10 +2,15 @@ export default {
   label: 'Round 1',
   name: 'Charades',
   type: 'charades',
+  intro: 'Act out African and diasporic cultural references — no words, no mouthing, no pointing at objects in the room.',
+  rules: [
+    'Teams take turns — one person acts, the rest of the team guesses',
+    'No speaking, mouthing words, or spelling things out',
+    'Host decides timing per turn',
+    'Crowd judges effort and creativity',
+  ],
   scoring: [
-    { label: '+1', points: 1 },
-    { label: '+2', points: 2 },
-    { label: '+3', points: 3 },
+    { label: 'Correct answer', points: 3 },
   ],
   questions: [
     { id: 'c1',  phrase: 'Jollof Rice Debate' },
