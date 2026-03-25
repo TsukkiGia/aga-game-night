@@ -85,7 +85,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
   function adjust(index, delta) {
     setTeams(prev =>
       prev.map((t, i) =>
-        i === index ? { ...t, score: Math.max(0, t.score + delta) } : t
+        i === index ? { ...t, score: t.score + delta } : t
       )
     )
     setFlashing(`${index}-${delta > 0 ? 'up' : 'down'}`)
@@ -112,8 +112,12 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
     socket.emit('host:reset')
   }
 
+  const buzzerUrl = `${ENDPOINT || window.location.origin}/buzz`
+
   if (activeQuestion !== null) {
     const [rIdx, qIdx] = activeQuestion
+
+    function handleBack() { handleDismiss(); setActiveQuestion(null) }
 
     if (qIdx === null) {
       return (
@@ -122,7 +126,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
           roundIndex={rIdx}
           doneQuestions={doneQuestions}
           onNavigate={(ri, qi) => setActiveQuestion([ri, qi])}
-          onBack={() => setActiveQuestion(null)}
+          onBack={handleBack}
         />
       )
     }
@@ -134,6 +138,8 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
         questionIndex={qIdx}
         doneQuestions={doneQuestions}
         teams={teams}
+        members={members}
+        buzzerUrl={buzzerUrl}
         buzzWinner={buzzWinner}
         armed={armed}
         isDone={doneQuestions.has(`${rIdx}-${qIdx}`)}
@@ -142,7 +148,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
         onDismiss={handleDismiss}
         onToggleDone={() => toggleDone(rIdx, qIdx)}
         onNavigate={(ri, qi) => setActiveQuestion([ri, qi])}
-        onBack={() => setActiveQuestion(null)}
+        onBack={handleBack}
         onNext={() => setActiveQuestion([rIdx, qIdx + 1])}
         onPrev={() => setActiveQuestion([rIdx, qIdx - 1])}
       />
@@ -151,7 +157,6 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
 
   const maxScore = Math.max(...teams.map(t => t.score), 1)
   const leaders = teams.filter(t => t.score === maxScore && maxScore > 0)
-  const buzzerUrl = `${ENDPOINT || window.location.origin}/buzz`
 
   return (
     <>

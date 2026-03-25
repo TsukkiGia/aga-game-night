@@ -983,6 +983,63 @@
   gap: 12px;
 }
 
+/* ── Right sidebar: team codes ── */
+.qv-codes-sidebar {
+  width: 160px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 8px;
+  overflow-y: auto;
+}
+.qv-codes-sidebar.collapsed {
+  width: 32px;
+  padding: 8px 4px;
+}
+.qv-codes-url {
+  font-size: 9px;
+  color: var(--text-muted);
+  word-break: break-all;
+  line-height: 1.4;
+  padding: 0 4px;
+}
+.qv-codes-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: white;
+  gap: 2px;
+}
+.qv-codes-chip.color-ember  { border-color: rgba(201,75,44,0.3); }
+.qv-codes-chip.color-gold   { border-color: rgba(199,141,10,0.3); }
+.qv-codes-chip.color-forest { border-color: rgba(0,85,72,0.3); }
+.qv-codes-chip.color-earth  { border-color: rgba(123,79,32,0.3); }
+.qv-codes-chip-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.qv-codes-chip-code {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+.qv-codes-chip.color-ember  .qv-codes-chip-code { color: var(--terra); }
+.qv-codes-chip.color-gold   .qv-codes-chip-code { color: var(--amber); }
+.qv-codes-chip.color-forest .qv-codes-chip-code { color: var(--teal); }
+.qv-codes-chip.color-earth  .qv-codes-chip-code { color: var(--brown); }
+.qv-codes-chip-members {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .qv-back {
   background: var(--bg);
   border: 1.5px solid var(--border);

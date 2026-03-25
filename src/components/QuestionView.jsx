@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 
 export default function QuestionView({
   rounds, roundIndex, questionIndex, doneQuestions,
-  teams, buzzWinner, armed,
+  teams, members, buzzerUrl, buzzWinner, armed,
   isDone, onAdjust, onArm, onDismiss,
   onToggleDone, onNavigate, onBack, onNext, onPrev,
 }) {
@@ -11,6 +11,7 @@ export default function QuestionView({
   const total = round.questions.length
   const [revealed, setRevealed] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [codesOpen, setCodesOpen] = useState(true)
 
   useEffect(() => { setRevealed(false) }, [questionIndex])
 
@@ -123,6 +124,28 @@ export default function QuestionView({
           <ThesisBody key={question.id} question={question} />
         )}
       </div>
+
+      {/* ── Right sidebar: team codes ─────────────────── */}
+      <div className={`qv-codes-sidebar${codesOpen ? '' : ' collapsed'}`}>
+        <button className="qv-sidebar-toggle" onClick={() => setCodesOpen(o => !o)}>
+          {codesOpen ? '›' : '‹'}
+        </button>
+        {codesOpen && (
+          <>
+            <div className="qv-codes-url">{buzzerUrl}</div>
+            {teams.map((t, i) => (
+              <div key={t.code} className={`qv-codes-chip color-${t.color}`}>
+                <span className="qv-codes-chip-name">{t.name}</span>
+                <span className="qv-codes-chip-code">{t.code}</span>
+                {members?.[i]?.length > 0 && (
+                  <span className="qv-codes-chip-members">{members[i].join(', ')}</span>
+                )}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
       </div> {/* end qv-main */}
 
       {/* ── Arm row (hidden for thesis) ──────────────── */}
