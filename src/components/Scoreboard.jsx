@@ -7,16 +7,48 @@ import { socket } from '../socket'
 import { ENDPOINT } from '../config'
 import rounds from '../rounds'
 
+const SCORES_KEY = 'scorekeeping_scores'
+const DONE_KEY   = 'scorekeeping_done'
+
+function loadScores(initialTeams) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SCORES_KEY) || '{}')
+    return initialTeams.map(t => ({ ...t, score: saved[t.code] ?? t.score }))
+  } catch {
+    return initialTeams
+  }
+}
+
+function loadDone() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(DONE_KEY) || '[]'))
+  } catch {
+    return new Set()
+  }
+}
+
 export default function Scoreboard({ teams: initialTeams, onReset }) {
-  const [teams, setTeams] = useState(initialTeams)
+  const [teams, setTeams] = useState(() => loadScores(initialTeams))
   const [flashing, setFlashing] = useState(null)
   const [armed, setArmed] = useState(false)
   const [buzzWinner, setBuzzWinner] = useState(null) // { teamIndex, team }
   const [codesOpen, setCodesOpen] = useState(true)
   const [activeQuestion, setActiveQuestion] = useState(null)  // [roundIdx, qIdx] | null
   const [questionsOpen, setQuestionsOpen] = useState(false)
-  const [doneQuestions, setDoneQuestions] = useState(new Set())
+  const [doneQuestions, setDoneQuestions] = useState(() => loadDone())
   const [members, setMembers] = useState([])  // [[names for team 0], [names for team 1], ...]
+
+  // Persist scores to localStorage on every change
+  useEffect(() => {
+    const s = {}
+    teams.forEach(t => { s[t.code] = t.score })
+    localStorage.setItem(SCORES_KEY, JSON.stringify(s))
+  }, [teams])
+
+  // Persist done questions to localStorage on every change
+  useEffect(() => {
+    localStorage.setItem(DONE_KEY, JSON.stringify([...doneQuestions]))
+  }, [doneQuestions])
 
   function toggleDone(rIdx, qIdx) {
     const key = `${rIdx}-${qIdx}`
@@ -60,7 +92,10 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
   }
 
   function resetScores() {
+    localStorage.removeItem(SCORES_KEY)
+    localStorage.removeItem(DONE_KEY)
     setTeams(prev => prev.map(t => ({ ...t, score: 0 })))
+    setDoneQuestions(new Set())
   }
 
   function handleArm() {
@@ -205,7 +240,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
             <button className="reset-scores-btn" onClick={resetScores}>
               ↺ Reset Scores
             </button>
-            <button className="new-game-btn" onClick={onReset}>
+            <button className="new-game-btn" onClick={() => { localStorage.removeItem(SCORES_KEY); localStorage.removeItem(DONE_KEY); onReset() }}>
               ◈ New Game
             </button>
           </div>

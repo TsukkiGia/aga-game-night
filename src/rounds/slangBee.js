@@ -5,7 +5,8 @@ export default {
   intro: 'The host reads a slang term, an example sentence, and its country of origin. Guess the meaning and use it in a sentence.',
   rules: [
     'Buzz in to answer — like a spelling bee, but for slang',
-    'Give (1) the meaning and (2) use it in a new sentence',
+    'Give the meaning of the term to score points',
+    'Bonus point if your answer is especially funny',
     'Each team may ask one clarifying question before answering',
     'Allowed: "positive or negative?", "person, action, or situation?", "casual or formal?"',
     'Not allowed: "What language is it?", "What\'s the translation?", "Use it in a sentence for us"',

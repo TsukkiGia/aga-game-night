@@ -8,8 +8,8 @@ export default {
   rules: [
     'Round robin — each team picks a translation style for their turn',
     'Choose from: Family-friendly English, Slang register, or Exaggerated academic jargon',
-    'Crowd votes on the best translation',
-    'Host awards points based on crowd reaction',
+    'Majority judge vote if a team gets points',
+    '3 points awarded to the team if majority judges say so',
   ],
   scoring: [
     { label: 'Majority vote', points: 3 },

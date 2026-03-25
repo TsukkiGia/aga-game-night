@@ -9,6 +9,7 @@ export default function BuzzerPage() {
   const [error, setError] = useState('')
   const [team, setTeam] = useState(null)       // { name, color, code }
   const [status, setStatus] = useState('join')
+  const [connected, setConnected] = useState(true)
   const inputRef = useRef(null)
   const teamRef = useRef(null)
   teamRef.current = team  // always current — no stale closure risk
@@ -17,6 +18,8 @@ export default function BuzzerPage() {
   useEffect(() => {
     socket.connect()
 
+    socket.on('connect',    () => setConnected(true))
+    socket.on('disconnect', () => setConnected(false))
     socket.on('buzz:armed', () => setStatus('armed'))
     socket.on('buzz:reset', () => setStatus(s => s === 'join' ? s : 'waiting'))
     socket.on('buzz:winner', (data) => {
@@ -29,6 +32,8 @@ export default function BuzzerPage() {
     })
 
     return () => {
+      socket.off('connect')
+      socket.off('disconnect')
       socket.off('buzz:armed')
       socket.off('buzz:reset')
       socket.off('buzz:winner')
@@ -113,6 +118,11 @@ export default function BuzzerPage() {
 
   return (
     <div className={`buzzer-page buzzer-active color-${team.color}`}>
+      {!connected && (
+        <div className="buzzer-reconnect-banner">
+          Reconnecting…
+        </div>
+      )}
       <div className="buzzer-team-header">
         <div className={`buzzer-team-dot color-${team.color}`} />
         <div className="buzzer-team-info">

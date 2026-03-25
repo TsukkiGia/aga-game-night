@@ -7,7 +7,7 @@ export default {
     'Teams take turns — one person acts, the rest of the team guesses',
     'No speaking, mouthing words, or spelling things out',
     'Host decides timing per turn',
-    'Crowd judges effort and creativity',
+    '3 points for a correct answer',
   ],
   scoring: [
     { label: 'Correct answer', points: 3 },
