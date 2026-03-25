@@ -6,6 +6,7 @@ import RoundIntroView from './RoundIntroView'
 import { socket } from '../socket'
 import { ENDPOINT } from '../config'
 import rounds from '../rounds'
+import { playBuzzIn, playCorrect, playWrong } from '../sounds'
 
 const SCORES_KEY = 'scorekeeping_scores'
 const DONE_KEY   = 'scorekeeping_done'
@@ -68,7 +69,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
 
     socket.on('buzz:armed',   () => setArmed(true))
     socket.on('buzz:reset',   () => { setArmed(false); setBuzzWinner(null) })
-    socket.on('buzz:winner',  (data) => { setArmed(false); setBuzzWinner(data) })
+    socket.on('buzz:winner',  (data) => { setArmed(false); setBuzzWinner(data); playBuzzIn() })
     socket.on('host:members', (data) => setMembers(data))
 
     return () => {
@@ -89,6 +90,8 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
     )
     setFlashing(`${index}-${delta > 0 ? 'up' : 'down'}`)
     setTimeout(() => setFlashing(null), 400)
+    if (delta > 0) playCorrect()
+    else playWrong()
   }
 
   function resetScores() {
