@@ -8,6 +8,7 @@ function load(name) {
 export function playBuzzIn()  { play('buzz_in') }
 export function playCorrect() { play('correct') }
 export function playWrong()   { play('wrong')   }
+export function playArm()     { play('arm')     }
 
 function play(name) {
   const audio = load(name)

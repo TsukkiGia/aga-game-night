@@ -1,7 +1,7 @@
 export default function TeamCard({ team, index, maxScore, isLeading, flashing, onAdjust }) {
   const flashUp = flashing === `${index}-up`
   const flashDown = flashing === `${index}-down`
-  const barPct = maxScore > 0 ? (team.score / maxScore) * 100 : 0
+  const barPct = maxScore > 0 ? Math.max(0, (team.score / maxScore) * 100) : 0
 
   return (
     <div className={`team-card color-${team.color} ${isLeading ? 'leading' : ''} ${flashUp ? 'flash-up' : ''} ${flashDown ? 'flash-down' : ''}`}>
@@ -30,7 +30,6 @@ export default function TeamCard({ team, index, maxScore, isLeading, flashing, o
         <button
           className="score-btn minus"
           onClick={() => onAdjust(-1)}
-          disabled={team.score === 0}
           aria-label="Subtract 1"
         >
           −
@@ -38,7 +37,6 @@ export default function TeamCard({ team, index, maxScore, isLeading, flashing, o
         <button
           className="score-btn minus-5"
           onClick={() => onAdjust(-5)}
-          disabled={team.score === 0}
           aria-label="Subtract 5"
         >
           −5

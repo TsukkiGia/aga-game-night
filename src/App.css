@@ -1113,6 +1113,7 @@
 /* Mini scoreboard strip */
 .qv-scores {
   display: flex;
+  justify-content: center;
   gap: 10px;
   padding: 14px 24px;
   background: var(--bg-card);

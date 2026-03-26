@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { socket } from '../socket'
-import { playBuzzIn } from '../sounds'
+import { playBuzzIn, playArm } from '../sounds'
 
 export function useGameSocket(initialTeams) {
   const [armed, setArmed] = useState(false)
@@ -31,6 +31,7 @@ export function useGameSocket(initialTeams) {
   function handleArm() {
     setArmed(true)
     socket.emit('host:arm')
+    playArm()
   }
 
   function handleDismiss() {
