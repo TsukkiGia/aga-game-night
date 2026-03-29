@@ -13,7 +13,7 @@ export default {
     'If you miss, one steal is allowed',
   ],
   scoring: [
-    { label: 'Correct meaning', points: 2 },
+    { label: 'Correct meaning', points: 3 },
     { label: 'Funny bonus',     points: 1 },
   ],
   questions: [

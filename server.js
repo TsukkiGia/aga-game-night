@@ -43,6 +43,7 @@ io.on('connection', (socket) => {
     socket.join('host')
     if (isNewGame) {
       state = { teams, armed: false, buzzedBy: null, members: {} }
+      io.except(socket.id).emit('game:reset')
     } else {
       state.teams = teams  // names/colors may have changed, preserve buzzer state
     }

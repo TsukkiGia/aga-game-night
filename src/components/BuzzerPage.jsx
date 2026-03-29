@@ -20,6 +20,7 @@ export default function BuzzerPage() {
 
     socket.on('connect',    () => setConnected(true))
     socket.on('disconnect', () => setConnected(false))
+    socket.on('game:reset', () => { setTeam(null); setCode(''); setStatus('join') })
     socket.on('buzz:armed', () => setStatus('armed'))
     socket.on('buzz:reset', () => setStatus(s => s === 'join' ? s : 'waiting'))
     socket.on('buzz:winner', (data) => {
@@ -34,6 +35,7 @@ export default function BuzzerPage() {
     return () => {
       socket.off('connect')
       socket.off('disconnect')
+      socket.off('game:reset')
       socket.off('buzz:armed')
       socket.off('buzz:reset')
       socket.off('buzz:winner')

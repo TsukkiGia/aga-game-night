@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 export default function QuestionView({
   rounds, roundIndex, questionIndex, doneQuestions,
@@ -9,11 +9,8 @@ export default function QuestionView({
   const round = rounds[roundIndex]
   const question = round.questions[questionIndex]
   const total = round.questions.length
-  const [revealed, setRevealed] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [codesOpen, setCodesOpen] = useState(true)
-
-  useEffect(() => { setRevealed(false) }, [questionIndex])
+  const [codesOpen, setCodesOpen] = useState(false)
 
   return (
     <div className="question-view">
@@ -46,30 +43,39 @@ export default function QuestionView({
               <span className="qv-strip-name">{team.name}</span>
               <span className="qv-strip-score">{team.score}</span>
             </div>
-            <div className="qv-strip-btns">
-              {round.scoring.map(({ label, points }) => (
-                <button
-                  key={label}
-                  className={`qv-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
-                  onClick={() => onAdjust(i, points)}
-                  title={label}
-                >
-                  {points > 0 ? `+${points}` : points}
-                </button>
-              ))}
-            </div>
           </div>
         ))}
       </div>
 
-      {/* ── Buzz banner ──────────────────────────────── */}
+      {/* ── Buzz popup modal ─────────────────────────── */}
       {buzzWinner && (
-        <div className={`qv-buzz-banner color-${buzzWinner.team.color}`}>
-          <span>🔔 {buzzWinner.memberName
-            ? <><strong>{buzzWinner.memberName}</strong> just buzzed in for {buzzWinner.team.name}!</>
-            : <><strong>{buzzWinner.team.name}</strong> buzzed in!</>}
-          </span>
-          <button className="qv-buzz-reset" onClick={onDismiss}>Reset Buzzers</button>
+        <div className="buzz-overlay" onClick={onDismiss}>
+          <div
+            className={`buzz-popup color-${buzzWinner.team.color}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="buzz-popup-label">BUZZED IN!</div>
+            <div className="buzz-popup-name">
+              {buzzWinner.memberName
+                ? `${buzzWinner.memberName} just buzzed in for ${buzzWinner.team.name}!`
+                : `${buzzWinner.team.name} buzzed in!`}
+            </div>
+            <div className="buzz-popup-icon">🔔</div>
+            <div className="buzz-popup-scoring">
+              {round.scoring.map(({ label, points }) => (
+                <button
+                  key={label}
+                  className={`buzz-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
+                  onClick={() => onAdjust(buzzWinner.teamIndex, points)}
+                  title={label}
+                >
+                  <span className="buzz-pts-label">{label}</span>
+                  <span className="buzz-pts-value">{points > 0 ? `+${points}` : points}</span>
+                </button>
+              ))}
+            </div>
+            <button className="buzz-dismiss-btn" onClick={onDismiss}>Reset Buzzers</button>
+          </div>
         </div>
       )}
 
@@ -112,10 +118,10 @@ export default function QuestionView({
       {/* ── Question body ────────────────────────────── */}
       <div className="qv-body">
         {round.type === 'video' && (
-          <VideoBody key={question.id} question={question} revealed={revealed} onReveal={() => setRevealed(true)} />
+          <VideoBody key={question.id} question={question} />
         )}
         {round.type === 'slang' && (
-          <SlangBody key={question.id} question={question} revealed={revealed} onReveal={() => setRevealed(true)} />
+          <SlangBody key={question.id} question={question} />
         )}
         {round.type === 'charades' && (
           <CharadesBody key={question.id} question={question} />
@@ -167,12 +173,13 @@ export default function QuestionView({
   )
 }
 
-function VideoBody({ question, revealed, onReveal }) {
+function VideoBody({ question }) {
+  const [revealed, setRevealed] = useState(false)
   return (
     <div className="qv-video-wrap">
       <video className="qv-video" src={`/videos/${question.video}`} controls />
       {!revealed ? (
-        <button className="qv-reveal-btn" onClick={onReveal}>Reveal Answer ▼</button>
+        <button className="qv-reveal-btn" onClick={() => setRevealed(true)}>Reveal Answer ▼</button>
       ) : (
         <div className="qv-answer-card">
           <div className="qv-answer-label">Answer</div>
@@ -189,14 +196,15 @@ function VideoBody({ question, revealed, onReveal }) {
   )
 }
 
-function SlangBody({ question, revealed, onReveal }) {
+function SlangBody({ question }) {
+  const [revealed, setRevealed] = useState(false)
   return (
     <div className="qv-slang-wrap">
       <div className="qv-slang-meta">{question.language} · {question.country}</div>
       <div className="qv-slang-term">{question.term}</div>
       <div className="qv-slang-sentence">"{question.sentence}"</div>
       {!revealed ? (
-        <button className="qv-reveal-btn" onClick={onReveal}>Reveal Meaning ▼</button>
+        <button className="qv-reveal-btn" onClick={() => setRevealed(true)}>Reveal Meaning ▼</button>
       ) : (
         <div className="qv-answer-card">
           <div className="qv-answer-label">Meaning</div>

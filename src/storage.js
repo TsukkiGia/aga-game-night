@@ -1,3 +1,4 @@
+export const TEAMS_KEY  = 'scorekeeping_teams'
 export const SCORES_KEY = 'scorekeeping_scores'
 export const DONE_KEY   = 'scorekeeping_done'
 
@@ -19,6 +20,7 @@ export function loadDone() {
 }
 
 export function clearAll() {
+  localStorage.removeItem(TEAMS_KEY)
   localStorage.removeItem(SCORES_KEY)
   localStorage.removeItem(DONE_KEY)
 }

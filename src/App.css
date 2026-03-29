@@ -616,10 +616,23 @@
   background: var(--bg);
 }
 
+.codes-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.codes-qr {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+
 .codes-hint {
   font-size: 12px;
   color: var(--text-muted);
-  margin-bottom: 12px;
   line-height: 1.6;
 }
 .codes-hint strong {
@@ -780,6 +793,33 @@
   75% {transform:rotate(-5deg)}
   100%{transform:rotate(0) scale(1)}
 }
+
+.buzz-popup-scoring {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin: 12px 0 4px;
+}
+
+.buzz-pts-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  transition: transform 0.1s, opacity 0.1s;
+}
+.buzz-pts-btn:hover { transform: scale(1.02); opacity: 0.9; }
+.buzz-pts-btn.pos { background: var(--teal-bg); color: var(--teal); }
+.buzz-pts-btn.neg { background: var(--terra-bg); color: var(--terra); }
+.buzz-pts-label { font-weight: 600; font-size: 13px; }
+.buzz-pts-value { font-weight: 900; font-size: 18px; }
 
 .buzz-dismiss-btn {
   margin-top: 10px;
@@ -1125,11 +1165,11 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 14px;
+  padding: 16px 22px;
   border-radius: 14px;
   background: var(--bg);
   border: 1.5px solid var(--border);
-  min-width: 130px;
+  min-width: 180px;
   flex-shrink: 0;
   transition: all 0.2s;
 }
@@ -1147,7 +1187,7 @@
 }
 
 .qv-strip-name {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
   color: var(--text);
   white-space: nowrap;
@@ -1156,7 +1196,7 @@
 }
 
 .qv-strip-score {
-  font-size: 22px;
+  font-size: 32px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;

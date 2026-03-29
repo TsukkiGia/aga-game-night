@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import QRCode from 'qrcode'
 import TeamCard from './TeamCard'
 import Leaderboard from './Leaderboard'
 import QuestionView from './QuestionView'
@@ -144,6 +145,12 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
 
 function CodesPanel({ teams, members, buzzerUrl }) {
   const [open, setOpen] = useState(true)
+  const [qrSrc, setQrSrc] = useState('')
+
+  useEffect(() => {
+    QRCode.toDataURL(buzzerUrl, { width: 160, margin: 1 }).then(setQrSrc)
+  }, [buzzerUrl])
+
   return (
     <div className="codes-panel">
       <button className="codes-toggle" onClick={() => setOpen(o => !o)}>
@@ -152,9 +159,12 @@ function CodesPanel({ teams, members, buzzerUrl }) {
       </button>
       {open && (
         <div className="codes-body">
-          <p className="codes-hint">
-            Team members go to <strong>{buzzerUrl}</strong> and enter their code to buzz in
-          </p>
+          <div className="codes-top">
+            {qrSrc && <img className="codes-qr" src={qrSrc} alt="Scan to join" />}
+            <p className="codes-hint">
+              Scan or go to <strong>{buzzerUrl}</strong> and enter your team code to buzz in
+            </p>
+          </div>
           <div className="codes-grid">
             {teams.map((t, i) => (
               <div key={t.code} className={`code-chip color-${t.color}`}>

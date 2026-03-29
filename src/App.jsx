@@ -2,12 +2,22 @@ import { useState } from 'react'
 import Setup from './components/Setup'
 import Scoreboard from './components/Scoreboard'
 import BuzzerPage from './components/BuzzerPage'
+import { TEAMS_KEY } from './storage'
 import './App.css'
 
 const isBuzzerMode = window.location.pathname.startsWith('/buzz')
 
+function loadTeams() {
+  try { return JSON.parse(localStorage.getItem(TEAMS_KEY)) } catch { return null }
+}
+
 export default function App() {
-  const [teams, setTeams] = useState(null)
+  const [teams, setTeams] = useState(() => loadTeams())
+
+  function handleStart(newTeams) {
+    localStorage.setItem(TEAMS_KEY, JSON.stringify(newTeams))
+    setTeams(newTeams)
+  }
 
   if (isBuzzerMode) {
     return <BuzzerPage />
@@ -27,7 +37,7 @@ export default function App() {
 
       <main className="app-main">
         {!teams ? (
-          <Setup onStart={setTeams} />
+          <Setup onStart={handleStart} />
         ) : (
           <Scoreboard teams={teams} onReset={() => setTeams(null)} />
         )}
