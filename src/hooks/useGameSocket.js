@@ -11,6 +11,7 @@ export function useGameSocket(initialTeams) {
     function setup() { socket.emit('host:setup', initialTeams) }
 
     socket.on('connect', setup)
+    if (socket.connected) setup()  // already connected (e.g. new game without page refresh)
     socket.connect()
 
     socket.on('buzz:armed',   () => setArmed(true))
