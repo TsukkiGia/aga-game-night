@@ -57,7 +57,7 @@ export default function QuestionView({
       </div>
 
       {/* ── Buzz popup modal ─────────────────────────── */}
-      {buzzWinner && (
+      {buzzWinner?.team && (
         <div className="buzz-overlay" onClick={onDismiss}>
           <div
             className={`buzz-popup color-${buzzWinner.team.color}`}

@@ -6,6 +6,7 @@ export default function Leaderboard({ teams }) {
     .map((t, i) => ({ ...t, originalIndex: i }))
     .sort((a, b) => b.score - a.score)
 
+  if (sorted.length === 0) return null
   const hasAnyScore = sorted[0].score > 0
 
   return (
@@ -20,10 +21,8 @@ export default function Leaderboard({ teams }) {
 
       <ol className="leaderboard-list">
         {sorted.map((team, rank) => {
-          const isTied = rank > 0 && sorted[rank - 1].score === team.score && team.score > 0
-          const displayRank = isTied
-            ? sorted.findIndex(t => t.score === team.score)
-            : rank
+          // display rank = index of first team with this score (handles ties correctly)
+          const displayRank = sorted.findIndex(t => t.score === team.score)
 
           return (
             <li

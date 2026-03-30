@@ -21,6 +21,20 @@
   --brown-light:  #A07040;
   --brown-bg:     #F5EFE6;
 
+  /* ── Extended palette ── */
+  --indigo:       #3D4FAB;
+  --indigo-light: #5A6EC7;
+  --indigo-bg:    #ECEFFE;
+  --rose:         #B03060;
+  --rose-light:   #D0507A;
+  --rose-bg:      #FCEDF3;
+  --slate:        #3A6B7A;
+  --slate-light:  #5A8E9E;
+  --slate-bg:     #EAF3F6;
+  --sage:         #4A7C59;
+  --sage-light:   #6A9E78;
+  --sage-bg:      #EBF4EE;
+
   /* ── Team slot colors ── */
   --c-ember:        var(--terra);
   --c-ember-light:  var(--terra-light);
@@ -34,6 +48,18 @@
   --c-earth:        var(--brown);
   --c-earth-light:  var(--brown-light);
   --c-earth-bg:     var(--brown-bg);
+  --c-indigo:       var(--indigo);
+  --c-indigo-light: var(--indigo-light);
+  --c-indigo-bg:    var(--indigo-bg);
+  --c-rose:         var(--rose);
+  --c-rose-light:   var(--rose-light);
+  --c-rose-bg:      var(--rose-bg);
+  --c-slate:        var(--slate);
+  --c-slate-light:  var(--slate-light);
+  --c-slate-bg:     var(--slate-bg);
+  --c-sage:         var(--sage);
+  --c-sage-light:   var(--sage-light);
+  --c-sage-bg:      var(--sage-bg);
 
   /* ── Neutrals ── */
   --bg:           #F3F1EC;

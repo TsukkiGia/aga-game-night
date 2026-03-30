@@ -64,7 +64,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
 
   return (
     <>
-      {buzzWinner && (
+      {buzzWinner?.team && (
         <div className="buzz-overlay" onClick={handleDismiss}>
           <div
             className={`buzz-popup color-${buzzWinner.team.color}`}

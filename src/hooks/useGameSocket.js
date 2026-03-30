@@ -24,7 +24,7 @@ export function useGameSocket(initialTeams) {
       socket.off('buzz:reset')
       socket.off('buzz:winner')
       socket.off('host:members')
-      socket.disconnect()
+      // do NOT disconnect — socket is shared; host reconnects automatically
     }
   }, [])
 

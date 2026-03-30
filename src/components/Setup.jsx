@@ -10,7 +10,7 @@ export default function Setup({ onStart }) {
   const [teamCount, setTeamCount] = useState(null)
   const [names, setNames] = useState([])
 
-  const teamColors = ['ember', 'gold', 'forest', 'earth']
+  const teamColors = ['ember', 'gold', 'forest', 'earth', 'indigo', 'rose', 'slate', 'sage']
 
   function handleCountSelect(n) {
     setTeamCount(n)
@@ -40,9 +40,9 @@ export default function Setup({ onStart }) {
         <div className="setup-step">
           <div className="setup-icon">🥁</div>
           <h2 className="setup-heading">How many teams?</h2>
-          <p className="setup-sub">Choose between 2 and 4 teams to compete</p>
+          <p className="setup-sub">Choose between 2 and 8 teams to compete</p>
           <div className="team-count-grid">
-            {[2, 3, 4].map(n => (
+            {[2, 3, 4, 5, 6, 7, 8].map(n => (
               <button
                 key={n}
                 className="count-btn"
@@ -59,7 +59,7 @@ export default function Setup({ onStart }) {
           <div className="setup-icon">✍️</div>
           <h2 className="setup-heading">Name Your Teams</h2>
           <p className="setup-sub">Give each team a name — or leave blank for defaults</p>
-          <div className="name-inputs">
+          <div className={`name-inputs${teamCount > 4 ? ' many' : ''}`}>
             {names.map((name, i) => (
               <div key={i} className={`name-input-row color-${teamColors[i]}`}>
                 <div className="team-badge">{i + 1}</div>
