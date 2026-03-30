@@ -5,6 +5,9 @@ import Leaderboard from './Leaderboard'
 import QuestionView from './QuestionView'
 import RoundIntroView from './RoundIntroView'
 import QuestionsPicker from './QuestionsPicker'
+import HalftimeScreen from './HalftimeScreen'
+import WinnerScreen from './WinnerScreen'
+import RoundTransitionScreen from './RoundTransitionScreen'
 import { ENDPOINT } from '../config'
 import rounds from '../rounds'
 import { useGameState } from '../hooks/useGameState'
@@ -13,9 +16,11 @@ import { useNavigation } from '../hooks/useNavigation'
 import { clearAll } from '../storage'
 
 export default function Scoreboard({ teams: initialTeams, onReset }) {
-  const { teams, doneQuestions, flashing, adjust, resetScores, toggleDone } = useGameState(initialTeams)
+  const { teams, doneQuestions, flashing, doublePoints, setDoublePoints, adjust, resetScores, toggleDone } = useGameState(initialTeams)
   const { armed, buzzWinner, members, handleArm, handleDismiss } = useGameSocket(initialTeams)
-  const { activeQuestion, questionsOpen, navigate, openQuestions, closeQuestions } = useNavigation()
+  const { activeQuestion, questionsOpen, transition, navigate, dismissTransition, openQuestions, closeQuestions } = useNavigation()
+  const [showHalftime, setShowHalftime] = useState(false)
+  const [showWinner, setShowWinner] = useState(false)
 
   const buzzerUrl = `${ENDPOINT || window.location.origin}/buzz`
 
@@ -25,37 +30,48 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
 
     if (qIdx === null) {
       return (
-        <RoundIntroView
-          rounds={rounds}
-          roundIndex={rIdx}
-          doneQuestions={doneQuestions}
-          onNavigate={navigate}
-          onBack={goBack}
-        />
+        <>
+          <RoundIntroView
+            rounds={rounds}
+            roundIndex={rIdx}
+            doneQuestions={doneQuestions}
+            onNavigate={(ri, qi) => navigate(ri, qi, rounds)}
+            onBack={goBack}
+          />
+          {transition && <RoundTransitionScreen round={transition} onDone={dismissTransition} />}
+        </>
       )
     }
 
     return (
-      <QuestionView
-        rounds={rounds}
-        roundIndex={rIdx}
-        questionIndex={qIdx}
-        doneQuestions={doneQuestions}
-        teams={teams}
-        members={members}
-        buzzerUrl={buzzerUrl}
-        buzzWinner={buzzWinner}
-        armed={armed}
-        isDone={doneQuestions.has(`${rIdx}-${qIdx}`)}
-        onAdjust={adjust}
-        onArm={handleArm}
-        onDismiss={handleDismiss}
-        onToggleDone={() => toggleDone(rIdx, qIdx)}
-        onNavigate={navigate}
-        onBack={goBack}
-        onNext={() => navigate(rIdx, qIdx + 1)}
-        onPrev={() => navigate(rIdx, qIdx - 1)}
-      />
+      <>
+        <QuestionView
+          rounds={rounds}
+          roundIndex={rIdx}
+          questionIndex={qIdx}
+          doneQuestions={doneQuestions}
+          teams={teams}
+          members={members}
+          buzzerUrl={buzzerUrl}
+          buzzWinner={buzzWinner}
+          armed={armed}
+          isDone={doneQuestions.has(`${rIdx}-${qIdx}`)}
+          onAdjust={adjust}
+          onArm={handleArm}
+          onDismiss={handleDismiss}
+          onToggleDone={() => toggleDone(rIdx, qIdx)}
+          onNavigate={(ri, qi) => navigate(ri, qi, rounds)}
+          onBack={goBack}
+          onNext={() => navigate(rIdx, qIdx + 1)}
+          onPrev={() => navigate(rIdx, qIdx - 1)}
+          onHalftime={() => setShowHalftime(true)}
+          onWinner={() => setShowWinner(true)}
+          doublePoints={doublePoints}
+          onToggleDouble={() => setDoublePoints(d => !d)}
+        />
+        {showHalftime && <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />}
+        {showWinner   && <WinnerScreen   teams={teams} onDismiss={() => setShowWinner(false)} onClose={() => { setShowWinner(false); clearAll(); onReset() }} />}
+      </>
     )
   }
 
@@ -120,6 +136,12 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
             <button className="questions-btn" onClick={openQuestions}>
               📋 Questions
             </button>
+            <button className="halftime-btn" onClick={() => setShowHalftime(true)}>
+              ⏸ Halftime
+            </button>
+            <button className="winner-btn" onClick={() => setShowWinner(true)}>
+              🏆 Winner
+            </button>
             <button className="reset-scores-btn" onClick={resetScores}>
               ↺ Reset Scores
             </button>
@@ -135,9 +157,19 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
       {questionsOpen && (
         <QuestionsPicker
           doneQuestions={doneQuestions}
-          onSelect={navigate}
+          onSelect={(ri, qi) => navigate(ri, qi, rounds)}
           onClose={closeQuestions}
         />
+      )}
+
+      {transition && <RoundTransitionScreen round={transition} onDone={dismissTransition} />}
+
+      {showHalftime && (
+        <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />
+      )}
+
+      {showWinner && (
+        <WinnerScreen teams={teams} onClose={() => { setShowWinner(false); clearAll(); onReset() }} />
       )}
     </>
   )

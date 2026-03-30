@@ -10,6 +10,7 @@ export default function QuestionView({
   teams, members, buzzerUrl, buzzWinner, armed,
   isDone, onAdjust, onArm, onDismiss,
   onToggleDone, onNavigate, onBack, onNext, onPrev,
+  onHalftime, onWinner, doublePoints, onToggleDouble,
 }) {
   const round = rounds[roundIndex]
   const question = round.questions[questionIndex]
@@ -34,6 +35,8 @@ export default function QuestionView({
           <button className={`qv-done-btn${isDone ? ' done' : ''}`} onClick={onToggleDone}>
             {isDone ? '✓ Done' : 'Mark Done'}
           </button>
+          <button className="halftime-btn" onClick={onHalftime}>⏸ Halftime</button>
+          <button className="winner-btn" onClick={onWinner}>🏆 Winner</button>
         </div>
       </div>
 
@@ -159,11 +162,18 @@ export default function QuestionView({
       {/* ── Arm row ──────────────────────────────────── */}
       <div className="qv-arm-row arm-row">
         <button
+          className={`double-pts-btn${doublePoints ? ' active' : ''}`}
+          onClick={onToggleDouble}
+          title="Double points for this question"
+        >
+          {doublePoints ? '2× ON' : '2×'}
+        </button>
+        <button
           className={`arm-btn ${armed ? 'armed' : ''}`}
           onClick={onArm}
           disabled={armed || buzzWinner !== null}
         >
-          {armed ? '🔴 Listening for buzz…' : '🎯 Arm Buzzers'}
+          {armed ? `🔴 Listening…${doublePoints ? ' (2×)' : ''}` : '🎯 Arm Buzzers'}
         </button>
         {armed && (
           <button className="arm-cancel-btn" onClick={onDismiss}>Cancel</button>

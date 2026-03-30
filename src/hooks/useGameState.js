@@ -6,6 +6,7 @@ export function useGameState(initialTeams) {
   const [teams, setTeams] = useState(() => loadScores(initialTeams))
   const [doneQuestions, setDoneQuestions] = useState(() => loadDone())
   const [flashing, setFlashing] = useState(null)
+  const [doublePoints, setDoublePoints] = useState(false)
 
   useEffect(() => {
     const s = {}
@@ -18,10 +19,11 @@ export function useGameState(initialTeams) {
   }, [doneQuestions])
 
   function adjust(index, delta) {
-    setTeams(prev => prev.map((t, i) => i === index ? { ...t, score: t.score + delta } : t))
-    setFlashing(`${index}-${delta > 0 ? 'up' : 'down'}`)
+    const effective = doublePoints ? delta * 2 : delta
+    setTeams(prev => prev.map((t, i) => i === index ? { ...t, score: t.score + effective } : t))
+    setFlashing(`${index}-${effective > 0 ? 'up' : 'down'}`)
     setTimeout(() => setFlashing(null), 400)
-    if (delta > 0) playCorrect()
+    if (effective > 0) playCorrect()
     else playWrong()
   }
 
@@ -40,5 +42,5 @@ export function useGameState(initialTeams) {
     })
   }
 
-  return { teams, doneQuestions, flashing, adjust, resetScores, toggleDone }
+  return { teams, doneQuestions, flashing, doublePoints, setDoublePoints, adjust, resetScores, toggleDone }
 }
