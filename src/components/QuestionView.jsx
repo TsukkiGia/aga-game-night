@@ -1,4 +1,9 @@
 import { useState } from 'react'
+import VideoBody from './VideoBody'
+import SlangBody from './SlangBody'
+import CharadesBody from './CharadesBody'
+import ThesisBody from './ThesisBody'
+import QRImg from './QRImg'
 
 export default function QuestionView({
   rounds, roundIndex, questionIndex, doneQuestions,
@@ -43,6 +48,10 @@ export default function QuestionView({
               <span className="qv-strip-name">{team.name}</span>
               <span className="qv-strip-score">{team.score}</span>
             </div>
+            <div className="qv-strip-btns">
+              <button className="qv-pts-btn neg" onClick={() => onAdjust(i, -1)}>−1</button>
+              <button className="qv-pts-btn pos" onClick={() => onAdjust(i, +1)}>+1</button>
+            </div>
           </div>
         ))}
       </div>
@@ -60,7 +69,7 @@ export default function QuestionView({
                 ? `${buzzWinner.memberName} just buzzed in for ${buzzWinner.team.name}!`
                 : `${buzzWinner.team.name} buzzed in!`}
             </div>
-            <div className="buzz-popup-icon">🔔</div>
+            <div className="buzz-popup-score">Current Score: {teams[buzzWinner.teamIndex]?.score ?? 0} pts</div>
             <div className="buzz-popup-scoring">
               {round.scoring.map(({ label, points }) => (
                 <button
@@ -82,157 +91,83 @@ export default function QuestionView({
       {/* ── Main area: sidebar + body ───────────────── */}
       <div className="qv-main">
 
-      {/* Sidebar */}
-      <div className={`qv-sidebar${sidebarOpen ? '' : ' collapsed'}`}>
-        <button className="qv-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)}>
-          {sidebarOpen ? '‹' : '›'}
-        </button>
-        {sidebarOpen && rounds.map((r, ri) => {
-          const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis' }
-          return (
-            <div key={ri} className="qv-sidebar-group">
-              <button
-                className="qv-sidebar-round-label clickable"
-                onClick={() => onNavigate(ri, null)}
-              >
-                {r.label}
-              </button>
-              {r.questions.map((q, qi) => {
-                const done = doneQuestions?.has(`${ri}-${qi}`)
-                const active = ri === roundIndex && qi === questionIndex
-                return (
-                  <button
-                    key={qi}
-                    className={`qv-sidebar-item${active ? ' active' : ''}${done ? ' done' : ''}`}
-                    onClick={() => onNavigate(ri, qi)}
-                  >
-                    {done ? '✓ ' : ''}{typeLabel[r.type]} {qi + 1}
-                  </button>
-                )
-              })}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* ── Question body ────────────────────────────── */}
-      <div className="qv-body">
-        {round.type === 'video' && (
-          <VideoBody key={question.id} question={question} />
-        )}
-        {round.type === 'slang' && (
-          <SlangBody key={question.id} question={question} />
-        )}
-        {round.type === 'charades' && (
-          <CharadesBody key={question.id} question={question} />
-        )}
-        {round.type === 'thesis' && (
-          <ThesisBody key={question.id} question={question} />
-        )}
-      </div>
-
-      {/* ── Right sidebar: team codes ─────────────────── */}
-      <div className={`qv-codes-sidebar${codesOpen ? '' : ' collapsed'}`}>
-        <button className="qv-sidebar-toggle" onClick={() => setCodesOpen(o => !o)}>
-          {codesOpen ? '›' : '‹'}
-        </button>
-        {codesOpen && (
-          <>
-            <div className="qv-codes-url">{buzzerUrl}</div>
-            {teams.map((t, i) => (
-              <div key={t.code} className={`qv-codes-chip color-${t.color}`}>
-                <span className="qv-codes-chip-name">{t.name}</span>
-                <span className="qv-codes-chip-code">{t.code}</span>
-                {members?.[i]?.length > 0 && (
-                  <span className="qv-codes-chip-members">{members[i].join(', ')}</span>
-                )}
-              </div>
-            ))}
-          </>
-        )}
-      </div>
-
-      </div> {/* end qv-main */}
-
-      {/* ── Arm row (hidden for thesis) ──────────────── */}
-      {round.type !== 'thesis' && round.type !== 'charades' && (
-        <div className="qv-arm-row arm-row">
-          <button
-            className={`arm-btn ${armed ? 'armed' : ''}`}
-            onClick={onArm}
-            disabled={armed || buzzWinner !== null}
-          >
-            {armed ? '🔴 Listening for buzz…' : '🎯 Arm Buzzers'}
+        {/* Left sidebar */}
+        <div className={`qv-sidebar${sidebarOpen ? '' : ' collapsed'}`}>
+          <button className="qv-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)}>
+            {sidebarOpen ? '‹' : '›'}
           </button>
-          {armed && (
-            <button className="arm-cancel-btn" onClick={onDismiss}>Cancel</button>
-          )}
+          {sidebarOpen && rounds.map((r, ri) => {
+            const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis' }
+            return (
+              <div key={ri} className="qv-sidebar-group">
+                <button
+                  className="qv-sidebar-round-label clickable"
+                  onClick={() => onNavigate(ri, null)}
+                >
+                  {r.label}
+                </button>
+                {r.questions.map((_q, qi) => {
+                  const done = doneQuestions?.has(`${ri}-${qi}`)
+                  const active = ri === roundIndex && qi === questionIndex
+                  return (
+                    <button
+                      key={qi}
+                      className={`qv-sidebar-item${active ? ' active' : ''}${done ? ' done' : ''}`}
+                      onClick={() => onNavigate(ri, qi)}
+                    >
+                      {done ? '✓ ' : ''}{typeLabel[r.type]} {qi + 1}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })}
         </div>
-      )}
-    </div>
-  )
-}
 
-function VideoBody({ question }) {
-  const [revealed, setRevealed] = useState(false)
-  return (
-    <div className="qv-video-wrap">
-      <video className="qv-video" src={`/videos/${question.video}`} controls />
-      {!revealed ? (
-        <button className="qv-reveal-btn" onClick={() => setRevealed(true)}>Reveal Answer ▼</button>
-      ) : (
-        <div className="qv-answer-card">
-          <div className="qv-answer-label">Answer</div>
-          <div className="qv-answer-text">{question.answer || '(add answer to rounds.js)'}</div>
-          {question.explanation && (
+        {/* ── Question body ────────────────────────────── */}
+        <div className="qv-body">
+          {round.type === 'video'    && <VideoBody    key={question.id} question={question} />}
+          {round.type === 'slang'    && <SlangBody    key={question.id} question={question} />}
+          {round.type === 'charades' && <CharadesBody key={question.id} question={question} />}
+          {round.type === 'thesis'   && <ThesisBody   key={question.id} question={question} />}
+        </div>
+
+        {/* Right sidebar: team codes */}
+        <div className={`qv-codes-sidebar${codesOpen ? '' : ' collapsed'}`}>
+          <button className="qv-sidebar-toggle" onClick={() => setCodesOpen(o => !o)}>
+            {codesOpen ? '›' : '‹'}
+          </button>
+          {codesOpen && (
             <>
-              <div className="qv-answer-label" style={{ marginTop: 12 }}>Explanation</div>
-              <div className="qv-answer-explanation">{question.explanation}</div>
+              <QRImg url={buzzerUrl} />
+              <div className="qv-codes-url">{buzzerUrl}</div>
+              {teams.map((t, i) => (
+                <div key={t.code} className={`qv-codes-chip color-${t.color}`}>
+                  <span className="qv-codes-chip-name">{t.name}</span>
+                  <span className="qv-codes-chip-code">{t.code}</span>
+                  {members?.[i]?.length > 0 && (
+                    <span className="qv-codes-chip-members">{members[i].join(', ')}</span>
+                  )}
+                </div>
+              ))}
             </>
           )}
         </div>
-      )}
-    </div>
-  )
-}
 
-function SlangBody({ question }) {
-  const [revealed, setRevealed] = useState(false)
-  return (
-    <div className="qv-slang-wrap">
-      <div className="qv-slang-meta">{question.language} · {question.country}</div>
-      <div className="qv-slang-term">{question.term}</div>
-      <div className="qv-slang-sentence">"{question.sentence}"</div>
-      {!revealed ? (
-        <button className="qv-reveal-btn" onClick={() => setRevealed(true)}>Reveal Meaning ▼</button>
-      ) : (
-        <div className="qv-answer-card">
-          <div className="qv-answer-label">Meaning</div>
-          <div className="qv-answer-text">{question.meaning}</div>
-        </div>
-      )}
-    </div>
-  )
-}
+      </div> {/* end qv-main */}
 
-function CharadesBody({ question }) {
-  return (
-    <div className="qv-charades-wrap">
-      <div className="qv-charades-label">Act this out</div>
-      <div className="qv-charades-phrase">{question.phrase}</div>
-    </div>
-  )
-}
-
-function ThesisBody({ question }) {
-  return (
-    <div className="qv-thesis-wrap">
-      <div className="qv-thesis-title">{question.title}</div>
-      <div className="qv-thesis-modes">
-        <div className="qv-thesis-modes-label">Translate into:</div>
-        {question.options.map(opt => (
-          <div key={opt} className="qv-thesis-mode">◈ {opt}</div>
-        ))}
+      {/* ── Arm row ──────────────────────────────────── */}
+      <div className="qv-arm-row arm-row">
+        <button
+          className={`arm-btn ${armed ? 'armed' : ''}`}
+          onClick={onArm}
+          disabled={armed || buzzWinner !== null}
+        >
+          {armed ? '🔴 Listening for buzz…' : '🎯 Arm Buzzers'}
+        </button>
+        {armed && (
+          <button className="arm-cancel-btn" onClick={onDismiss}>Cancel</button>
+        )}
       </div>
     </div>
   )

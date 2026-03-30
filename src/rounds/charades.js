@@ -7,10 +7,14 @@ export default {
     'Teams take turns — one person acts, the rest of the team guesses',
     'No speaking, mouthing words, or spelling things out',
     'Host decides timing per turn',
-    '3 points for a correct answer',
+    '3 points for a correct answer by the acting team',
+    'If time runs out, other teams can steal by buzzing in',
+    '+2 for a correct steal, -1 for a wrong steal',
   ],
   scoring: [
     { label: 'Correct answer', points: 3 },
+    { label: 'Correct steal',  points: 2 },
+    { label: 'Wrong steal',    points: -1 },
   ],
   questions: [
     { id: 'c1',  phrase: 'Jollof Rice Debate' },

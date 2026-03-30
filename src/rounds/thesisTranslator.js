@@ -2,11 +2,11 @@ const OPTIONS = ['Family-friendly English', 'Slang register', 'Exaggerated acade
 
 export default {
   label: 'Round 4',
-  name: 'Thesis Translator',
+  name: 'Title Translator',
   type: 'thesis',
   intro: 'Teams translate a real thesis title into a chosen register. Crowd votes on the best translation.',
   rules: [
-    'Round robin — each team picks a translation style for their turn',
+    'Round robin — each team picks two translation styles for their turn',
     'Choose from: Family-friendly English, Slang register, or Exaggerated academic jargon',
     'Majority judge vote if a team gets points',
     '3 points awarded to the team if majority judges say so',

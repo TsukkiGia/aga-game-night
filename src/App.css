@@ -784,6 +784,14 @@
   animation: ring 0.6s ease;
   margin: 4px 0;
 }
+
+.buzz-popup-score {
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  opacity: 0.75;
+  margin: 2px 0 4px;
+}
 @keyframes ring {
   0%  {transform:rotate(0) scale(1)}
   15% {transform:rotate(-20deg) scale(1.2)}
@@ -1647,6 +1655,57 @@
   letter-spacing: -0.04em;
   line-height: 1.05;
 }
+
+/* ── Timer ── */
+.qv-timer {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.qv-timer-display {
+  font-size: 64px;
+  font-weight: 900;
+  color: var(--teal);
+  letter-spacing: -0.04em;
+  transition: color 0.3s;
+}
+.qv-timer-display.urgent { color: var(--terra); }
+.qv-timer-display.done   { color: var(--text-muted); font-size: 32px; font-weight: 700; }
+
+.qv-timer-bar-track {
+  width: 240px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.qv-timer-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 1s linear, background 0.3s;
+}
+
+.qv-timer-btns {
+  display: flex;
+  gap: 8px;
+}
+.qv-timer-btn {
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: none;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.qv-timer-btn:hover { opacity: 0.85; }
+.qv-timer-btn.start  { background: var(--teal);  color: white; }
+.qv-timer-btn.pause  { background: var(--amber); color: white; }
+.qv-timer-btn.reset  { background: var(--bg); color: var(--text-muted); border: 1.5px solid var(--border); }
 
 /* ── Question view sidebar ── */
 .qv-main {

@@ -7,14 +7,14 @@ export default {
   type: 'video',
   intro: 'Watch a comedic video in a language, register, or slang variety from African and diasporic communities. Identify what you hear.',
   rules: [
-    'Give the language, variety, or region — or the closest you can identify',
+    'Give the language or country',
     'No word-for-word translation needed — capturing the vibe counts',
     'Buzz in to answer; if you miss, one steal is allowed',
     'Host reveals the answer with a short explanation',
   ],
   scoring: [
     { label: 'Correct language', points: 3 },
-    { label: 'Correct region',   points: 1 },
+    { label: 'Correct country',   points: 1 },
     { label: 'Wrong',            points: -1 },
   ],
   questions: [
