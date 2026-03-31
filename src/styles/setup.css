@@ -1,0 +1,186 @@
+/* ══════════════════════════════════════════
+   SETUP SCREEN
+══════════════════════════════════════════ */
+.setup-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+}
+
+.setup-step {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 48px 44px;
+  max-width: 680px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.setup-icon {
+  font-size: 52px;
+  margin-bottom: 16px;
+}
+
+.setup-heading {
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.setup-sub {
+  font-size: 15px;
+  color: var(--text-muted);
+  margin-bottom: 36px;
+}
+
+/* Team count buttons */
+.team-count-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.count-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  color: var(--text);
+  transition: all 0.2s ease;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.count-btn:hover {
+  border-color: var(--terra);
+  background: var(--terra-bg);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(201,75,44,0.15);
+}
+
+.count-btn:active { transform: translateY(0); }
+
+.count-number {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--terra);
+  line-height: 1;
+}
+
+.count-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+/* Name inputs */
+.name-inputs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-bottom: 32px;
+  width: 100%;
+}
+
+.name-inputs.many {
+  grid-template-columns: 1fr 1fr;
+}
+
+.name-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.team-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 15px;
+  flex-shrink: 0;
+  color: white;
+}
+
+.name-input-row.color-ember .team-badge  { background: var(--terra); }
+.name-input-row.color-gold  .team-badge  { background: var(--amber); color: white; }
+.name-input-row.color-forest .team-badge { background: var(--teal); }
+.name-input-row.color-earth .team-badge  { background: var(--brown); }
+.name-input-row.color-indigo .team-badge { background: var(--indigo); }
+.name-input-row.color-rose   .team-badge { background: var(--rose); }
+.name-input-row.color-slate  .team-badge { background: var(--slate); }
+.name-input-row.color-sage   .team-badge { background: var(--sage); }
+
+.team-name-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+.team-name-input::placeholder { color: var(--text-muted); opacity: 0.5; font-weight: 400; }
+.team-name-input:focus { background: white; border-color: var(--terra); box-shadow: 0 0 0 3px rgba(201,75,44,0.1); }
+
+.name-input-row.color-forest .team-name-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,85,72,0.1); }
+.name-input-row.color-gold   .team-name-input:focus { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(199,141,10,0.1); }
+.name-input-row.color-earth  .team-name-input:focus { border-color: var(--brown); box-shadow: 0 0 0 3px rgba(123,79,32,0.1); }
+.name-input-row.color-indigo .team-name-input:focus { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(61,79,171,0.1); }
+.name-input-row.color-rose   .team-name-input:focus { border-color: var(--rose);   box-shadow: 0 0 0 3px rgba(176,48,96,0.1); }
+.name-input-row.color-slate  .team-name-input:focus { border-color: var(--slate);  box-shadow: 0 0 0 3px rgba(58,107,122,0.1); }
+.name-input-row.color-sage   .team-name-input:focus { border-color: var(--sage);   box-shadow: 0 0 0 3px rgba(74,124,89,0.1); }
+
+.setup-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.back-btn {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 13px 22px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.back-btn:hover { border-color: var(--text-muted); color: var(--text); }
+
+.start-btn {
+  background: var(--terra);
+  border-radius: 10px;
+  padding: 13px 32px;
+  color: white;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  transition: all 0.2s;
+  box-shadow: 0 4px 14px rgba(201,75,44,0.3);
+}
+.start-btn:hover { background: var(--terra-light); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(201,75,44,0.35); }
+.start-btn:active { transform: translateY(0); }

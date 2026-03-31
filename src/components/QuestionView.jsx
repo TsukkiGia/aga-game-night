@@ -17,6 +17,7 @@ export default function QuestionView({
   const total = round.questions.length
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [codesOpen, setCodesOpen] = useState(false)
+  const [revealedInModal, setRevealedInModal] = useState(false)
 
   return (
     <div className="question-view">
@@ -78,7 +79,12 @@ export default function QuestionView({
                 <button
                   key={label}
                   className={`buzz-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
-                  onClick={() => onAdjust(buzzWinner.teamIndex, points)}
+                  onClick={() => {
+                    onAdjust(buzzWinner.teamIndex, points)
+                    if (points > 0 && (round.type === 'slang' || round.type === 'video')) {
+                      setRevealedInModal(true)
+                    }
+                  }}
                   title={label}
                 >
                   <span className="buzz-pts-label">{label}</span>
@@ -86,7 +92,28 @@ export default function QuestionView({
                 </button>
               ))}
             </div>
-            <button className="buzz-dismiss-btn" onClick={onDismiss}>Reset Buzzers</button>
+
+            {revealedInModal && (
+              <div className="buzz-popup-answer">
+                {round.type === 'slang' && (
+                  <>
+                    <div className="buzz-popup-answer-label">Meaning</div>
+                    <div className="buzz-popup-answer-text">{question.meaning}</div>
+                  </>
+                )}
+                {round.type === 'video' && (
+                  <>
+                    <div className="buzz-popup-answer-label">Answer</div>
+                    <div className="buzz-popup-answer-text">{question.answer}</div>
+                    {question.explanation && (
+                      <div className="buzz-popup-answer-explanation">{question.explanation}</div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            <button className="buzz-dismiss-btn" onClick={() => { setRevealedInModal(false); onDismiss() }}>Reset Buzzers</button>
           </div>
         </div>
       )}

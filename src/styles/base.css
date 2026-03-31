@@ -1,0 +1,80 @@
+/* ══════════════════════════════════════════
+   KENTE STRIPE
+══════════════════════════════════════════ */
+.kente-bar {
+  height: 8px;
+  background: repeating-linear-gradient(
+    90deg,
+    #C94B2C 0px,  #C94B2C 20px,
+    #E8A01E 20px, #E8A01E 40px,
+    #1A1814 40px, #1A1814 48px,
+    #005548 48px, #005548 68px,
+    #E8A01E 68px, #E8A01E 88px,
+    #C94B2C 88px, #C94B2C 108px,
+    #1A1814 108px,#1A1814 116px
+  );
+  flex-shrink: 0;
+}
+.kente-bar.thin { height: 5px; }
+
+/* ══════════════════════════════════════════
+   APP SHELL
+══════════════════════════════════════════ */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+}
+
+.app-header {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 16px 24px;
+}
+
+.app-title {
+  font-size: clamp(18px, 3.5vw, 26px);
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  color: var(--text);
+  margin: 0;
+}
+
+.adinkra-left,
+.adinkra-right {
+  font-size: 22px;
+  color: var(--terra);
+  opacity: 0.5;
+  user-select: none;
+}
+
+.app-main {
+  flex: 1;
+  padding: 36px 20px 60px;
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.app-footer {
+  margin-top: auto;
+}
+.footer-symbols {
+  text-align: center;
+  padding: 10px;
+  font-size: 13px;
+  letter-spacing: 0.4em;
+  color: var(--text-muted);
+  opacity: 0.4;
+}
