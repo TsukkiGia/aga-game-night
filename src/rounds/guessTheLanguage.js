@@ -9,8 +9,8 @@ export default {
   rules: [
     'Give the language or country',
     'No word-for-word translation needed — capturing the vibe counts',
-    'Buzz in to answer; if you miss, one steal is allowed',
-    '+2 for a correct steal, −1 for a wrong steal',
+    'Buzz in to answer — correct language scores 3pts, correct country scores 1pt',
+    'A steal is always available after any answer — +2 correct, −1 wrong',
     'Host reveals the answer with a short explanation',
   ],
   scoring: [

@@ -4,10 +4,10 @@ export default {
   type: 'slang',
   intro: 'The host reads a slang term, an example sentence, and its country of origin. Try and guess the meaning of the word!',
   rules: [
-    'Buzz in to answer — like a spelling bee, but for slang',
-    'Give the meaning of the term to score points',
-    'Bonus point if your answer is especially funny',
-    'If you miss, one steal is allowed — +2 for correct, −1 for wrong',
+    'Host reads the term, example sentence, and country of origin',
+    'Buzz in to give the meaning — correct answer: +3 pts',
+    'Bonus +1 if your answer is especially funny (host decides)',
+    'One steal allowed after a miss — +2 correct, −1 wrong',
   ],
   scoring: [
     { label: 'Correct meaning', points: 3 },

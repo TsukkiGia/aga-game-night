@@ -4,12 +4,12 @@ export default {
   type: 'charades',
   intro: 'Act out African and diasporic cultural references — no words, no mouthing, no pointing at objects in the room.',
   rules: [
-    'Teams take turns — one person acts, the rest of the team guesses',
+    'Round robin — one person from each team acts while their team guesses',
     'No speaking, mouthing words, or spelling things out',
-    '90 seconds per turn',
-    '3 points for a correct answer by the acting team',
-    'If time runs out, other teams can steal by buzzing in',
-    '+2 for a correct steal, −1 for a wrong steal',
+    '90 seconds on the timer — start it when the phrase is revealed',
+    'Correct answer: +3 pts',
+    'If time runs out, one steal is open — buzz in to attempt',
+    'Correct steal: +2 pts — wrong steal: −1 pt',
   ],
   scoring: [
     { label: 'Correct answer', points: 3 },

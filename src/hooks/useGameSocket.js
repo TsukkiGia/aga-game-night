@@ -35,6 +35,11 @@ export function useGameSocket(initialTeams) {
     playArm()
   }
 
+  function handleManualBuzz(teamIndex, teams) {
+    setBuzzWinner({ team: teams[teamIndex], teamIndex, memberName: null })
+    setStealMode(false)
+  }
+
   function handleDismiss() {
     setBuzzWinner(null)
     setArmed(false)
@@ -51,5 +56,5 @@ export function useGameSocket(initialTeams) {
     playArm()
   }
 
-  return { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal }
+  return { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz }
 }

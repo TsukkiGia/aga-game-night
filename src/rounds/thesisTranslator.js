@@ -6,13 +6,17 @@ export default {
   type: 'thesis',
   intro: 'Teams translate a real thesis title into a chosen register. Crowd votes on the best translation.',
   rules: [
-    'Round robin — each team picks two translation styles for their turn',
-    'Choose from: Family-friendly English, Slang register, or Exaggerated academic jargon',
-    'Majority judge vote if a team gets points',
-    '3 points awarded to the team if majority judges say so',
+    'Round robin — each team translates the title in their chosen register',
+    'Choose from: Family-friendly English, Slang, or Exaggerated academic jargon',
+    '90 seconds — timer starts when the title is revealed',
+    'Crowd votes on the best translation — winning team gets +3 pts',
+    'One steal is open after — buzz in to attempt',
+    'Correct steal: +2 pts — wrong steal: −1 pt',
   ],
   scoring: [
     { label: 'Majority vote', points: 3 },
+    { label: 'Correct steal', points: 2 },
+    { label: 'Wrong steal',   points: -1 },
   ],
   questions: [
     {

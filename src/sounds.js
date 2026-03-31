@@ -34,6 +34,7 @@ export function playAirhorn()       { play('airhorn', 'mp3') }
 export function playBoo()           { play('boo', 'mp3') }
 export function playLaughter()      { play('laughter-short', 'mp3') }
 export function playOkayy()         { play('okay', 'mp3') }
+export function playPower()         { play('power', 'mp3') }
 
 // Timer music — looping, returns a stop function
 export function playTimerMusic() {

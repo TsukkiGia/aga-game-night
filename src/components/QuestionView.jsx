@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { playPower } from '../sounds'
 import VideoBody from './VideoBody'
 import SlangBody from './SlangBody'
 import CharadesBody from './CharadesBody'
@@ -8,8 +9,8 @@ import QRImg from './QRImg'
 export default function QuestionView({
   rounds, roundIndex, questionIndex, doneQuestions,
   teams, members, buzzerUrl, buzzWinner, armed,
-  isDone, onAdjust, onArm, onDismiss,
-  stealMode, onWrongAndSteal,
+  onAdjust, onArm, onDismiss,
+  stealMode, onWrongAndSteal, onManualBuzz,
   onToggleDone, onNavigate, onBack, onNext, onPrev,
   onHalftime, onWinner, doublePoints, onToggleDouble,
 }) {
@@ -33,10 +34,7 @@ export default function QuestionView({
         <div className="qv-pagination">
           <span className="qv-counter">Q {questionIndex + 1} / {total}</span>
           <button className="qv-arrow" onClick={onPrev} disabled={questionIndex === 0}>‹</button>
-          <button className="qv-arrow" onClick={onNext} disabled={questionIndex === total - 1}>›</button>
-          <button className={`qv-done-btn${isDone ? ' done' : ''}`} onClick={onToggleDone}>
-            {isDone ? '✓ Done' : 'Mark Done'}
-          </button>
+          <button className="qv-arrow" onClick={() => { onToggleDone(); onNext() }}>›</button>
           <button className="halftime-btn" onClick={onHalftime}>⏸ Halftime</button>
           <button className="winner-btn" onClick={onWinner}>🏆 Winner</button>
         </div>
@@ -48,6 +46,8 @@ export default function QuestionView({
           <div
             key={i}
             className={`qv-team-strip color-${team.color}${buzzWinner?.teamIndex === i ? ' qv-buzzed' : ''}`}
+            onClick={() => !buzzWinner && onManualBuzz(i)}
+            style={{ cursor: buzzWinner ? 'default' : 'pointer' }}
           >
             <div className="qv-strip-info">
               <span className="qv-strip-name">{team.name}</span>
@@ -102,7 +102,7 @@ export default function QuestionView({
                 ))}
             </div>
 
-            {round.scoring.some(({ label }) => label.toLowerCase().includes('steal')) && (
+            {!stealMode && round.scoring.some(({ label }) => label.toLowerCase().includes('steal')) && (
               <button className="buzz-steal-btn" onClick={() => { setRevealedInModal(false); onWrongAndSteal() }}>
                 Open Steal
               </button>
@@ -205,7 +205,7 @@ export default function QuestionView({
       <div className="qv-arm-row arm-row">
         <button
           className={`double-pts-btn${doublePoints ? ' active' : ''}`}
-          onClick={onToggleDouble}
+          onClick={() => { if (!doublePoints) playPower(); onToggleDouble() }}
           title="Double points for this question"
         >
           {doublePoints ? '2× ON' : '2×'}

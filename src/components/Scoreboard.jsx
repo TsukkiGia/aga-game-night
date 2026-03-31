@@ -15,7 +15,7 @@ import { playGameStart } from '../sounds'
 
 export default function Scoreboard({ teams: initialTeams, onReset }) {
   const { teams, doneQuestions, doublePoints, setDoublePoints, adjust, resetForNewGame, toggleDone } = useGameState(initialTeams)
-  const { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal } = useGameSocket(initialTeams)
+  const { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz } = useGameSocket(initialTeams)
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
   const [showWinner, setShowWinner] = useState(false)
@@ -54,16 +54,21 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
           buzzerUrl={buzzerUrl}
           buzzWinner={buzzWinner}
           armed={armed}
-          isDone={doneQuestions.has(`${rIdx}-${qIdx}`)}
           onAdjust={adjust}
           onArm={handleArm}
           onDismiss={handleDismiss}
           stealMode={stealMode}
           onWrongAndSteal={handleWrongAndSteal}
+          onManualBuzz={(i) => handleManualBuzz(i, teams)}
           onToggleDone={() => toggleDone(rIdx, qIdx)}
           onNavigate={(ri, qi) => navigate(ri, qi, rounds)}
           onBack={goBack}
-          onNext={() => navigate(rIdx, qIdx + 1)}
+          onNext={() => {
+            const isLastQuestion = qIdx === rounds[rIdx].questions.length - 1
+            const isLastRound = rIdx === rounds.length - 1
+            if (isLastQuestion && !isLastRound) navigate(rIdx + 1, null, rounds)
+            else if (!isLastQuestion) navigate(rIdx, qIdx + 1)
+          }}
           onPrev={() => navigate(rIdx, qIdx - 1)}
           onHalftime={() => setShowHalftime(true)}
           onWinner={() => setShowWinner(true)}

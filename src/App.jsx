@@ -48,7 +48,7 @@ export default function App() {
         <div className="kente-bar" />
         <div className="header-content">
           <div className="adinkra-left">⬡</div>
-          <h1 className="app-title">SCORE KEEPER</h1>
+          <h1 className="app-title">Sankofa Showdown</h1>
           <div className="adinkra-right">⬡</div>
         </div>
         <div className="kente-bar" />
