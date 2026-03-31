@@ -43,6 +43,12 @@ export default function QuestionView({
     return () => { clearInterval(buzzCountdownRef.current); stopTick(); setBuzzCountdown(null) }
   }, [buzzWinner])
 
+  function stopCountdown() {
+    clearInterval(buzzCountdownRef.current)
+    stopTick()
+    setBuzzCountdown(null)
+  }
+
   return (
     <div className="question-view">
 
@@ -132,6 +138,7 @@ export default function QuestionView({
                       key={label}
                       className={`buzz-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
                       onClick={() => {
+                        stopCountdown()
                         onAdjust(buzzWinner.teamIndex, points)
                         const canRevealAnswer = round.type === 'slang' || round.type === 'video' || round.type === 'charades'
 
