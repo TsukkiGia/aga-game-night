@@ -61,10 +61,11 @@ export function useGameSocket(initialTeams) {
   }
 
   function handleWrongAndSteal() {
+    const lockedOutTeamIndex = buzzWinner?.teamIndex ?? null
     socket.emit('host:reset', (resetResult) => {
       if (!resetResult?.ok) return
       setStealMode(true)
-      socket.emit('host:arm', (armResult) => {
+      socket.emit('host:arm', { lockedOutTeamIndex }, (armResult) => {
         if (armResult?.ok) playArm()
         else setStealMode(false)
       })

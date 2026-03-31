@@ -17,6 +17,7 @@ let state = {
   armed: false,
   buzzedBy: null,  // teamIndex | null
   buzzedMemberName: null,
+  stealLockedOutTeamIndex: null,
   members: {},     // { [teamIndex]: { [socketId]: memberName } }
 }
 
@@ -44,7 +45,7 @@ io.on('connection', (socket) => {
     const isNewGame = JSON.stringify(teams.map(t => t.code)) !== JSON.stringify(state.teams.map(t => t.code))
     socket.join('host')
     if (isNewGame) {
-      state = { teams, armed: false, buzzedBy: null, buzzedMemberName: null, members: {} }
+      state = { teams, armed: false, buzzedBy: null, buzzedMemberName: null, stealLockedOutTeamIndex: null, members: {} }
       io.except(socket.id).emit('game:reset')
     } else {
       state.teams = teams  // names/colors may have changed, preserve buzzer state
@@ -56,8 +57,11 @@ io.on('connection', (socket) => {
   })
 
   // ── Host: arm the buzzers ──────────────────────────────────
-  socket.on('host:arm', (callback) => {
-    const respond = typeof callback === 'function' ? callback : () => {}
+  socket.on('host:arm', (arg1, arg2) => {
+    const options = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}
+    const respond = typeof arg1 === 'function' ? arg1 : (typeof arg2 === 'function' ? arg2 : () => {})
+    const requestedLockout = Number.isInteger(options.lockedOutTeamIndex) ? options.lockedOutTeamIndex : null
+
     if (!socket.rooms.has('host')) {
       respond({ ok: false, error: 'unauthorized' })
       return
@@ -68,6 +72,7 @@ io.on('connection', (socket) => {
       return
     }
     state.armed = true
+    state.stealLockedOutTeamIndex = requestedLockout
     io.emit('buzz:armed')
     respond({ ok: true })
   })
@@ -83,6 +88,7 @@ io.on('connection', (socket) => {
     state.armed = false
     state.buzzedBy = null
     state.buzzedMemberName = null
+    state.stealLockedOutTeamIndex = null
     io.emit('buzz:reset')
     respond({ ok: true })
   })
@@ -124,6 +130,7 @@ io.on('connection', (socket) => {
     if (state.buzzedBy !== null)       return
     const idx = socket.data.teamIndex
     if (idx === undefined || idx === null) return
+    if (idx === state.stealLockedOutTeamIndex) return
 
     state.armed = false
     state.buzzedBy = idx
