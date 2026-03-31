@@ -33,6 +33,11 @@ export function useGameState(initialTeams) {
     setDoneQuestions(new Set())
   }
 
+  function resetForNewGame() {
+    setTeams(prev => prev.map(t => ({ ...t, score: 0 })))
+    setDoneQuestions(new Set())
+  }
+
   function toggleDone(rIdx, qIdx) {
     const key = `${rIdx}-${qIdx}`
     setDoneQuestions(prev => {
@@ -42,5 +47,5 @@ export function useGameState(initialTeams) {
     })
   }
 
-  return { teams, doneQuestions, flashing, doublePoints, setDoublePoints, adjust, resetScores, toggleDone }
+  return { teams, doneQuestions, flashing, doublePoints, setDoublePoints, adjust, resetScores, resetForNewGame, toggleDone }
 }
