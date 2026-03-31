@@ -72,5 +72,14 @@ export function useGameSocket(initialTeams) {
     })
   }
 
-  return { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz }
+  function handleRearm() {
+    socket.emit('host:reset', (resetResult) => {
+      if (!resetResult?.ok) return
+      socket.emit('host:arm', (armResult) => {
+        if (armResult?.ok) playArm()
+      })
+    })
+  }
+
+  return { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm }
 }

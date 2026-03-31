@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { playWinner, playWinnerMusical, playApplause } from '../sounds'
 
-export default function WinnerScreen({ teams, onClose, onDismiss }) {
+export default function WinnerScreen({ teams, onClose, onDismiss, onTiebreaker }) {
   const canvasRef = useRef(null)
 
   const sorted = [...teams]
@@ -12,6 +12,14 @@ export default function WinnerScreen({ teams, onClose, onDismiss }) {
   const hasScores = topScore > 0
   const winners = hasScores ? sorted.filter(t => t.score === topScore) : []
   const isTie = winners.length > 1
+
+  // Place = number of teams with a strictly higher score (ties share the same place)
+  const places = sorted.map(team => sorted.filter(t => t.score > team.score).length)
+  const medals = ['🥇', '🥈', '🥉']
+
+  // Hide podium if a 4th team was cut off with the same place as the 3rd slot
+  // (e.g. 4 tied for 1st, 3 tied for 2nd, 4 tied for 3rd)
+  const showPodium = !sorted[3] || places[3] > places[2]
 
   useEffect(() => { playWinner(); playWinnerMusical(); playApplause() }, [])
 
@@ -72,14 +80,15 @@ export default function WinnerScreen({ teams, onClose, onDismiss }) {
 
         {hasScores && <div className="winner-score">{topScore} pts</div>}
 
-        <div className="winner-podium">
+        {showPodium && <div className="winner-podium">
           {[1, 0, 2].map(rank => {
             const team = sorted[rank]
             if (!team) return <div key={rank} className="podium-slot empty" />
+            const place = places[rank]
             return (
-              <div key={team.originalIndex} className={`podium-slot rank-${rank}`}>
+              <div key={team.originalIndex} className={`podium-slot rank-${place}`}>
                 <div className={`podium-card color-${team.color}`}>
-                  <div className="podium-medal">{['🥇','🥈','🥉'][rank]}</div>
+                  <div className="podium-medal">{medals[place] ?? '🏅'}</div>
                   <div className="podium-name">{team.name}</div>
                   <div className={`podium-score color-${team.color}`}>{team.score}</div>
                 </div>
@@ -87,10 +96,15 @@ export default function WinnerScreen({ teams, onClose, onDismiss }) {
               </div>
             )
           })}
-        </div>
+        </div>}
 
         <div className="winner-actions">
           <button className="winner-dismiss-btn" onClick={onDismiss}>✕ Close</button>
+          {isTie && onTiebreaker && (
+            <button className="winner-tiebreaker-btn" onClick={() => onTiebreaker(winners)}>
+              ⚡ Sudden Death
+            </button>
+          )}
           <button className="winner-close-btn" onClick={onClose}>↺ Play Again</button>
         </div>
       </div>

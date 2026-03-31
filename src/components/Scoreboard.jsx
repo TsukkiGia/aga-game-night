@@ -3,6 +3,7 @@ import QuestionView from './QuestionView'
 import RoundIntroView from './RoundIntroView'
 import HalftimeScreen from './HalftimeScreen'
 import WinnerScreen from './WinnerScreen'
+import SuddenDeathOverlay from './SuddenDeathOverlay'
 import RoundTransitionScreen from './RoundTransitionScreen'
 import CodesPanel from './CodesPanel'
 import { ENDPOINT } from '../config'
@@ -15,11 +16,37 @@ import { playGameStart } from '../sounds'
 
 export default function Scoreboard({ teams: initialTeams, onReset }) {
   const { teams, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, toggleDone } = useGameState(initialTeams)
-  const { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz } = useGameSocket(initialTeams)
+  const { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm } = useGameSocket(initialTeams)
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
   const [showWinner, setShowWinner] = useState(false)
   const [launching, setLaunching] = useState(false)
+  const [suddenDeath, setSuddenDeath] = useState(false)
+  const [tiedTeams, setTiedTeams] = useState([])
+
+  function handleTiebreaker(winners) {
+    setShowWinner(false)
+    setTiedTeams(winners)
+    setSuddenDeath(true)
+    handleArm()
+  }
+
+  function handleSuddenDeathAward(teamIndex) {
+    adjust(teamIndex, 1)
+    handleDismiss()
+    setSuddenDeath(false)
+    setShowWinner(true)
+  }
+
+  function handleSuddenDeathWrong() {
+    handleRearm()
+  }
+
+  function handleSuddenDeathCancel() {
+    handleDismiss()
+    setSuddenDeath(false)
+    setShowWinner(true)
+  }
 
   const buzzerUrl = `${ENDPOINT || window.location.origin}/buzz`
 
@@ -88,7 +115,8 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
           onToggleDouble={() => setDoublePoints(d => !d)}
         />
         {showHalftime && <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />}
-        {showWinner   && <WinnerScreen   teams={teams} onDismiss={() => setShowWinner(false)} onClose={() => { setShowWinner(false); clearAll(); onReset() }} />}
+        {showWinner   && <WinnerScreen   teams={teams} onDismiss={() => setShowWinner(false)} onClose={() => { setShowWinner(false); clearAll(); onReset() }} onTiebreaker={handleTiebreaker} />}
+        {suddenDeath  && <SuddenDeathOverlay tiedTeams={tiedTeams} buzzWinner={buzzWinner} onAward={handleSuddenDeathAward} onWrong={handleSuddenDeathWrong} onCancel={handleSuddenDeathCancel} />}
       </>
     )
   }

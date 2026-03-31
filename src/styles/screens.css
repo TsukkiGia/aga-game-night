@@ -543,3 +543,137 @@
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
 }
+
+/* ══════════════════════════════════════════
+   SUDDEN DEATH OVERLAY
+══════════════════════════════════════════ */
+.sd-overlay { background: rgba(0,0,0,0.92); }
+
+.sudden-death-screen {
+  background: var(--bg-card);
+  border-radius: 28px;
+  padding: 48px 52px;
+  max-width: 480px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.sd-tag {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--amber);
+  text-transform: uppercase;
+}
+
+.sd-heading {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.sd-teams {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sd-team-chip {
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-weight: 800;
+  font-size: 15px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+}
+
+.sd-waiting {
+  font-size: 15px;
+  color: var(--text-muted);
+  padding: 16px 0;
+}
+
+.sd-buzz-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.sd-buzzed-label {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.sd-buzz-sublabel {
+  font-size: 14px;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.sd-buzz-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.sd-correct-btn {
+  background: var(--teal);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 28px;
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sd-correct-btn:hover { background: var(--teal-light); transform: translateY(-2px); }
+
+.sd-wrong-btn {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 24px;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sd-wrong-btn:hover { border-color: var(--terra); color: var(--terra); }
+
+.sd-cancel-btn {
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color 0.15s;
+}
+.sd-cancel-btn:hover { color: var(--text); }
+
+.winner-tiebreaker-btn {
+  background: var(--amber);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 28px;
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.winner-tiebreaker-btn:hover { background: var(--amber-light); transform: translateY(-2px); }
