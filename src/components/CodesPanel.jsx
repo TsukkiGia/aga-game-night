@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import QRCode from 'qrcode'
+import MemberRoster from './MemberRoster'
 
 export default function CodesPanel({ teams, members, buzzerUrl }) {
   const [open, setOpen] = useState(true)
@@ -28,9 +29,7 @@ export default function CodesPanel({ teams, members, buzzerUrl }) {
               <div key={t.code} className={`code-chip color-${t.color}`}>
                 <span className="code-team-name">{t.name}</span>
                 <span className="code-value">{t.code}</span>
-                {members[i]?.length > 0 && (
-                  <span className="code-members">{members[i].join(', ')}</span>
-                )}
+                <MemberRoster members={members?.[i] || []} />
               </div>
             ))}
           </div>

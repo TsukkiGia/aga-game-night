@@ -203,35 +203,63 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 12px;
+  gap: 0;
   margin-bottom: 32px;
 }
 
-.podium-entry {
+.podium-slot {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 16px 20px;
-  border-radius: 16px;
+  width: 140px;
+}
+.podium-slot.empty { width: 140px; }
+
+.podium-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  border-radius: 14px;
   background: var(--bg);
   border: 1.5px solid var(--border);
-  min-width: 110px;
+  width: 100%;
+  margin-bottom: 8px;
 }
-.podium-entry.rank-0 { transform: scale(1.1); background: var(--amber-bg); border-color: var(--amber-light); }
+.podium-slot.rank-0 .podium-card { background: var(--amber-bg); border-color: var(--amber-light); }
 
-.podium-medal { font-size: 28px; }
-.podium-name  { font-size: 13px; font-weight: 800; }
-.podium-score { font-size: 22px; font-weight: 900; }
+.podium-medal { font-size: 28px; line-height: 1; }
+.podium-name  { font-size: 14px; font-weight: 800; text-align: center; }
+.podium-score { font-size: 26px; font-weight: 900; }
 
-.podium-entry.color-ember  .podium-score { color: var(--terra); }
-.podium-entry.color-gold   .podium-score { color: var(--amber); }
-.podium-entry.color-forest .podium-score { color: var(--teal); }
-.podium-entry.color-earth  .podium-score { color: var(--brown); }
-.podium-entry.color-indigo .podium-score { color: var(--indigo); }
-.podium-entry.color-rose   .podium-score { color: var(--rose); }
-.podium-entry.color-slate  .podium-score { color: var(--slate); }
-.podium-entry.color-sage   .podium-score { color: var(--sage); }
+.podium-score.color-ember  { color: var(--terra); }
+.podium-score.color-gold   { color: var(--amber); }
+.podium-score.color-forest { color: var(--teal); }
+.podium-score.color-earth  { color: var(--brown); }
+.podium-score.color-indigo { color: var(--indigo); }
+.podium-score.color-rose   { color: var(--rose); }
+.podium-score.color-slate  { color: var(--slate); }
+.podium-score.color-sage   { color: var(--sage); }
+
+.podium-block {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px 8px 0 0;
+  font-weight: 900;
+  color: white;
+}
+.podium-slot.rank-0 .podium-block { height: 90px; background: var(--amber-light); }
+.podium-slot.rank-1 .podium-block { height: 60px; background: #aaa; }
+.podium-slot.rank-2 .podium-block { height: 40px; background: #b07340; }
+
+.podium-rank-num {
+  font-size: 22px;
+  font-weight: 900;
+  opacity: 0.9;
+}
 
 .winner-actions {
   display: flex;

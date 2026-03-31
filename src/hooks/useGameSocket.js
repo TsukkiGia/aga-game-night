@@ -50,7 +50,7 @@ export function useGameSocket(initialTeams) {
   }
 
   function handleManualBuzz(teamIndex, teams) {
-    setBuzzWinner({ team: teams[teamIndex], teamIndex, memberName: null })
+    setBuzzWinner({ team: teams[teamIndex], teamIndex, memberName: null, manual: true })
     setStealMode(false)
   }
 

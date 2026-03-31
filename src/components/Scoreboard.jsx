@@ -100,6 +100,13 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
     setTimeout(() => navigate(0, null, rounds, true), 600)
   }
 
+  function handleNewGame() {
+    clearDoublePoints()
+    handleDismiss()
+    clearAll()
+    onReset()
+  }
+
   return (
     <>
       {buzzWinner?.team && (
@@ -126,7 +133,15 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
         <CodesPanel teams={teams} members={members} buzzerUrl={buzzerUrl} />
 
         <div className="home-hero">
-          <div className="arm-row">
+          <div className="home-actions-row">
+            <button className="home-new-game-btn" onClick={handleNewGame}>
+              ↺ New Game
+            </button>
+
+            <button className="home-start-game-btn" onClick={handleStart}>
+              ▶ Start Game
+            </button>
+
             <button
               className={`arm-btn ${armed ? 'armed' : ''}`}
               onClick={handleArm}
@@ -138,10 +153,6 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
               <button className="arm-cancel-btn" onClick={handleDismiss}>Cancel</button>
             )}
           </div>
-
-          <button className="start-game-btn" onClick={handleStart}>
-            ▶ Start Game
-          </button>
         </div>
       </div>
     </>

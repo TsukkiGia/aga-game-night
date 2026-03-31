@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { playPower } from '../sounds'
+import { useState, useEffect, useRef } from 'react'
+import { playPower, playTick, stopTick, playTimeUp } from '../sounds'
 import VideoBody from './VideoBody'
 import SlangBody from './SlangBody'
 import CharadesBody from './CharadesBody'
 import ThesisBody from './ThesisBody'
 import QRImg from './QRImg'
+import MemberRoster from './MemberRoster'
 
 export default function QuestionView({
   rounds, roundIndex, questionIndex, doneQuestions,
@@ -20,6 +21,27 @@ export default function QuestionView({
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [codesOpen, setCodesOpen] = useState(false)
   const [revealedInModal, setRevealedInModal] = useState(false)
+  const [buzzCountdown, setBuzzCountdown] = useState(null)
+  const buzzCountdownRef = useRef(null)
+
+  // Auto 10s countdown when a real buzz comes in (not manual, not steal)
+  useEffect(() => {
+    if (!buzzWinner || buzzWinner.manual) { setBuzzCountdown(null); return }
+    setBuzzCountdown(10)
+    let count = 10
+    buzzCountdownRef.current = setInterval(() => {
+      count--
+      setBuzzCountdown(count)
+      if (count > 0) {
+        playTick()
+      } else {
+        stopTick()
+        playTimeUp()
+        clearInterval(buzzCountdownRef.current)
+      }
+    }, 1000)
+    return () => { clearInterval(buzzCountdownRef.current); stopTick(); setBuzzCountdown(null) }
+  }, [buzzWinner])
 
   return (
     <div className="question-view">
@@ -84,6 +106,12 @@ export default function QuestionView({
             className={`buzz-popup color-${buzzWinner.team.color}`}
             onClick={e => e.stopPropagation()}
           >
+            {buzzCountdown !== null && (
+              <div className="buzz-countdown-wrap">
+                <div className={`buzz-countdown${buzzCountdown <= 3 ? ' urgent' : ''}`}>{buzzCountdown}</div>
+                <div className="buzz-countdown-caption">seconds to answer</div>
+              </div>
+            )}
             <div className="buzz-popup-label">{stealMode ? '🔀 STEAL!' : 'BUZZED IN!'}</div>
             <div className="buzz-popup-name">
               {buzzWinner.memberName
@@ -105,7 +133,7 @@ export default function QuestionView({
                       className={`buzz-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
                       onClick={() => {
                         onAdjust(buzzWinner.teamIndex, points)
-                        const canRevealAnswer = round.type === 'slang' || round.type === 'video'
+                        const canRevealAnswer = round.type === 'slang' || round.type === 'video' || round.type === 'charades'
 
                         if (stealMode) {
                           if (canRevealAnswer) setRevealedInModal(true)
@@ -136,6 +164,12 @@ export default function QuestionView({
                   <>
                     <div className="buzz-popup-answer-label">Meaning</div>
                     <div className="buzz-popup-answer-text">{question.meaning}</div>
+                  </>
+                )}
+                {round.type === 'charades' && (
+                  <>
+                    <div className="buzz-popup-answer-label">Phrase</div>
+                    <div className="buzz-popup-answer-text">{question.phrase}</div>
                   </>
                 )}
                 {round.type === 'video' && (
@@ -210,9 +244,7 @@ export default function QuestionView({
                 <div key={t.code} className={`qv-codes-chip color-${t.color}`}>
                   <span className="qv-codes-chip-name">{t.name}</span>
                   <span className="qv-codes-chip-code">{t.code}</span>
-                  {members?.[i]?.length > 0 && (
-                    <span className="qv-codes-chip-members">{members[i].join(', ')}</span>
-                  )}
+                  <MemberRoster members={members?.[i] || []} compact maxVisible={3} />
                 </div>
               ))}
             </>

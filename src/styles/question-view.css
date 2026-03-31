@@ -28,7 +28,7 @@
 
 /* ── Right sidebar: team codes ── */
 .qv-codes-sidebar {
-  width: 240px;
+  width: 270px;
   flex-shrink: 0;
   border-left: 1px solid var(--border);
   background: var(--bg-card);
@@ -68,14 +68,14 @@
 .qv-codes-chip.color-slate  { border-color: rgba(58,107,122,0.3); }
 .qv-codes-chip.color-sage   { border-color: rgba(74,124,89,0.3); }
 .qv-codes-chip-name {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-muted);
 }
 .qv-codes-chip-code {
-  font-size: 22px;
+  font-size: 32px;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
 }
 .qv-codes-chip.color-ember  .qv-codes-chip-code { color: var(--terra); }
 .qv-codes-chip.color-gold   .qv-codes-chip-code { color: var(--amber); }
@@ -85,9 +85,36 @@
 .qv-codes-chip.color-rose   .qv-codes-chip-code { color: var(--rose); }
 .qv-codes-chip.color-slate  .qv-codes-chip-code { color: var(--slate); }
 .qv-codes-chip.color-sage   .qv-codes-chip-code { color: var(--sage); }
-.qv-codes-chip-members {
-  font-size: 12px;
-  color: var(--text-muted);
+.qv-codes-chip .member-roster {
+  margin-top: 2px;
+  gap: 4px;
+}
+
+.qv-codes-chip .member-roster-head {
+  width: 100%;
+}
+
+.qv-codes-chip .member-roster-label {
+  font-size: 9px;
+}
+
+.qv-codes-chip .member-roster-count {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+.qv-codes-chip .member-roster-list {
+  justify-content: center;
+}
+
+.qv-codes-chip .member-roster-pill,
+.qv-codes-chip .member-roster-more {
+  font-size: 10px;
+  padding: 4px 7px;
+}
+
+.qv-codes-chip .member-roster-empty {
+  font-size: 10px;
   text-align: center;
 }
 

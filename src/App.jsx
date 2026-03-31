@@ -18,18 +18,26 @@ export default function App() {
   useWakeLock(true)
 
   useEffect(() => {
+    if (isBuzzerMode) return
+
     function onKey(e) {
-      if (!e.shiftKey) return
-      if (e.key === 'C') playCrickets()
-      if (e.key === 'F') playFaaah()
-      if (e.key === 'R') playCorrectAnswer()
-      if (e.key === 'N') playNani()
-      if (e.key === 'W') playWhatTheHell()
-      if (e.key === 'S') playShocked()
-      if (e.key === 'A') playAirhorn()
-      if (e.key === 'B') playBoo()
-      if (e.key === 'L') playLaughter()
-      if (e.key === 'O') playOkayy()
+      if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return
+      const target = e.target
+      const tag = target?.tagName
+      const isTypingField = target?.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+      if (isTypingField) return
+
+      const key = String(e.key || '').toUpperCase()
+      if (key === 'C') playCrickets()
+      if (key === 'F') playFaaah()
+      if (key === 'R') playCorrectAnswer()
+      if (key === 'N') playNani()
+      if (key === 'W') playWhatTheHell()
+      if (key === 'S') playShocked()
+      if (key === 'A') playAirhorn()
+      if (key === 'B') playBoo()
+      if (key === 'L') playLaughter()
+      if (key === 'O') playOkayy()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

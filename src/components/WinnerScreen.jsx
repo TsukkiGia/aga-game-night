@@ -73,15 +73,20 @@ export default function WinnerScreen({ teams, onClose, onDismiss }) {
         {hasScores && <div className="winner-score">{topScore} pts</div>}
 
         <div className="winner-podium">
-          {sorted.slice(0, Math.min(3, sorted.length)).map((team, rank) => (
-            <div key={team.originalIndex} className={`podium-entry rank-${rank} color-${team.color}`}>
-              <div className="podium-medal">
-                {['🥇','🥈','🥉'][rank]}
+          {[1, 0, 2].map(rank => {
+            const team = sorted[rank]
+            if (!team) return <div key={rank} className="podium-slot empty" />
+            return (
+              <div key={team.originalIndex} className={`podium-slot rank-${rank}`}>
+                <div className={`podium-card color-${team.color}`}>
+                  <div className="podium-medal">{['🥇','🥈','🥉'][rank]}</div>
+                  <div className="podium-name">{team.name}</div>
+                  <div className={`podium-score color-${team.color}`}>{team.score}</div>
+                </div>
+                <div className="podium-block" />
               </div>
-              <div className="podium-name">{team.name}</div>
-              <div className="podium-score">{team.score}</div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="winner-actions">
