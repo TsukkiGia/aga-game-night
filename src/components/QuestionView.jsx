@@ -103,10 +103,11 @@ export default function QuestionView({
                     className={`buzz-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
                     onClick={() => {
                       onAdjust(buzzWinner.teamIndex, points)
+                      const canRevealAnswer = round.type === 'slang' || round.type === 'video'
+
                       if (stealMode) {
-                        setRevealedInModal(false)
-                        onDismiss()
-                      } else if (points >= 3 && (round.type === 'slang' || round.type === 'video')) {
+                        if (canRevealAnswer) setRevealedInModal(true)
+                      } else if (points >= 3 && canRevealAnswer) {
                         setRevealedInModal(true)
                       }
                     }}

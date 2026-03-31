@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently -n \"server,vite\" -c \"yellow,cyan\" \"nodemon --watch server.js server.js\" \"vite\"",
     "server": "nodemon --watch server.js server.js",
+    "test": "node --test",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
