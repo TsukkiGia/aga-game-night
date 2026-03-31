@@ -3,6 +3,7 @@ import Setup from './components/Setup'
 import Scoreboard from './components/Scoreboard'
 import BuzzerPage from './components/BuzzerPage'
 import { TEAMS_KEY } from './storage'
+import { useWakeLock } from './hooks/useWakeLock'
 import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy } from './sounds'
 import './App.css'
 
@@ -14,6 +15,7 @@ function loadTeams() {
 
 export default function App() {
   const [teams, setTeams] = useState(() => loadTeams())
+  useWakeLock(true)
 
   useEffect(() => {
     function onKey(e) {
