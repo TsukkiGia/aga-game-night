@@ -1,10 +1,5 @@
 import { useState } from 'react'
 
-const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-function genCode() {
-  return Array.from({ length: 4 }, () => CHARS[Math.floor(Math.random() * CHARS.length)]).join('')
-}
-
 export default function Setup({ onStart }) {
   const [step, setStep] = useState('count') // 'count' | 'names'
   const [teamCount, setTeamCount] = useState(null)
@@ -28,7 +23,6 @@ export default function Setup({ onStart }) {
       name,
       score: 0,
       color: teamColors[i],
-      code: genCode(),
     })))
   }
 

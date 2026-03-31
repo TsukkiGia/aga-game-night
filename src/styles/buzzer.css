@@ -245,29 +245,51 @@
 
 .buzzer-form { display: flex; flex-direction: column; gap: 12px; }
 
-.buzzer-code-input {
-  background: var(--bg);
-  border: 2px solid var(--border);
-  border-radius: 14px;
-  padding: 18px 20px;
-  font-size: 36px;
-  font-weight: 900;
-  font-family: monospace;
-  letter-spacing: 0.25em;
-  text-align: center;
-  color: var(--text);
-  text-transform: uppercase;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+.buzzer-team-select {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
 }
-.buzzer-code-input:focus {
-  background: white;
-  border-color: var(--terra);
-  box-shadow: 0 0 0 4px rgba(201,75,44,0.1);
-}
-.buzzer-code-input::placeholder { color: var(--text-muted); opacity: 0.3; }
 
-.buzzer-error { color: var(--terra); font-size: 13px; font-weight: 700; }
+.buzzer-no-teams {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 16px 0;
+}
+
+.buzzer-team-option {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 14px;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  font-family: var(--font);
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.buzzer-team-option:hover { border-color: currentColor; }
+.buzzer-team-option.color-ember  { color: var(--terra); }
+.buzzer-team-option.color-ember.selected  { background: var(--terra-bg);  border-color: var(--terra);  }
+.buzzer-team-option.color-gold   { color: var(--amber); }
+.buzzer-team-option.color-gold.selected   { background: var(--amber-bg);  border-color: var(--amber-light); }
+.buzzer-team-option.color-forest { color: var(--teal); }
+.buzzer-team-option.color-forest.selected { background: var(--teal-bg);   border-color: var(--teal);   }
+.buzzer-team-option.color-earth  { color: var(--brown); }
+.buzzer-team-option.color-earth.selected  { background: var(--brown-bg);  border-color: var(--brown);  }
+.buzzer-team-option.color-indigo { color: var(--indigo); }
+.buzzer-team-option.color-indigo.selected { background: var(--indigo-bg); border-color: var(--indigo); }
+.buzzer-team-option.color-rose   { color: var(--rose); }
+.buzzer-team-option.color-rose.selected   { background: var(--rose-bg);   border-color: var(--rose);   }
+.buzzer-team-option.color-slate  { color: var(--slate); }
+.buzzer-team-option.color-slate.selected  { background: var(--slate-bg);  border-color: var(--slate);  }
+.buzzer-team-option.color-sage   { color: var(--sage); }
+.buzzer-team-option.color-sage.selected   { background: var(--sage-bg);   border-color: var(--sage);   }
 
 .buzzer-join-btn {
   background: var(--terra);

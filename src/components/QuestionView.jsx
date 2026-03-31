@@ -9,7 +9,7 @@ import MemberRoster from './MemberRoster'
 
 export default function QuestionView({
   rounds, roundIndex, questionIndex, doneQuestions,
-  teams, members, buzzerUrl, buzzWinner, armed,
+  teams, members, buzzWinner, armed, buzzerUrl,
   onAdjust, onArm, onDismiss,
   stealMode, onWrongAndSteal, onManualBuzz,
   onToggleDone, onNavigate, onBack, onNext, onPrev,
@@ -19,7 +19,7 @@ export default function QuestionView({
   const question = round.questions[questionIndex]
   const total = round.questions.length
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [codesOpen, setCodesOpen] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
   const [revealedInModal, setRevealedInModal] = useState(false)
   const [buzzCountdown, setBuzzCountdown] = useState(null)
   const buzzCountdownRef = useRef(null)
@@ -238,19 +238,18 @@ export default function QuestionView({
           {round.type === 'thesis'   && <ThesisBody   key={question.id} question={question} />}
         </div>
 
-        {/* Right sidebar: team codes */}
-        <div className={`qv-codes-sidebar${codesOpen ? '' : ' collapsed'}`}>
-          <button className="qv-sidebar-toggle" onClick={() => setCodesOpen(o => !o)}>
-            {codesOpen ? '›' : '‹'}
+        {/* Right sidebar: QR code */}
+        <div className={`qv-codes-sidebar${qrOpen ? '' : ' collapsed'}`}>
+          <button className="qv-sidebar-toggle" onClick={() => setQrOpen(o => !o)}>
+            {qrOpen ? '›' : '‹'}
           </button>
-          {codesOpen && (
+          {qrOpen && (
             <>
               <QRImg url={buzzerUrl} />
               <div className="qv-codes-url">{buzzerUrl}</div>
               {teams.map((t, i) => (
-                <div key={t.code} className={`qv-codes-chip color-${t.color}`}>
+                <div key={i} className={`qv-codes-chip color-${t.color}`}>
                   <span className="qv-codes-chip-name">{t.name}</span>
-                  <span className="qv-codes-chip-code">{t.code}</span>
                   <MemberRoster members={members?.[i] || []} compact maxVisible={3} />
                 </div>
               ))}

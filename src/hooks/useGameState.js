@@ -14,7 +14,7 @@ export function useGameState(initialTeams) {
 
   useEffect(() => {
     const s = {}
-    teams.forEach(t => { s[t.code] = t.score })
+    teams.forEach((t, i) => { s[i] = t.score })
     localStorage.setItem(SCORES_KEY, JSON.stringify(s))
   }, [teams])
 

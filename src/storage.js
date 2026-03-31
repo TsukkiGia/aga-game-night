@@ -5,7 +5,7 @@ export const DONE_KEY   = 'scorekeeping_done'
 export function loadScores(initialTeams) {
   try {
     const saved = JSON.parse(localStorage.getItem(SCORES_KEY) || '{}')
-    return initialTeams.map(t => ({ ...t, score: saved[t.code] ?? t.score }))
+    return initialTeams.map((t, i) => ({ ...t, score: saved[i] ?? t.score }))
   } catch {
     return initialTeams
   }

@@ -10,7 +10,10 @@ export default function CharadesBody({ question }) {
       {!revealed ? (
         <button className="qv-reveal-btn" onClick={() => setRevealed(true)}>Reveal Phrase ▼</button>
       ) : (
-        <div className="qv-charades-phrase">{question.phrase}</div>
+        <div className="buzz-popup-answer">
+          <div className="buzz-popup-answer-label">Phrase</div>
+          <div className="buzz-popup-answer-text">{question.phrase}</div>
+        </div>
       )}
     </div>
   )

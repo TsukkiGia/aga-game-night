@@ -47,7 +47,7 @@ export function createBuzzServer() {
     // ── Host: register teams + codes ──────────────────────────
     socket.on('host:setup', (teams, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
-      const isNewGame = JSON.stringify(teams.map(t => t.code)) !== JSON.stringify(state.teams.map(t => t.code))
+      const isNewGame = JSON.stringify(teams.map(t => t.name)) !== JSON.stringify(state.teams.map(t => t.name))
       socket.join('host')
       if (isNewGame) {
         state = { ...initialState(), teams }
@@ -55,7 +55,7 @@ export function createBuzzServer() {
       } else {
         state.teams = teams  // names/colors may have changed, preserve buzzer state
       }
-      console.log(`[host:setup] ${isNewGame ? 'new game' : 'reconnect'} — teams:`, teams.map(t => `${t.name}=${t.code}`).join(', '))
+      console.log(`[host:setup] ${isNewGame ? 'new game' : 'reconnect'} — teams:`, teams.map(t => t.name).join(', '))
       socket.emit('state:sync', state)
       broadcastMembers()
       respond({ ok: true })
@@ -98,16 +98,21 @@ export function createBuzzServer() {
       respond({ ok: true })
     })
 
-    // ── Member: join with code + name ─────────────────────────
-    socket.on('member:join', (code, memberName, callback) => {
+    // ── Member: get teams list ────────────────────────────────
+    socket.on('member:get-teams', (callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
-      const normalised = code.trim().toUpperCase()
+      respond({ teams: state.teams.map(({ name, color }) => ({ name, color })) })
+    })
+
+    // ── Member: join with teamIndex + name ────────────────────
+    socket.on('member:join', (teamIndex, memberName, callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      const idx = parseInt(teamIndex, 10)
       const name = (memberName || '').trim() || 'Anonymous'
-      console.log(`[member:join] socket=${socket.id} code="${normalised}" name="${name}" | registered teams: [${state.teams.map(t => t.code).join(', ')}]`)
-      const idx = state.teams.findIndex(t => t.code === normalised)
-      if (idx === -1) {
-        console.log(`[member:join] FAIL — no match`)
-        respond({ error: 'Invalid code. Check with your host.' })
+      console.log(`[member:join] socket=${socket.id} teamIndex=${idx} name="${name}"`)
+      if (isNaN(idx) || idx < 0 || idx >= state.teams.length) {
+        console.log(`[member:join] FAIL — invalid teamIndex`)
+        respond({ error: 'Invalid team.' })
         return
       }
       socket.data.teamIndex = idx

@@ -13,37 +13,44 @@ function deriveStatusFromSync(sync, teamIndex, memberName) {
 }
 
 export default function BuzzerPage() {
-  const [code, setCode] = useState('')
+  const [availableTeams, setAvailableTeams] = useState([])
+  const [selectedIndex, setSelectedIndex] = useState(null)
   const [name, setName] = useState('')
-  const [error, setError] = useState('')
-  const [team, setTeam] = useState(null)       // { name, color, code }
+  const [team, setTeam] = useState(null)
+  const [teamIndex, setTeamIndex] = useState(null)
   const [status, setStatus] = useState('join')
   const [connected, setConnected] = useState(true)
-  const inputRef = useRef(null)
-  const teamRef = useRef(null)
+  const teamIndexRef = useRef(null)
   const nameRef = useRef('')
-  teamRef.current = team  // always current — no stale closure risk
+  teamIndexRef.current = teamIndex
   nameRef.current = name
 
-  // Effect 1: socket lifecycle — runs once, never disconnects mid-session
+  // Effect 1: socket lifecycle
   useEffect(() => {
     socket.connect()
 
-    socket.on('connect',    () => setConnected(true))
+    function fetchTeams() {
+      socket.emit('member:get-teams', (res) => {
+        if (res?.teams) setAvailableTeams(res.teams)
+      })
+    }
+
+    socket.on('connect', () => { setConnected(true); fetchTeams() })
     socket.on('disconnect', () => setConnected(false))
-    socket.on('game:reset', () => { setTeam(null); setCode(''); setStatus('join') })
+    socket.on('game:reset', () => { setTeam(null); setTeamIndex(null); setSelectedIndex(null); setStatus('join') })
     socket.on('buzz:armed', () => setStatus('armed'))
     socket.on('buzz:reset', () => setStatus(s => s === 'join' ? s : 'waiting'))
     socket.on('buzz:winner', (data) => {
       setStatus(prev => {
         if (prev === 'armed' || prev === 'waiting') {
-          const sameTeam = data.team.code === teamRef.current?.code
-          if (!sameTeam) return 'locked-out'
+          if (data.teamIndex !== teamIndexRef.current) return 'locked-out'
           return data.memberName === nameRef.current ? 'i-buzzed' : 'team-buzzed'
         }
         return prev
       })
     })
+
+    if (socket.connected) fetchTeams()
 
     return () => {
       socket.off('connect')
@@ -56,12 +63,12 @@ export default function BuzzerPage() {
     }
   }, [])
 
-  // Effect 2: rejoin on reconnect — only registered once team is known
+  // Effect 2: rejoin on reconnect
   useEffect(() => {
-    if (!team) return
+    if (teamIndex === null) return
     function rejoin() {
       const memberName = name.trim() || 'Anonymous'
-      socket.emit('member:join', team.code, memberName, (res) => {
+      socket.emit('member:join', teamIndex, memberName, (res) => {
         if (res?.error) return
         if (res?.team) setTeam(res.team)
         if (res?.teamIndex !== undefined) {
@@ -71,18 +78,16 @@ export default function BuzzerPage() {
     }
     socket.on('connect', rejoin)
     return () => socket.off('connect', rejoin)
-  }, [team, name])
+  }, [teamIndex, name])
 
   function handleJoin(e) {
     e.preventDefault()
-    setError('')
+    if (selectedIndex === null) return
     const memberName = name.trim() || 'Anonymous'
-    socket.emit('member:join', code, memberName, (res) => {
-      if (res.error) {
-        setError(res.error)
-        return
-      }
+    socket.emit('member:join', selectedIndex, memberName, (res) => {
+      if (res?.error) return
       setTeam(res.team)
+      setTeamIndex(res.teamIndex)
       setStatus(deriveStatusFromSync(res.sync, res.teamIndex, memberName))
     })
   }
@@ -99,19 +104,24 @@ export default function BuzzerPage() {
         <div className="buzzer-join-card">
           <div className="buzzer-logo">🥁</div>
           <h1 className="buzzer-title">JOIN GAME</h1>
-          <p className="buzzer-sub">Enter the code your host gave you</p>
+          <p className="buzzer-sub">Pick your team and enter your name</p>
           <form className="buzzer-form" onSubmit={handleJoin}>
-            <input
-              ref={inputRef}
-              className="buzzer-code-input"
-              value={code}
-              onChange={e => setCode(e.target.value.toUpperCase())}
-              placeholder="XXXX"
-              maxLength={4}
-              autoFocus
-              autoComplete="off"
-              autoCapitalize="characters"
-            />
+            <div className="buzzer-team-select">
+              {availableTeams.length === 0 ? (
+                <p className="buzzer-no-teams">Waiting for host to start the game…</p>
+              ) : (
+                availableTeams.map((t, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`buzzer-team-option color-${t.color}${selectedIndex === i ? ' selected' : ''}`}
+                    onClick={() => setSelectedIndex(i)}
+                  >
+                    {t.name}
+                  </button>
+                ))
+              )}
+            </div>
             <input
               className="buzzer-name-input"
               value={name}
@@ -120,8 +130,7 @@ export default function BuzzerPage() {
               maxLength={24}
               autoComplete="off"
             />
-            {error && <p className="buzzer-error">{error}</p>}
-            <button className="buzzer-join-btn" type="submit" disabled={code.length < 4 || !name.trim()}>
+            <button className="buzzer-join-btn" type="submit" disabled={selectedIndex === null || !name.trim()}>
               Join Team →
             </button>
           </form>
@@ -132,20 +141,18 @@ export default function BuzzerPage() {
 
   // ── Buzzer screen ────────────────────────────────────────────
   const statusConfig = {
-    waiting:   { label: 'Waiting for host…',     sub: 'Hold tight — the host will arm the buzzers', pulse: false },
-    armed:     { label: 'BUZZ NOW!',              sub: 'Be the first to buzz in!',                   pulse: true  },
-    'i-buzzed':{ label: 'YOU BUZZED IN!',         sub: 'The host will call on you',                  pulse: false },
-    'team-buzzed': { label: 'YOUR TEAM BUZZED IN!', sub: 'Your teammate got there first',            pulse: false },
-    'locked-out': { label: 'Locked Out',          sub: 'Another team buzzed first',                  pulse: false },
+    waiting:      { label: 'Waiting for host…',      sub: 'Hold tight — the host will arm the buzzers', pulse: false },
+    armed:        { label: 'BUZZ NOW!',               sub: 'Be the first to buzz in!',                   pulse: true  },
+    'i-buzzed':   { label: 'YOU BUZZED IN!',          sub: 'The host will call on you',                  pulse: false },
+    'team-buzzed':{ label: 'YOUR TEAM BUZZED IN!',    sub: 'Your teammate got there first',              pulse: false },
+    'locked-out': { label: 'Locked Out',              sub: 'Another team buzzed first',                  pulse: false },
   }
   const cfg = statusConfig[status] || statusConfig.waiting
 
   return (
     <div className={`buzzer-page buzzer-active color-${team.color}`}>
       {!connected && (
-        <div className="buzzer-reconnect-banner">
-          Reconnecting…
-        </div>
+        <div className="buzzer-reconnect-banner">Reconnecting…</div>
       )}
       <div className="buzzer-team-header">
         <div className={`buzzer-team-dot color-${team.color}`} />
@@ -160,20 +167,20 @@ export default function BuzzerPage() {
 
       <button
         className={`buzzer-btn color-${team.color}
-          ${status === 'armed' ? 'buzzer-btn-ready' : ''}
-          ${status === 'i-buzzed' ? 'buzzer-btn-winner' : ''}
+          ${status === 'armed'       ? 'buzzer-btn-ready'  : ''}
+          ${status === 'i-buzzed'    ? 'buzzer-btn-winner' : ''}
           ${status === 'team-buzzed' ? 'buzzer-btn-winner' : ''}
-          ${status === 'locked-out' ? 'buzzer-btn-locked' : ''}
-          ${cfg.pulse ? 'buzzer-pulse' : ''}
+          ${status === 'locked-out'  ? 'buzzer-btn-locked' : ''}
+          ${cfg.pulse                ? 'buzzer-pulse'      : ''}
         `}
         onClick={handleBuzz}
         disabled={status !== 'armed'}
       >
-        {status === 'waiting'    && '⏳'}
-        {status === 'armed'      && '🔔'}
-        {status === 'i-buzzed'   && '🏆'}
+        {status === 'waiting'     && '⏳'}
+        {status === 'armed'       && '🔔'}
+        {status === 'i-buzzed'    && '🏆'}
         {status === 'team-buzzed' && '👥'}
-        {status === 'locked-out' && '🔒'}
+        {status === 'locked-out'  && '🔒'}
       </button>
     </div>
   )
