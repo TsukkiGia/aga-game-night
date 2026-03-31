@@ -11,6 +11,7 @@ import { useGameState } from '../hooks/useGameState'
 import { useGameSocket } from '../hooks/useGameSocket'
 import { useNavigation } from '../hooks/useNavigation'
 import { clearAll } from '../storage'
+import { playGameStart } from '../sounds'
 
 export default function Scoreboard({ teams: initialTeams, onReset }) {
   const { teams, doneQuestions, doublePoints, setDoublePoints, adjust, resetForNewGame, toggleDone } = useGameState(initialTeams)
@@ -76,6 +77,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
   function handleStart() {
     resetForNewGame()
     setLaunching(true)
+    playGameStart()
     setTimeout(() => navigate(0, null, rounds), 600)
   }
 

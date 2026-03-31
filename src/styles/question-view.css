@@ -28,7 +28,7 @@
 
 /* ── Right sidebar: team codes ── */
 .qv-codes-sidebar {
-  width: 160px;
+  width: 240px;
   flex-shrink: 0;
   border-left: 1px solid var(--border);
   background: var(--bg-card);

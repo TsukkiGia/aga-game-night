@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { playTransition } from '../sounds'
 
 export function useNavigation() {
   const [activeQuestion, setActiveQuestion] = useState(null)  // [rIdx, qIdx|null] | null
@@ -13,10 +14,11 @@ export function useNavigation() {
     if (rIdx === null) {
       setActiveQuestion(null)
     } else if (qIdx === null && rounds) {
-      // Show transition screen before round intro
+      playTransition()
       setTransition(rounds[rIdx])
       setActiveQuestion([rIdx, null])
     } else {
+      playTransition()
       setActiveQuestion([rIdx, qIdx])
     }
   }
