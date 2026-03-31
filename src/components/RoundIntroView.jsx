@@ -1,8 +1,14 @@
+import { useState } from 'react'
+import QRImg from './QRImg'
+import MemberRoster from './MemberRoster'
+
 export default function RoundIntroView({
   rounds, roundIndex, doneQuestions,
+  teams, members, buzzerUrl,
   onNavigate, onBack,
 }) {
   const round = rounds[roundIndex]
+  const [qrOpen, setQrOpen] = useState(true)
 
   return (
     <div className="question-view">
@@ -17,10 +23,10 @@ export default function RoundIntroView({
         <div />
       </div>
 
-      {/* Main: sidebar + content */}
+      {/* Main: sidebar + content + right sidebar */}
       <div className="qv-main">
 
-        {/* Sidebar */}
+        {/* Left sidebar */}
         <Sidebar rounds={rounds} roundIndex={roundIndex} activeQIdx={null} doneQuestions={doneQuestions} onNavigate={onNavigate} />
 
         {/* Intro content */}
@@ -59,6 +65,26 @@ export default function RoundIntroView({
             </button>
           </div>
         </div>
+
+        {/* Right sidebar: QR code + team chips */}
+        <div className={`qv-codes-sidebar${qrOpen ? '' : ' collapsed'}`}>
+          <button className="qv-sidebar-toggle" onClick={() => setQrOpen(o => !o)}>
+            {qrOpen ? '›' : '‹'}
+          </button>
+          {qrOpen && (
+            <>
+              <QRImg url={buzzerUrl} />
+              <div className="qv-codes-url">{buzzerUrl}</div>
+              {teams.map((t, i) => (
+                <div key={i} className={`qv-codes-chip color-${t.color}`}>
+                  <span className="qv-codes-chip-name">{t.name}</span>
+                  <MemberRoster members={members?.[i] || []} compact maxVisible={3} />
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
       </div>
     </div>
   )
@@ -77,7 +103,7 @@ function Sidebar({ rounds, roundIndex, activeQIdx, doneQuestions, onNavigate }) 
             >
               {r.label}
             </button>
-            {r.questions.map((q, qi) => {
+            {r.questions.map((_q, qi) => {
               const done = doneQuestions?.has(`${ri}-${qi}`)
               const active = ri === roundIndex && qi === activeQIdx
               return (

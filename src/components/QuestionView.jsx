@@ -4,12 +4,10 @@ import VideoBody from './VideoBody'
 import SlangBody from './SlangBody'
 import CharadesBody from './CharadesBody'
 import ThesisBody from './ThesisBody'
-import QRImg from './QRImg'
-import MemberRoster from './MemberRoster'
 
 export default function QuestionView({
   rounds, roundIndex, questionIndex, doneQuestions,
-  teams, members, buzzWinner, armed, buzzerUrl,
+  teams, buzzWinner, armed,
   onAdjust, onArm, onDismiss,
   stealMode, onWrongAndSteal, onManualBuzz,
   onToggleDone, onNavigate, onBack, onNext, onPrev,
@@ -19,8 +17,8 @@ export default function QuestionView({
   const question = round.questions[questionIndex]
   const total = round.questions.length
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [qrOpen, setQrOpen] = useState(false)
   const [revealedInModal, setRevealedInModal] = useState(false)
+  const [revealedCountry, setRevealedCountry] = useState(false)
   const [buzzCountdown, setBuzzCountdown] = useState(null)
   const buzzCountdownRef = useRef(null)
 
@@ -144,6 +142,8 @@ export default function QuestionView({
 
                         if (stealMode) {
                           if (canRevealAnswer) setRevealedInModal(true)
+                        } else if (round.type === 'video' && label === 'Correct country') {
+                          setRevealedCountry(true)
                         } else if (points >= 3 && canRevealAnswer) {
                           setRevealedInModal(true)
                         }
@@ -158,12 +158,19 @@ export default function QuestionView({
             </div>
 
             {!stealMode && round.scoring.some(({ label }) => label.toLowerCase().includes('steal')) && (
-              <button className="buzz-steal-btn" onClick={() => { setRevealedInModal(false); onWrongAndSteal() }}>
+              <button className="buzz-steal-btn" onClick={() => { setRevealedInModal(false); setRevealedCountry(false); onWrongAndSteal() }}>
                 Open Steal
               </button>
             )}
 
-            <button className="buzz-dismiss-btn" onClick={() => { setRevealedInModal(false); onDismiss() }}>Reset Buzzers</button>
+            <button className="buzz-dismiss-btn" onClick={() => { setRevealedInModal(false); setRevealedCountry(false); onDismiss() }}>Reset Buzzers</button>
+
+            {revealedCountry && !revealedInModal && round.type === 'video' && question.countries?.length > 0 && (
+              <div className="buzz-popup-answer">
+                <div className="buzz-popup-answer-label">Countries</div>
+                <div className="buzz-popup-answer-text">{question.countries.join(', ')}</div>
+              </div>
+            )}
 
             {revealedInModal && (
               <div className="buzz-popup-answer">
@@ -197,7 +204,7 @@ export default function QuestionView({
       {/* ── Main area: sidebar + body ───────────────── */}
       <div className="qv-main">
 
-        {/* Left sidebar */}
+        {/* Left sidebar: question list */}
         <div className={`qv-sidebar${sidebarOpen ? '' : ' collapsed'}`}>
           <button className="qv-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)}>
             {sidebarOpen ? '‹' : '›'}
@@ -207,7 +214,7 @@ export default function QuestionView({
             return (
               <div key={ri} className="qv-sidebar-group">
                 <button
-                  className="qv-sidebar-round-label clickable"
+                  className={`qv-sidebar-round-label clickable${ri === roundIndex && questionIndex === null ? ' active-round' : ''}`}
                   onClick={() => onNavigate(ri, null)}
                 >
                   {r.label}
@@ -236,25 +243,6 @@ export default function QuestionView({
           {round.type === 'slang'    && <SlangBody    key={question.id} question={question} />}
           {round.type === 'charades' && <CharadesBody key={question.id} question={question} />}
           {round.type === 'thesis'   && <ThesisBody   key={question.id} question={question} />}
-        </div>
-
-        {/* Right sidebar: QR code */}
-        <div className={`qv-codes-sidebar${qrOpen ? '' : ' collapsed'}`}>
-          <button className="qv-sidebar-toggle" onClick={() => setQrOpen(o => !o)}>
-            {qrOpen ? '›' : '‹'}
-          </button>
-          {qrOpen && (
-            <>
-              <QRImg url={buzzerUrl} />
-              <div className="qv-codes-url">{buzzerUrl}</div>
-              {teams.map((t, i) => (
-                <div key={i} className={`qv-codes-chip color-${t.color}`}>
-                  <span className="qv-codes-chip-name">{t.name}</span>
-                  <MemberRoster members={members?.[i] || []} compact maxVisible={3} />
-                </div>
-              ))}
-            </>
-          )}
         </div>
 
       </div> {/* end qv-main */}

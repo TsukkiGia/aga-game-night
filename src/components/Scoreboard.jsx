@@ -73,6 +73,9 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
             rounds={rounds}
             roundIndex={rIdx}
             doneQuestions={doneQuestions}
+            teams={teams}
+            members={members}
+            buzzerUrl={buzzerUrl}
             onNavigate={navigateWithReset}
             onBack={goBack}
           />
@@ -89,8 +92,6 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
           questionIndex={qIdx}
           doneQuestions={doneQuestions}
           teams={teams}
-          members={members}
-          buzzerUrl={buzzerUrl}
           buzzWinner={buzzWinner}
           armed={armed}
           onAdjust={adjust}

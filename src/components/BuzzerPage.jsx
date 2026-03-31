@@ -1,7 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import { socket } from '../socket'
 
-// status: 'join' | 'waiting' | 'armed' | 'i-buzzed' | 'team-buzzed' | 'locked-out'
+// status: 'loading' | 'join' | 'waiting' | 'armed' | 'i-buzzed' | 'team-buzzed' | 'locked-out'
+
+const STORAGE_KEY = 'sankofa_player'
+
+function loadSaved() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null }
+}
+function savePlayer(teamIndex, name) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ teamIndex, name }))
+}
+function clearPlayer() {
+  localStorage.removeItem(STORAGE_KEY)
+}
 
 function deriveStatusFromSync(sync, teamIndex, memberName) {
   if (sync?.buzzedBy !== null && sync?.buzzedBy !== undefined) {
@@ -18,7 +30,7 @@ export default function BuzzerPage() {
   const [name, setName] = useState('')
   const [team, setTeam] = useState(null)
   const [teamIndex, setTeamIndex] = useState(null)
-  const [status, setStatus] = useState('join')
+  const [status, setStatus] = useState(() => loadSaved() ? 'loading' : 'join')
   const [connected, setConnected] = useState(true)
   const teamIndexRef = useRef(null)
   const nameRef = useRef('')
@@ -29,17 +41,42 @@ export default function BuzzerPage() {
   useEffect(() => {
     socket.connect()
 
-    function fetchTeams() {
+    function onConnect() {
+      setConnected(true)
+
+      // Always fetch teams for the join screen
       socket.emit('member:get-teams', (res) => {
         if (res?.teams) setAvailableTeams(res.teams)
       })
+
+      // Auto-rejoin from saved data on initial connect
+      const saved = loadSaved()
+      if (saved && teamIndexRef.current === null) {
+        socket.emit('member:join', saved.teamIndex, saved.name, (res) => {
+          if (res?.error) {
+            clearPlayer()
+            setStatus('join')
+            return
+          }
+          setTeam(res.team)
+          setTeamIndex(res.teamIndex)
+          setName(saved.name)
+          setStatus(deriveStatusFromSync(res.sync, res.teamIndex, saved.name))
+        })
+      }
     }
 
-    socket.on('connect', () => { setConnected(true); fetchTeams() })
+    socket.on('connect', onConnect)
     socket.on('disconnect', () => setConnected(false))
-    socket.on('game:reset', () => { setTeam(null); setTeamIndex(null); setSelectedIndex(null); setStatus('join') })
+    socket.on('game:reset', () => {
+      clearPlayer()
+      setTeam(null)
+      setTeamIndex(null)
+      setSelectedIndex(null)
+      setStatus('join')
+    })
     socket.on('buzz:armed', () => setStatus('armed'))
-    socket.on('buzz:reset', () => setStatus(s => s === 'join' ? s : 'waiting'))
+    socket.on('buzz:reset', () => setStatus(s => s === 'join' || s === 'loading' ? s : 'waiting'))
     socket.on('buzz:winner', (data) => {
       setStatus(prev => {
         if (prev === 'armed' || prev === 'waiting') {
@@ -50,10 +87,10 @@ export default function BuzzerPage() {
       })
     })
 
-    if (socket.connected) fetchTeams()
+    if (socket.connected) onConnect()
 
     return () => {
-      socket.off('connect')
+      socket.off('connect', onConnect)
       socket.off('disconnect')
       socket.off('game:reset')
       socket.off('buzz:armed')
@@ -63,13 +100,13 @@ export default function BuzzerPage() {
     }
   }, [])
 
-  // Effect 2: rejoin on reconnect
+  // Effect 2: rejoin on reconnect once team is known
   useEffect(() => {
     if (teamIndex === null) return
     function rejoin() {
-      const memberName = name.trim() || 'Anonymous'
+      const memberName = nameRef.current || 'Anonymous'
       socket.emit('member:join', teamIndex, memberName, (res) => {
-        if (res?.error) return
+        if (res?.error) { clearPlayer(); setStatus('join'); return }
         if (res?.team) setTeam(res.team)
         if (res?.teamIndex !== undefined) {
           setStatus(deriveStatusFromSync(res.sync, res.teamIndex, memberName))
@@ -78,7 +115,7 @@ export default function BuzzerPage() {
     }
     socket.on('connect', rejoin)
     return () => socket.off('connect', rejoin)
-  }, [teamIndex, name])
+  }, [teamIndex])
 
   function handleJoin(e) {
     e.preventDefault()
@@ -86,6 +123,7 @@ export default function BuzzerPage() {
     const memberName = name.trim() || 'Anonymous'
     socket.emit('member:join', selectedIndex, memberName, (res) => {
       if (res?.error) return
+      savePlayer(res.teamIndex, memberName)
       setTeam(res.team)
       setTeamIndex(res.teamIndex)
       setStatus(deriveStatusFromSync(res.sync, res.teamIndex, memberName))
@@ -95,6 +133,19 @@ export default function BuzzerPage() {
   function handleBuzz() {
     if (status !== 'armed') return
     socket.emit('member:buzz')
+  }
+
+  // ── Loading screen (auto-rejoin in progress) ─────────────────
+  if (status === 'loading') {
+    return (
+      <div className="buzzer-page">
+        <div className="buzzer-join-card">
+          <div className="buzzer-logo">⏳</div>
+          <h1 className="buzzer-title">Reconnecting…</h1>
+          <p className="buzzer-sub">Picking up where you left off</p>
+        </div>
+      </div>
+    )
   }
 
   // ── Join screen ─────────────────────────────────────────────

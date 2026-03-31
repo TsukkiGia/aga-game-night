@@ -8,7 +8,7 @@
   background: var(--bg);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 /* Nav bar */
@@ -309,7 +309,7 @@
 .qv-body {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
   padding: 40px 24px;
 }
@@ -377,6 +377,7 @@
   flex: 1;
   min-width: 0;
   overflow-y: auto;
+  align-items: safe center;
 }
 
 /* ── Sidebar collapse + groups ── */
