@@ -10,11 +10,24 @@ export function useGameSocket(initialTeams) {
 
   useEffect(() => {
     function setup() { socket.emit('host:setup', initialTeams) }
+    function syncState(state) {
+      setArmed(Boolean(state.armed))
+      setBuzzWinner(
+        state.buzzedBy === null
+          ? null
+          : {
+              teamIndex: state.buzzedBy,
+              team: state.teams[state.buzzedBy],
+              memberName: state.buzzedMemberName,
+            }
+      )
+    }
 
     socket.on('connect', setup)
     if (socket.connected) setup()
     socket.connect()
 
+    socket.on('state:sync',   syncState)
     socket.on('buzz:armed',   () => setArmed(true))
     socket.on('buzz:reset',   () => { setArmed(false); setBuzzWinner(null) })
     socket.on('buzz:winner',  (data) => { setArmed(false); setBuzzWinner(data); playBuzzIn() })
@@ -22,6 +35,7 @@ export function useGameSocket(initialTeams) {
 
     return () => {
       socket.off('connect', setup)
+      socket.off('state:sync', syncState)
       socket.off('buzz:armed')
       socket.off('buzz:reset')
       socket.off('buzz:winner')
@@ -30,9 +44,9 @@ export function useGameSocket(initialTeams) {
   }, [])
 
   function handleArm() {
-    setArmed(true)
-    socket.emit('host:arm')
-    playArm()
+    socket.emit('host:arm', (result) => {
+      if (result?.ok) playArm()
+    })
   }
 
   function handleManualBuzz(teamIndex, teams) {
@@ -41,19 +55,20 @@ export function useGameSocket(initialTeams) {
   }
 
   function handleDismiss() {
-    setBuzzWinner(null)
-    setArmed(false)
-    setStealMode(false)
-    socket.emit('host:reset')
+    socket.emit('host:reset', (result) => {
+      if (result?.ok) setStealMode(false)
+    })
   }
 
   function handleWrongAndSteal() {
-    setBuzzWinner(null)
-    setStealMode(true)
-    setArmed(true)
-    socket.emit('host:reset')
-    socket.emit('host:arm')
-    playArm()
+    socket.emit('host:reset', (resetResult) => {
+      if (!resetResult?.ok) return
+      setStealMode(true)
+      socket.emit('host:arm', (armResult) => {
+        if (armResult?.ok) playArm()
+        else setStealMode(false)
+      })
+    })
   }
 
   return { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz }

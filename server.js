@@ -16,6 +16,7 @@ let state = {
   teams: [],       // [{ name, color, code }]
   armed: false,
   buzzedBy: null,  // teamIndex | null
+  buzzedMemberName: null,
   members: {},     // { [teamIndex]: { [socketId]: memberName } }
 }
 
@@ -38,11 +39,12 @@ io.on('connection', (socket) => {
   })
 
   // ── Host: register teams + codes ──────────────────────────
-  socket.on('host:setup', (teams) => {
+  socket.on('host:setup', (teams, callback) => {
+    const respond = typeof callback === 'function' ? callback : () => {}
     const isNewGame = JSON.stringify(teams.map(t => t.code)) !== JSON.stringify(state.teams.map(t => t.code))
     socket.join('host')
     if (isNewGame) {
-      state = { teams, armed: false, buzzedBy: null, members: {} }
+      state = { teams, armed: false, buzzedBy: null, buzzedMemberName: null, members: {} }
       io.except(socket.id).emit('game:reset')
     } else {
       state.teams = teams  // names/colors may have changed, preserve buzzer state
@@ -50,35 +52,51 @@ io.on('connection', (socket) => {
     console.log(`[host:setup] ${isNewGame ? 'new game' : 'reconnect'} — teams:`, teams.map(t => `${t.name}=${t.code}`).join(', '))
     socket.emit('state:sync', state)
     broadcastMembers()
+    respond({ ok: true })
   })
 
   // ── Host: arm the buzzers ──────────────────────────────────
-  socket.on('host:arm', () => {
-    if (!socket.rooms.has('host')) return  // only host can arm
+  socket.on('host:arm', (callback) => {
+    const respond = typeof callback === 'function' ? callback : () => {}
+    if (!socket.rooms.has('host')) {
+      respond({ ok: false, error: 'unauthorized' })
+      return
+    }
     console.log(`[host:arm] armed=${state.armed} buzzedBy=${state.buzzedBy}`)
-    if (state.buzzedBy !== null) return
+    if (state.buzzedBy !== null) {
+      respond({ ok: false, error: 'buzz-locked' })
+      return
+    }
     state.armed = true
     io.emit('buzz:armed')
+    respond({ ok: true })
   })
 
   // ── Host: reset after a buzz ───────────────────────────────
-  socket.on('host:reset', () => {
-    if (!socket.rooms.has('host')) return  // only host can reset
+  socket.on('host:reset', (callback) => {
+    const respond = typeof callback === 'function' ? callback : () => {}
+    if (!socket.rooms.has('host')) {
+      respond({ ok: false, error: 'unauthorized' })
+      return
+    }
     console.log(`[host:reset]`)
     state.armed = false
     state.buzzedBy = null
+    state.buzzedMemberName = null
     io.emit('buzz:reset')
+    respond({ ok: true })
   })
 
   // ── Member: join with code + name ─────────────────────────
   socket.on('member:join', (code, memberName, callback) => {
+    const respond = typeof callback === 'function' ? callback : () => {}
     const normalised = code.trim().toUpperCase()
     const name = (memberName || '').trim() || 'Anonymous'
     console.log(`[member:join] socket=${socket.id} code="${normalised}" name="${name}" | registered teams: [${state.teams.map(t => t.code).join(', ')}]`)
     const idx = state.teams.findIndex(t => t.code === normalised)
     if (idx === -1) {
       console.log(`[member:join] FAIL — no match`)
-      callback({ error: 'Invalid code. Check with your host.' })
+      respond({ error: 'Invalid code. Check with your host.' })
       return
     }
     socket.data.teamIndex = idx
@@ -87,7 +105,7 @@ io.on('connection', (socket) => {
     if (!state.members[idx]) state.members[idx] = {}
     state.members[idx][socket.id] = name
     console.log(`[member:join] OK — joined team "${state.teams[idx].name}" as "${name}"`)
-    callback({ team: state.teams[idx], teamIndex: idx })
+    respond({ team: state.teams[idx], teamIndex: idx })
     broadcastMembers()
 
     // Sync state for late joiners
@@ -95,7 +113,7 @@ io.on('connection', (socket) => {
     if (state.buzzedBy !== null) socket.emit('buzz:winner', {
       teamIndex: state.buzzedBy,
       team: state.teams[state.buzzedBy],
-      memberName: socket.data.memberName,
+      memberName: state.buzzedMemberName,
     })
   })
 
@@ -109,6 +127,7 @@ io.on('connection', (socket) => {
 
     state.armed = false
     state.buzzedBy = idx
+    state.buzzedMemberName = socket.data.memberName
     console.log(`[member:buzz] broadcasting buzz:winner for team "${state.teams[idx].name}" member "${socket.data.memberName}"`)
     io.emit('buzz:winner', { teamIndex: idx, team: state.teams[idx], memberName: socket.data.memberName })
   })

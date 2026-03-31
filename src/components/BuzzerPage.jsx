@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { socket } from '../socket'
 
-// status: 'join' | 'waiting' | 'armed' | 'i-buzzed' | 'locked-out'
+// status: 'join' | 'waiting' | 'armed' | 'i-buzzed' | 'team-buzzed' | 'locked-out'
 
 export default function BuzzerPage() {
   const [code, setCode] = useState('')
@@ -12,7 +12,9 @@ export default function BuzzerPage() {
   const [connected, setConnected] = useState(true)
   const inputRef = useRef(null)
   const teamRef = useRef(null)
+  const nameRef = useRef('')
   teamRef.current = team  // always current — no stale closure risk
+  nameRef.current = name
 
   // Effect 1: socket lifecycle — runs once, never disconnects mid-session
   useEffect(() => {
@@ -26,7 +28,9 @@ export default function BuzzerPage() {
     socket.on('buzz:winner', (data) => {
       setStatus(prev => {
         if (prev === 'armed' || prev === 'waiting') {
-          return data.team.code === teamRef.current?.code ? 'i-buzzed' : 'locked-out'
+          const sameTeam = data.team.code === teamRef.current?.code
+          if (!sameTeam) return 'locked-out'
+          return data.memberName === nameRef.current ? 'i-buzzed' : 'team-buzzed'
         }
         return prev
       })
@@ -67,8 +71,6 @@ export default function BuzzerPage() {
   function handleBuzz() {
     if (status !== 'armed') return
     socket.emit('member:buzz')
-    // Optimistically mark as buzzed; server will confirm via buzz:winner
-    setStatus('i-buzzed')
   }
 
   // ── Join screen ─────────────────────────────────────────────
@@ -114,6 +116,7 @@ export default function BuzzerPage() {
     waiting:   { label: 'Waiting for host…',     sub: 'Hold tight — the host will arm the buzzers', pulse: false },
     armed:     { label: 'BUZZ NOW!',              sub: 'Be the first to buzz in!',                   pulse: true  },
     'i-buzzed':{ label: 'YOU BUZZED IN!',         sub: 'The host will call on you',                  pulse: false },
+    'team-buzzed': { label: 'YOUR TEAM BUZZED IN!', sub: 'Your teammate got there first',            pulse: false },
     'locked-out': { label: 'Locked Out',          sub: 'Another team buzzed first',                  pulse: false },
   }
   const cfg = statusConfig[status] || statusConfig.waiting
@@ -140,6 +143,7 @@ export default function BuzzerPage() {
         className={`buzzer-btn color-${team.color}
           ${status === 'armed' ? 'buzzer-btn-ready' : ''}
           ${status === 'i-buzzed' ? 'buzzer-btn-winner' : ''}
+          ${status === 'team-buzzed' ? 'buzzer-btn-winner' : ''}
           ${status === 'locked-out' ? 'buzzer-btn-locked' : ''}
           ${cfg.pulse ? 'buzzer-pulse' : ''}
         `}
@@ -149,6 +153,7 @@ export default function BuzzerPage() {
         {status === 'waiting'    && '⏳'}
         {status === 'armed'      && '🔔'}
         {status === 'i-buzzed'   && '🏆'}
+        {status === 'team-buzzed' && '👥'}
         {status === 'locked-out' && '🔒'}
       </button>
     </div>

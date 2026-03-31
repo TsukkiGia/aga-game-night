@@ -54,8 +54,24 @@ export default function QuestionView({
               <span className="qv-strip-score">{team.score}</span>
             </div>
             <div className="qv-strip-btns">
-              <button className="qv-pts-btn neg" onClick={() => onAdjust(i, -1)}>−1</button>
-              <button className="qv-pts-btn pos" onClick={() => onAdjust(i, +1)}>+1</button>
+              <button
+                className="qv-pts-btn neg"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onAdjust(i, -1)
+                }}
+              >
+                −1
+              </button>
+              <button
+                className="qv-pts-btn pos"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onAdjust(i, +1)
+                }}
+              >
+                +1
+              </button>
             </div>
           </div>
         ))}
