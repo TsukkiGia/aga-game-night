@@ -3,4 +3,6 @@ import guessTheLanguage from './rounds/guessTheLanguage.js'
 import slangBee         from './rounds/slangBee.js'
 import thesisTranslator from './rounds/thesisTranslator.js'
 
-export default [charades, guessTheLanguage, slangBee, thesisTranslator]
+const rounds = [guessTheLanguage, charades, slangBee, thesisTranslator]
+
+export default rounds.map((r, i) => ({ ...r, label: `Round ${i + 1}` }))

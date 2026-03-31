@@ -6,10 +6,10 @@ export default {
   rules: [
     'Teams take turns — one person acts, the rest of the team guesses',
     'No speaking, mouthing words, or spelling things out',
-    'Host decides timing per turn',
+    '90 seconds per turn',
     '3 points for a correct answer by the acting team',
     'If time runs out, other teams can steal by buzzing in',
-    '+2 for a correct steal, -1 for a wrong steal',
+    '+2 for a correct steal, −1 for a wrong steal',
   ],
   scoring: [
     { label: 'Correct answer', points: 3 },

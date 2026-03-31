@@ -6,12 +6,13 @@ export function useGameSocket(initialTeams) {
   const [armed, setArmed] = useState(false)
   const [buzzWinner, setBuzzWinner] = useState(null)
   const [members, setMembers] = useState([])
+  const [stealMode, setStealMode] = useState(false)
 
   useEffect(() => {
     function setup() { socket.emit('host:setup', initialTeams) }
 
     socket.on('connect', setup)
-    if (socket.connected) setup()  // already connected (e.g. new game without page refresh)
+    if (socket.connected) setup()
     socket.connect()
 
     socket.on('buzz:armed',   () => setArmed(true))
@@ -25,7 +26,6 @@ export function useGameSocket(initialTeams) {
       socket.off('buzz:reset')
       socket.off('buzz:winner')
       socket.off('host:members')
-      // do NOT disconnect — socket is shared; host reconnects automatically
     }
   }, [])
 
@@ -38,8 +38,18 @@ export function useGameSocket(initialTeams) {
   function handleDismiss() {
     setBuzzWinner(null)
     setArmed(false)
+    setStealMode(false)
     socket.emit('host:reset')
   }
 
-  return { armed, buzzWinner, members, handleArm, handleDismiss }
+  function handleWrongAndSteal() {
+    setBuzzWinner(null)
+    setStealMode(true)
+    setArmed(true)
+    socket.emit('host:reset')
+    socket.emit('host:arm')
+    playArm()
+  }
+
+  return { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal }
 }

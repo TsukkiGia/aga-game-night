@@ -9,16 +9,16 @@ export function useNavigation() {
   // navigate(null)        → back to main scoreboard
   // navigate(rIdx, null)  → round intro (with transition)
   // navigate(rIdx, qIdx)  → specific question
-  function navigate(rIdx, qIdx = null, rounds = null) {
+  function navigate(rIdx, qIdx = null, rounds = null, silent = false) {
     setQuestionsOpen(false)
     if (rIdx === null) {
       setActiveQuestion(null)
     } else if (qIdx === null && rounds) {
-      playTransition()
+      if (!silent) playTransition()
       setTransition(rounds[rIdx])
       setActiveQuestion([rIdx, null])
     } else {
-      playTransition()
+      if (!silent) playTransition()
       setActiveQuestion([rIdx, qIdx])
     }
   }

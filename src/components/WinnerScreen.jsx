@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { playWinner } from '../sounds'
+import { playWinner, playWinnerMusical, playApplause } from '../sounds'
 
 export default function WinnerScreen({ teams, onClose, onDismiss }) {
   const canvasRef = useRef(null)
@@ -13,7 +13,7 @@ export default function WinnerScreen({ teams, onClose, onDismiss }) {
   const winners = hasScores ? sorted.filter(t => t.score === topScore) : []
   const isTie = winners.length > 1
 
-  useEffect(() => { playWinner() }, [])
+  useEffect(() => { playWinner(); playWinnerMusical(); playApplause() }, [])
 
   // Simple confetti
   useEffect(() => {

@@ -127,6 +127,22 @@
 }
 .buzz-dismiss-btn:hover { background: var(--terra-light); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(201,75,44,0.35); }
 
+.buzz-steal-btn {
+  margin-top: 8px;
+  background: var(--amber);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.buzz-steal-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
 .buzz-popup-answer {
   margin-top: 14px;
   background: rgba(255,255,255,0.12);

@@ -9,6 +9,7 @@ export default function QuestionView({
   rounds, roundIndex, questionIndex, doneQuestions,
   teams, members, buzzerUrl, buzzWinner, armed,
   isDone, onAdjust, onArm, onDismiss,
+  stealMode, onWrongAndSteal,
   onToggleDone, onNavigate, onBack, onNext, onPrev,
   onHalftime, onWinner, doublePoints, onToggleDouble,
 }) {
@@ -67,7 +68,7 @@ export default function QuestionView({
             className={`buzz-popup color-${buzzWinner.team.color}`}
             onClick={e => e.stopPropagation()}
           >
-            <div className="buzz-popup-label">BUZZED IN!</div>
+            <div className="buzz-popup-label">{stealMode ? '🔀 STEAL!' : 'BUZZED IN!'}</div>
             <div className="buzz-popup-name">
               {buzzWinner.memberName
                 ? `${buzzWinner.memberName} just buzzed in for ${buzzWinner.team.name}!`
@@ -75,23 +76,39 @@ export default function QuestionView({
             </div>
             <div className="buzz-popup-score">Current Score: {teams[buzzWinner.teamIndex]?.score ?? 0} pts</div>
             <div className="buzz-popup-scoring">
-              {round.scoring.map(({ label, points }) => (
-                <button
-                  key={label}
-                  className={`buzz-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
-                  onClick={() => {
-                    onAdjust(buzzWinner.teamIndex, points)
-                    if (points > 0 && (round.type === 'slang' || round.type === 'video')) {
-                      setRevealedInModal(true)
-                    }
-                  }}
-                  title={label}
-                >
-                  <span className="buzz-pts-label">{label}</span>
-                  <span className="buzz-pts-value">{points > 0 ? `+${points}` : points}</span>
-                </button>
-              ))}
+              {round.scoring
+                .filter(({ label }) => {
+                  const isStealEntry = label.toLowerCase().includes('steal')
+                  return stealMode ? isStealEntry : !isStealEntry
+                })
+                .map(({ label, points }) => (
+                  <button
+                    key={label}
+                    className={`buzz-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
+                    onClick={() => {
+                      onAdjust(buzzWinner.teamIndex, points)
+                      if (stealMode) {
+                        setRevealedInModal(false)
+                        onDismiss()
+                      } else if (points >= 3 && (round.type === 'slang' || round.type === 'video')) {
+                        setRevealedInModal(true)
+                      }
+                    }}
+                    title={label}
+                  >
+                    <span className="buzz-pts-label">{label}</span>
+                    <span className="buzz-pts-value">{points > 0 ? `+${points}` : points}</span>
+                  </button>
+                ))}
             </div>
+
+            {round.scoring.some(({ label }) => label.toLowerCase().includes('steal')) && (
+              <button className="buzz-steal-btn" onClick={() => { setRevealedInModal(false); onWrongAndSteal() }}>
+                Open Steal
+              </button>
+            )}
+
+            <button className="buzz-dismiss-btn" onClick={() => { setRevealedInModal(false); onDismiss() }}>Reset Buzzers</button>
 
             {revealedInModal && (
               <div className="buzz-popup-answer">
@@ -112,8 +129,6 @@ export default function QuestionView({
                 )}
               </div>
             )}
-
-            <button className="buzz-dismiss-btn" onClick={() => { setRevealedInModal(false); onDismiss() }}>Reset Buzzers</button>
           </div>
         </div>
       )}

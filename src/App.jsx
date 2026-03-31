@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Setup from './components/Setup'
 import Scoreboard from './components/Scoreboard'
 import BuzzerPage from './components/BuzzerPage'
 import { TEAMS_KEY } from './storage'
+import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy } from './sounds'
 import './App.css'
 
 const isBuzzerMode = window.location.pathname.startsWith('/buzz')
@@ -13,6 +14,24 @@ function loadTeams() {
 
 export default function App() {
   const [teams, setTeams] = useState(() => loadTeams())
+
+  useEffect(() => {
+    function onKey(e) {
+      if (!e.shiftKey) return
+      if (e.key === 'C') playCrickets()
+      if (e.key === 'F') playFaaah()
+      if (e.key === 'R') playCorrectAnswer()
+      if (e.key === 'N') playNani()
+      if (e.key === 'W') playWhatTheHell()
+      if (e.key === 'S') playShocked()
+      if (e.key === 'A') playAirhorn()
+      if (e.key === 'B') playBoo()
+      if (e.key === 'L') playLaughter()
+      if (e.key === 'O') playOkayy()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   function handleStart(newTeams) {
     localStorage.setItem(TEAMS_KEY, JSON.stringify(newTeams))

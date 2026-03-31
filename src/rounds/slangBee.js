@@ -7,11 +7,13 @@ export default {
     'Buzz in to answer — like a spelling bee, but for slang',
     'Give the meaning of the term to score points',
     'Bonus point if your answer is especially funny',
-    'If you miss, one steal is allowed',
+    'If you miss, one steal is allowed — +2 for correct, −1 for wrong',
   ],
   scoring: [
     { label: 'Correct meaning', points: 3 },
     { label: 'Funny bonus',     points: 1 },
+    { label: 'Correct steal',   points: 2 },
+    { label: 'Wrong steal',     points: -1 },
   ],
   questions: [
     {

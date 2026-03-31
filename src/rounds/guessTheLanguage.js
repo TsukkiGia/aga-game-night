@@ -10,12 +10,14 @@ export default {
     'Give the language or country',
     'No word-for-word translation needed — capturing the vibe counts',
     'Buzz in to answer; if you miss, one steal is allowed',
+    '+2 for a correct steal, −1 for a wrong steal',
     'Host reveals the answer with a short explanation',
   ],
   scoring: [
     { label: 'Correct language', points: 3 },
-    { label: 'Correct country',   points: 1 },
-    { label: 'Wrong',            points: -1 },
+    { label: 'Correct country',  points: 1 },
+    { label: 'Correct steal',    points: 2 },
+    { label: 'Wrong steal',      points: -1 },
   ],
   questions: [
     { id: 'r1q1', video: 'r1-01.mp4', answer: '', explanation: '' },

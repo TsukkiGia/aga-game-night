@@ -1,4 +1,8 @@
+import { useEffect } from 'react'
+import { playWhistle } from '../sounds'
+
 export default function HalftimeScreen({ teams, onClose }) {
+  useEffect(() => { playWhistle() }, [])
   const sorted = [...teams]
     .map((t, i) => ({ ...t, originalIndex: i }))
     .sort((a, b) => b.score - a.score)
