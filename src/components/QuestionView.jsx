@@ -97,26 +97,29 @@ export default function QuestionView({
                   const isStealEntry = label.toLowerCase().includes('steal')
                   return stealMode ? isStealEntry : !isStealEntry
                 })
-                .map(({ label, points }) => (
-                  <button
-                    key={label}
-                    className={`buzz-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
-                    onClick={() => {
-                      onAdjust(buzzWinner.teamIndex, points)
-                      const canRevealAnswer = round.type === 'slang' || round.type === 'video'
+                .map(({ label, points }) => {
+                  const displayPoints = doublePoints ? points * 2 : points
+                  return (
+                    <button
+                      key={label}
+                      className={`buzz-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
+                      onClick={() => {
+                        onAdjust(buzzWinner.teamIndex, points)
+                        const canRevealAnswer = round.type === 'slang' || round.type === 'video'
 
-                      if (stealMode) {
-                        if (canRevealAnswer) setRevealedInModal(true)
-                      } else if (points >= 3 && canRevealAnswer) {
-                        setRevealedInModal(true)
-                      }
-                    }}
-                    title={label}
-                  >
-                    <span className="buzz-pts-label">{label}</span>
-                    <span className="buzz-pts-value">{points > 0 ? `+${points}` : points}</span>
-                  </button>
-                ))}
+                        if (stealMode) {
+                          if (canRevealAnswer) setRevealedInModal(true)
+                        } else if (points >= 3 && canRevealAnswer) {
+                          setRevealedInModal(true)
+                        }
+                      }}
+                      title={label}
+                    >
+                      <span className="buzz-pts-label">{label}</span>
+                      <span className="buzz-pts-value">{displayPoints > 0 ? `+${displayPoints}` : displayPoints}</span>
+                    </button>
+                  )
+                })}
             </div>
 
             {!stealMode && round.scoring.some(({ label }) => label.toLowerCase().includes('steal')) && (

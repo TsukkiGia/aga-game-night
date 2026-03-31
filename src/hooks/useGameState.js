@@ -8,6 +8,10 @@ export function useGameState(initialTeams) {
   const [flashing, setFlashing] = useState(null)
   const [doublePoints, setDoublePoints] = useState(false)
 
+  function clearDoublePoints() {
+    setDoublePoints(false)
+  }
+
   useEffect(() => {
     const s = {}
     teams.forEach(t => { s[t.code] = t.score })
@@ -31,11 +35,13 @@ export function useGameState(initialTeams) {
     clearAll()
     setTeams(prev => prev.map(t => ({ ...t, score: 0 })))
     setDoneQuestions(new Set())
+    clearDoublePoints()
   }
 
   function resetForNewGame() {
     setTeams(prev => prev.map(t => ({ ...t, score: 0 })))
     setDoneQuestions(new Set())
+    clearDoublePoints()
   }
 
   function toggleDone(rIdx, qIdx) {
@@ -47,5 +53,5 @@ export function useGameState(initialTeams) {
     })
   }
 
-  return { teams, doneQuestions, flashing, doublePoints, setDoublePoints, adjust, resetScores, resetForNewGame, toggleDone }
+  return { teams, doneQuestions, flashing, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetScores, resetForNewGame, toggleDone }
 }

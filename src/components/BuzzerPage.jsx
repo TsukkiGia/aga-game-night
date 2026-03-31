@@ -3,6 +3,15 @@ import { socket } from '../socket'
 
 // status: 'join' | 'waiting' | 'armed' | 'i-buzzed' | 'team-buzzed' | 'locked-out'
 
+function deriveStatusFromSync(sync, teamIndex, memberName) {
+  if (sync?.buzzedBy !== null && sync?.buzzedBy !== undefined) {
+    if (sync.buzzedBy !== teamIndex) return 'locked-out'
+    return sync.buzzedMemberName === memberName ? 'i-buzzed' : 'team-buzzed'
+  }
+  if (sync?.armed) return 'armed'
+  return 'waiting'
+}
+
 export default function BuzzerPage() {
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
@@ -50,7 +59,16 @@ export default function BuzzerPage() {
   // Effect 2: rejoin on reconnect — only registered once team is known
   useEffect(() => {
     if (!team) return
-    function rejoin() { socket.emit('member:join', team.code, name, () => {}) }
+    function rejoin() {
+      const memberName = name.trim() || 'Anonymous'
+      socket.emit('member:join', team.code, memberName, (res) => {
+        if (res?.error) return
+        if (res?.team) setTeam(res.team)
+        if (res?.teamIndex !== undefined) {
+          setStatus(deriveStatusFromSync(res.sync, res.teamIndex, memberName))
+        }
+      })
+    }
     socket.on('connect', rejoin)
     return () => socket.off('connect', rejoin)
   }, [team, name])
@@ -58,13 +76,14 @@ export default function BuzzerPage() {
   function handleJoin(e) {
     e.preventDefault()
     setError('')
-    socket.emit('member:join', code, name, (res) => {
+    const memberName = name.trim() || 'Anonymous'
+    socket.emit('member:join', code, memberName, (res) => {
       if (res.error) {
         setError(res.error)
         return
       }
       setTeam(res.team)
-      setStatus('waiting')
+      setStatus(deriveStatusFromSync(res.sync, res.teamIndex, memberName))
     })
   }
 

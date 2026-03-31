@@ -269,3 +269,32 @@ test('reconnected members still obey steal lockout while armed', async () => {
     await harness.close()
   }
 })
+
+test('member:join ack includes authoritative sync state', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const memberA = await harness.connect()
+    const memberB = await harness.connect()
+    const memberC = await harness.connect()
+
+    await emitAck(host, 'host:setup', TEAMS)
+    await emitAck(memberA, 'member:join', TEAMS[0].code, 'Alice')
+
+    await emitAck(host, 'host:arm')
+    const armedJoin = await emitAck(memberB, 'member:join', TEAMS[1].code, 'Bob')
+    assert.equal(armedJoin.sync.armed, true)
+    assert.equal(armedJoin.sync.buzzedBy, null)
+
+    const winnerPromise = once(host, 'buzz:winner')
+    memberA.emit('member:buzz')
+    await winnerPromise
+
+    const postBuzzJoin = await emitAck(memberC, 'member:join', TEAMS[1].code, 'Cara')
+    assert.equal(postBuzzJoin.sync.armed, false)
+    assert.equal(postBuzzJoin.sync.buzzedBy, 0)
+    assert.equal(postBuzzJoin.sync.buzzedMemberName, 'Alice')
+  } finally {
+    await harness.close()
+  }
+})

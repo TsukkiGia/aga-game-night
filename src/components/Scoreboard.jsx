@@ -14,7 +14,7 @@ import { clearAll } from '../storage'
 import { playGameStart } from '../sounds'
 
 export default function Scoreboard({ teams: initialTeams, onReset }) {
-  const { teams, doneQuestions, doublePoints, setDoublePoints, adjust, resetForNewGame, toggleDone } = useGameState(initialTeams)
+  const { teams, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, toggleDone } = useGameState(initialTeams)
   const { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz } = useGameSocket(initialTeams)
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
@@ -25,7 +25,19 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
 
   if (activeQuestion !== null) {
     const [rIdx, qIdx] = activeQuestion
-    function goBack() { handleDismiss(); setLaunching(false); navigate(null) }
+    function dismissBuzzAndResetMultiplier() {
+      clearDoublePoints()
+      handleDismiss()
+    }
+    function navigateWithReset(ri, qi = null) {
+      clearDoublePoints()
+      navigate(ri, qi, rounds)
+    }
+    function goBack() {
+      dismissBuzzAndResetMultiplier()
+      setLaunching(false)
+      navigate(null)
+    }
 
     if (qIdx === null) {
       return (
@@ -34,7 +46,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
             rounds={rounds}
             roundIndex={rIdx}
             doneQuestions={doneQuestions}
-            onNavigate={(ri, qi) => navigate(ri, qi, rounds)}
+            onNavigate={navigateWithReset}
             onBack={goBack}
           />
           {transition && <RoundTransitionScreen round={transition} onDone={dismissTransition} />}
@@ -56,20 +68,20 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
           armed={armed}
           onAdjust={adjust}
           onArm={handleArm}
-          onDismiss={handleDismiss}
+          onDismiss={dismissBuzzAndResetMultiplier}
           stealMode={stealMode}
           onWrongAndSteal={handleWrongAndSteal}
           onManualBuzz={(i) => handleManualBuzz(i, teams)}
           onToggleDone={() => toggleDone(rIdx, qIdx)}
-          onNavigate={(ri, qi) => navigate(ri, qi, rounds)}
+          onNavigate={navigateWithReset}
           onBack={goBack}
           onNext={() => {
             const isLastQuestion = qIdx === rounds[rIdx].questions.length - 1
             const isLastRound = rIdx === rounds.length - 1
-            if (isLastQuestion && !isLastRound) navigate(rIdx + 1, null, rounds)
-            else if (!isLastQuestion) navigate(rIdx, qIdx + 1)
+            if (isLastQuestion && !isLastRound) navigateWithReset(rIdx + 1, null)
+            else if (!isLastQuestion) navigateWithReset(rIdx, qIdx + 1)
           }}
-          onPrev={() => navigate(rIdx, qIdx - 1)}
+          onPrev={() => navigateWithReset(rIdx, qIdx - 1)}
           onHalftime={() => setShowHalftime(true)}
           onWinner={() => setShowWinner(true)}
           doublePoints={doublePoints}

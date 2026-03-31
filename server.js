@@ -116,7 +116,15 @@ export function createBuzzServer() {
       if (!state.members[idx]) state.members[idx] = {}
       state.members[idx][socket.id] = name
       console.log(`[member:join] OK — joined team "${state.teams[idx].name}" as "${name}"`)
-      respond({ team: state.teams[idx], teamIndex: idx })
+      respond({
+        team: state.teams[idx],
+        teamIndex: idx,
+        sync: {
+          armed: state.armed,
+          buzzedBy: state.buzzedBy,
+          buzzedMemberName: state.buzzedMemberName,
+        },
+      })
       broadcastMembers()
 
       // Sync state for late joiners
