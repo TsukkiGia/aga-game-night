@@ -1,6 +1,3 @@
-// Videos: place .mp4 files in public/videos/ named r1-01.mp4 through r1-08.mp4
-// Fill in the answer and explanation fields below.
-
 export default {
   label: 'Round 2',
   name: 'Guess the Language',
@@ -20,13 +17,143 @@ export default {
     { label: 'Wrong steal',      points: -1 },
   ],
   questions: [
-    { id: 'r1q1', video: 'r1-01.mp4', answer: '', explanation: '' },
-    { id: 'r1q2', video: 'r1-02.mp4', answer: '', explanation: '' },
-    { id: 'r1q3', video: 'r1-03.mp4', answer: '', explanation: '' },
-    { id: 'r1q4', video: 'r1-04.mp4', answer: '', explanation: '' },
-    { id: 'r1q5', video: 'r1-05.mp4', answer: '', explanation: '' },
-    { id: 'r1q6', video: 'r1-06.mp4', answer: '', explanation: '' },
-    { id: 'r1q7', video: 'r1-07.mp4', answer: '', explanation: '' },
-    { id: 'r1q8', video: 'r1-08.mp4', answer: '', explanation: '' },
+    {
+      id: 'gtl-yoruba',
+      video: 'Yoruba.mov',
+      answer: 'Yoruba',
+      explanation: 'Yoruba is one of Nigeria\'s three major languages, with ~45 million speakers in southwestern Nigeria, Benin, and Togo. It has a rich oral literary tradition and its influence extends to the Americas through the diaspora — especially in Brazilian Candomblé and Cuban Lucumí.',
+    },
+    {
+      id: 'gtl-swahili',
+      video: 'Swahili.mov',
+      answer: 'Swahili',
+      explanation: 'Swahili (Kiswahili) is East Africa\'s great lingua franca, with ~200 million speakers — most as a second language. Official in Kenya, Tanzania, Uganda, Rwanda, and DRC. Its vocabulary is ~40% Arabic-influenced from centuries of Indian Ocean trade.',
+    },
+    {
+      id: 'gtl-krio',
+      video: 'Krio.mp4',
+      answer: 'Krio',
+      explanation: 'Krio is an English-based creole spoken as a lingua franca by ~97% of Sierra Leone\'s population. It developed from the language of freed slaves who settled in Freetown in the late 18th century.',
+    },
+    {
+      id: 'gtl-dinka',
+      video: 'Dinka.mp4',
+      answer: 'Dinka',
+      explanation: 'Dinka is a Nilotic language of South Sudan, spoken by the Dinka people — the country\'s largest ethnic group. It has a complex tonal system and is one of the most widely spoken languages in South Sudan.',
+    },
+    {
+      id: 'gtl-lingala',
+      video: 'Lingala.mp4',
+      answer: 'Lingala',
+      explanation: 'Lingala is a Bantu language spoken across the DRC, Republic of Congo, Central African Republic, and Angola. It\'s the language of Congolese rumba and ndombolo music, and one of the DRC\'s four national languages.',
+    },
+    {
+      id: 'gtl-twi',
+      video: 'Twi.mp4',
+      answer: 'Twi',
+      explanation: 'Twi is an Akan language spoken by about 9 million people in Ghana, especially in the Ashanti region and the south. It\'s part of the broader Akan group (which includes Fante) and is one of Ghana\'s most dominant local languages.',
+    },
+    {
+      id: 'gtl-amharic',
+      video: 'Amharic.mp4',
+      answer: 'Amharic',
+      explanation: 'Amharic is the official language of Ethiopia, spoken by ~25 million people natively. It\'s a Semitic language written in the ancient Ge\'ez (Ethiopic) script — the most widely spoken Semitic language after Arabic.',
+    },
+    {
+      id: 'gtl-zulu',
+      video: 'Zulu.mov',
+      answer: 'Zulu',
+      explanation: 'IsiZulu is South Africa\'s most widely spoken home language, with ~12 million native speakers. A Bantu language known for its distinctive click consonants (shared with other Nguni languages like Xhosa). "Sawubona" is its famous greeting.',
+    },
+    {
+      id: 'gtl-wolof',
+      video: 'wolof.mp4',
+      answer: 'Wolof',
+      explanation: 'Wolof is the dominant everyday language of Senegal and the Gambia, spoken natively by ~5 million and as a second language by ~12 million more — even though French is Senegal\'s official language. Central to Senegalese identity, music, and humor.',
+    },
+    {
+      id: 'gtl-igbo',
+      video: 'Igbo.mp4',
+      answer: 'Igbo',
+      explanation: 'Igbo is one of Nigeria\'s three major languages, spoken by ~24 million people in the southeast. It\'s a tonal language with hundreds of dialects, and is one of the most linguistically complex languages in Africa.',
+    },
+    {
+      id: 'gtl-somali',
+      video: 'Somali.mp4',
+      answer: 'Somali',
+      explanation: 'Somali is a Cushitic (Afroasiatic) language spoken by ~22 million people across Somalia, Ethiopia, Djibouti, and Kenya. It\'s the most widely spoken Cushitic language and has a rich oral poetry tradition.',
+    },
+    {
+      id: 'gtl-luganda',
+      video: 'Luganda.mp4',
+      answer: 'Luganda',
+      explanation: 'Luganda is a Bantu language spoken by the Baganda — Uganda\'s largest ethnic group — and is the most widely spoken local language in the country. It\'s the official language of the historic Buganda Kingdom.',
+    },
+    {
+      id: 'gtl-ewe',
+      video: 'Ewe.mp4',
+      answer: 'Ewe',
+      explanation: 'Ewe is a Gbe language spoken across Ghana, Togo, and Benin by about 7 million people. It\'s part of the Volta-Congo family and has a significant diaspora presence due to the transatlantic slave trade.',
+    },
+    {
+      id: 'gtl-tshiluba',
+      video: 'Tshiluba.mp4',
+      answer: 'Tshiluba',
+      explanation: 'Tshiluba (Luba-Kasai) is a Bantu language of the Kasai region of the DRC, with about 6 million native speakers. One of the four national languages of the DRC alongside Lingala, Swahili, and Kikongo.',
+    },
+    {
+      id: 'gtl-bambara',
+      video: 'Bambara.mp4',
+      answer: 'Bambara',
+      explanation: 'Bambara (Bamanankan) is a Mande language spoken primarily in Mali, serving as a lingua franca across much of West Africa. About 14 million speakers, and closely related to Dyula and Jula.',
+    },
+    {
+      id: 'gtl-shona',
+      video: 'Shona.mp4',
+      answer: 'Shona',
+      explanation: 'Shona is Zimbabwe\'s most widely spoken indigenous language, used by about 75% of the population. A Bantu language with dialects including Karanga, Zezuru, and Korekore. Also spoken in parts of Mozambique.',
+    },
+    {
+      id: 'gtl-luo',
+      video: 'Luo.mp4',
+      answer: 'Luo',
+      explanation: 'Luo (Dholuo) is a Nilotic language spoken by the Luo people of Kenya, Uganda, and Tanzania. It\'s not Bantu — it belongs to the Nilo-Saharan family. Barack Obama\'s paternal family are Luo from western Kenya.',
+    },
+    {
+      id: 'gtl-kituba',
+      video: 'Kituba.mp4',
+      answer: 'Kituba',
+      explanation: 'Kituba (also called Kikongo ya Leta or Munukutuba) is a Bantu-based creole that developed from Kikongo as a trade and administrative language in the Republic of Congo and DRC.',
+    },
+    {
+      id: 'gtl-tswana',
+      video: 'Tswana.mp4',
+      answer: 'Tswana',
+      explanation: 'Setswana is a Bantu language and the national language of Botswana, also widely spoken in South Africa. About 5 million speakers. Closely related to Sesotho and Sepedi — together these are called the Sotho-Tswana languages.',
+    },
+    {
+      id: 'gtl-ibibio',
+      video: 'Ibibio.mp4',
+      answer: 'Ibibio',
+      explanation: 'Ibibio is spoken by the Ibibio people of southeastern Nigeria, primarily in Akwa Ibom State. About 4 million speakers. It\'s closely related to Efik and part of the Cross River language group.',
+    },
+    {
+      id: 'gtl-kikuyu',
+      video: 'Kikuyu.mp4',
+      answer: 'Kikuyu',
+      explanation: 'Kikuyu (Gikuyu) is a Bantu language spoken by Kenya\'s largest ethnic group, the Kikuyu, primarily around Mount Kenya. About 8 million speakers. Closely related to Meru and Embu.',
+    },
+    {
+      id: 'gtl-nyanja',
+      video: 'Nyanja.mp4',
+      answer: 'Nyanja',
+      explanation: 'Nyanja (also called Chichewa or Chewa) is a Bantu language spoken in Malawi, Zambia, Mozambique, and Zimbabwe. It\'s Malawi\'s national language and has over 15 million speakers across the region.',
+    },
+    {
+      id: 'gtl-meru',
+      video: 'Meru.mp4',
+      answer: 'Meru',
+      explanation: 'Kimeru is a Bantu language spoken by the Meru people of central Kenya, on the eastern slopes of Mount Kenya. About 2 million speakers. Closely related to Kikuyu and Embu, but distinct enough to be its own language.',
+    },
   ],
 }

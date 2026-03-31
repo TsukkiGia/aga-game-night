@@ -225,7 +225,7 @@ export default function QuestionView({
 
         {/* ── Question body ────────────────────────────── */}
         <div className="qv-body">
-          {round.type === 'video'    && <VideoBody    key={question.id} question={question} />}
+          {round.type === 'video'    && <VideoBody    key={question.id} question={question} paused={!!buzzWinner} />}
           {round.type === 'slang'    && <SlangBody    key={question.id} question={question} />}
           {round.type === 'charades' && <CharadesBody key={question.id} question={question} />}
           {round.type === 'thesis'   && <ThesisBody   key={question.id} question={question} />}
