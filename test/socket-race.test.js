@@ -4,8 +4,8 @@ import { io as createClient } from 'socket.io-client'
 import { createBuzzServer } from '../server.js'
 
 const TEAMS = [
-  { name: 'Team A', color: 'ember', code: 'A1A1' },
-  { name: 'Team B', color: 'gold', code: 'B2B2' },
+  { name: 'Team A', color: 'ember' },
+  { name: 'Team B', color: 'gold' },
 ]
 
 function wait(ms) {
@@ -95,8 +95,8 @@ test('first buzz wins under near-simultaneous buzzes', async () => {
     const setupResult = await emitAck(host, 'host:setup', TEAMS)
     assert.equal(setupResult.ok, true)
 
-    const joinA = await emitAck(memberA, 'member:join', TEAMS[0].code, 'Alice')
-    const joinB = await emitAck(memberB, 'member:join', TEAMS[1].code, 'Bob')
+    const joinA = await emitAck(memberA, 'member:join', 0, 'Alice')
+    const joinB = await emitAck(memberB, 'member:join', 1, 'Bob')
     assert.equal(joinA.teamIndex, 0)
     assert.equal(joinB.teamIndex, 1)
 
@@ -134,8 +134,8 @@ test('steal lockout rejects buzzes from the failed team', async () => {
     const memberB = await harness.connect()
 
     await emitAck(host, 'host:setup', TEAMS)
-    await emitAck(memberA, 'member:join', TEAMS[0].code, 'Alice')
-    await emitAck(memberB, 'member:join', TEAMS[1].code, 'Bob')
+    await emitAck(memberA, 'member:join', 0, 'Alice')
+    await emitAck(memberB, 'member:join', 1, 'Bob')
 
     await emitAck(host, 'host:arm')
     const firstWinnerPromise = once(host, 'buzz:winner')
@@ -172,7 +172,7 @@ test('late joiners receive the original winner member name', async () => {
     const lateJoiner = await harness.connect()
 
     await emitAck(host, 'host:setup', TEAMS)
-    await emitAck(winnerSocket, 'member:join', TEAMS[0].code, 'Alice')
+    await emitAck(winnerSocket, 'member:join', 0, 'Alice')
     await emitAck(host, 'host:arm')
 
     const winnerBroadcast = once(host, 'buzz:winner')
@@ -180,7 +180,7 @@ test('late joiners receive the original winner member name', async () => {
     await winnerBroadcast
 
     const syncWinnerPromise = once(lateJoiner, 'buzz:winner')
-    const joinLate = await emitAck(lateJoiner, 'member:join', TEAMS[0].code, 'Bob')
+    const joinLate = await emitAck(lateJoiner, 'member:join', 0, 'Bob')
     assert.equal(joinLate.teamIndex, 0)
     const syncWinner = await syncWinnerPromise
 
@@ -198,7 +198,7 @@ test('reconnected host receives authoritative state via state:sync', async () =>
     const memberA = await harness.connect()
 
     await emitAck(host1, 'host:setup', TEAMS)
-    await emitAck(memberA, 'member:join', TEAMS[0].code, 'Alice')
+    await emitAck(memberA, 'member:join', 0, 'Alice')
     await emitAck(host1, 'host:arm')
     const winnerPromise = once(host1, 'buzz:winner')
     memberA.emit('member:buzz')
@@ -227,8 +227,8 @@ test('reconnected members still obey steal lockout while armed', async () => {
     const memberB = await harness.connect()
 
     await emitAck(host, 'host:setup', TEAMS)
-    await emitAck(memberA, 'member:join', TEAMS[0].code, 'Alice')
-    await emitAck(memberB, 'member:join', TEAMS[1].code, 'Bob')
+    await emitAck(memberA, 'member:join', 0, 'Alice')
+    await emitAck(memberB, 'member:join', 1, 'Bob')
 
     await emitAck(host, 'host:arm')
     const firstWinnerPromise = once(host, 'buzz:winner')
@@ -247,8 +247,8 @@ test('reconnected members still obey steal lockout while armed', async () => {
 
     const armedA = once(memberARejoined, 'buzz:armed')
     const armedB = once(memberBRejoined, 'buzz:armed')
-    await emitAck(memberARejoined, 'member:join', TEAMS[0].code, 'Alice2')
-    await emitAck(memberBRejoined, 'member:join', TEAMS[1].code, 'Bob2')
+    await emitAck(memberARejoined, 'member:join', 0, 'Alice2')
+    await emitAck(memberBRejoined, 'member:join', 1, 'Bob2')
     await armedA
     await armedB
 
@@ -279,10 +279,10 @@ test('member:join ack includes authoritative sync state', async () => {
     const memberC = await harness.connect()
 
     await emitAck(host, 'host:setup', TEAMS)
-    await emitAck(memberA, 'member:join', TEAMS[0].code, 'Alice')
+    await emitAck(memberA, 'member:join', 0, 'Alice')
 
     await emitAck(host, 'host:arm')
-    const armedJoin = await emitAck(memberB, 'member:join', TEAMS[1].code, 'Bob')
+    const armedJoin = await emitAck(memberB, 'member:join', 1, 'Bob')
     assert.equal(armedJoin.sync.armed, true)
     assert.equal(armedJoin.sync.buzzedBy, null)
 
@@ -290,7 +290,7 @@ test('member:join ack includes authoritative sync state', async () => {
     memberA.emit('member:buzz')
     await winnerPromise
 
-    const postBuzzJoin = await emitAck(memberC, 'member:join', TEAMS[1].code, 'Cara')
+    const postBuzzJoin = await emitAck(memberC, 'member:join', 1, 'Cara')
     assert.equal(postBuzzJoin.sync.armed, false)
     assert.equal(postBuzzJoin.sync.buzzedBy, 0)
     assert.equal(postBuzzJoin.sync.buzzedMemberName, 'Alice')

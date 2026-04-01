@@ -4,7 +4,7 @@ import Scoreboard from './components/Scoreboard'
 import BuzzerPage from './components/BuzzerPage'
 import { TEAMS_KEY } from './storage'
 import { useWakeLock } from './hooks/useWakeLock'
-import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy } from './sounds'
+import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong } from './sounds'
 import './App.css'
 
 const isBuzzerMode = window.location.pathname.startsWith('/buzz')
@@ -38,6 +38,7 @@ export default function App() {
       if (key === 'B') playBoo()
       if (key === 'L') playLaughter()
       if (key === 'O') playOkayy()
+      if (key === 'V') playVeryWrong()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

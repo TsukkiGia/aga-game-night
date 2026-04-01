@@ -7,7 +7,7 @@ import { dirname, join, resolve } from 'path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 function initialState() {
   return {
-    teams: [],       // [{ name, color, code }]
+    teams: [],       // [{ name, color }]
     armed: false,
     buzzedBy: null,  // teamIndex | null
     buzzedMemberName: null,
@@ -44,7 +44,7 @@ export function createBuzzServer() {
       }
     })
 
-    // ── Host: register teams + codes ──────────────────────────
+    // ── Host: register teams ──────────────────────────────────
     socket.on('host:setup', (teams, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       const isNewGame = JSON.stringify(teams.map(t => t.name)) !== JSON.stringify(state.teams.map(t => t.name))

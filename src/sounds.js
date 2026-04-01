@@ -14,6 +14,7 @@ function play(name, ext = 'wav') {
 export function playBuzzIn()    { play('buzz_in') }
 export function playCorrect()   { play('correct') }
 export function playWrong()     { play('wrong') }
+export function playVeryWrong() { play('very-wrong', 'mov') }
 export function playArm()       { play('arm') }
 export function playGameStart() { play('game_start') }
 export function playWinner()        { play('winner', 'mp3') }
