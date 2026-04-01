@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "npm run build && node server.js",
     "dev": "concurrently -n \"server,vite\" -c \"yellow,cyan\" \"nodemon --watch server.js server.js\" \"vite\"",
     "server": "nodemon --watch server.js server.js",
     "test": "node --test",
