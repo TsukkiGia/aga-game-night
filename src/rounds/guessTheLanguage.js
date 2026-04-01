@@ -129,13 +129,13 @@ export default {
       countries: ['Zimbabwe', 'Mozambique'],
       explanation: 'Shona is Zimbabwe\'s most widely spoken indigenous language, used by about 75% of the population. A Bantu language with dialects including Karanga, Zezuru, and Korekore. Also spoken in parts of Mozambique.',
     },
-    {
-      id: 'gtl-luo',
-      video: 'Luo.mp4',
-      answer: 'Luo',
-      countries: ['Kenya', 'Uganda', 'Tanzania'],
-      explanation: 'Luo (Dholuo) is a Nilotic language spoken by the Luo people of Kenya, Uganda, and Tanzania. It\'s not Bantu — it belongs to the Nilo-Saharan family. Barack Obama\'s paternal family are Luo from western Kenya.',
-    },
+    // {
+    //   id: 'gtl-luo',
+    //   video: 'Luo.mp4',
+    //   answer: 'Luo',
+    //   countries: ['Kenya', 'Uganda', 'Tanzania'],
+    //   explanation: 'Luo (Dholuo) is a Nilotic language spoken by the Luo people of Kenya, Uganda, and Tanzania. It\'s not Bantu — it belongs to the Nilo-Saharan family. Barack Obama\'s paternal family are Luo from western Kenya.',
+    // },
     {
       id: 'gtl-kituba',
       video: 'Kituba.mp4',

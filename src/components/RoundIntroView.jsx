@@ -8,7 +8,7 @@ export default function RoundIntroView({
   onNavigate, onBack,
 }) {
   const round = rounds[roundIndex]
-  const [qrOpen, setQrOpen] = useState(true)
+  const [qrOpen, setQrOpen] = useState(false)
 
   return (
     <div className="question-view">

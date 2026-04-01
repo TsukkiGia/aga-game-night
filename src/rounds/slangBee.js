@@ -40,5 +40,21 @@ export default {
       sentence: "Don't go there tonight, kuna ngori.",
       meaning: 'Trouble or difficulty',
     },
+    {
+      id: 'r2q4',
+      term: 'Tchalé',
+      language: 'Ewe Slang',
+      country: 'Togo',
+      sentence: "Tchalé, you good?",
+      meaning: 'Friend, buddy, guy',
+    },
+    {
+      id: 'r2q5',
+      term: 'Wolokoso',
+      language: 'Ugandan Slang',
+      country: 'Uganda',
+      sentence: 'That group chat is just wolokoso from morning till night.',
+      meaning: 'Gossip, rumors, or reckless chatter',
+    },
   ],
 }
