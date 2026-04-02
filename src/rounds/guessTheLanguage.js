@@ -166,7 +166,7 @@ export default {
     },
     {
       id: 'gtl-nyanja',
-      video: 'Nyanja.mp4',
+      video: 'Nyanja.mov',
       answer: 'Nyanja',
       countries: ['Malawi', 'Zambia', 'Mozambique', 'Zimbabwe'],
       explanation: 'Nyanja (also called Chichewa or Chewa) is a Bantu language spoken in Malawi, Zambia, Mozambique, and Zimbabwe. It\'s Malawi\'s national language and has over 15 million speakers across the region.',

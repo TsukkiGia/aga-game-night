@@ -5,6 +5,12 @@ import { fileURLToPath } from 'url'
 import { dirname, join, resolve } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const DEBUG_BUZZ = /^(1|true|yes)$/i.test(process.env.DEBUG_BUZZ || '')
+
+function debugLog(...args) {
+  if (DEBUG_BUZZ) console.log(...args)
+}
+
 function initialState() {
   return {
     teams: [],       // [{ name, color }]
@@ -15,6 +21,22 @@ function initialState() {
     allowedTeamIndices: null,  // null = all allowed, Set = only these indices
     members: {},     // { [teamIndex]: { [socketId]: memberName } }
   }
+}
+
+function normalizeTeams(rawTeams) {
+  if (!Array.isArray(rawTeams)) return null
+  if (rawTeams.length < 1 || rawTeams.length > 8) return null
+
+  const normalized = rawTeams.map((team) => {
+    if (!team || typeof team !== 'object') return null
+    const name = String(team.name || '').trim()
+    const color = String(team.color || '').trim()
+    if (!name || !color) return null
+    return { name, color }
+  })
+
+  if (normalized.some((team) => team === null)) return null
+  return normalized
 }
 
 export function createBuzzServer() {
@@ -34,10 +56,10 @@ export function createBuzzServer() {
   }
 
   io.on('connection', (socket) => {
-    console.log(`[connect] socket=${socket.id}`)
+    debugLog(`[connect] socket=${socket.id}`)
 
     socket.on('disconnect', () => {
-      console.log(`[disconnect] socket=${socket.id}`)
+      debugLog(`[disconnect] socket=${socket.id}`)
       const idx = socket.data.teamIndex
       if (idx !== undefined && state.members[idx]) {
         delete state.members[idx][socket.id]
@@ -48,15 +70,21 @@ export function createBuzzServer() {
     // ── Host: register teams ──────────────────────────────────
     socket.on('host:setup', (teams, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
-      const isNewGame = JSON.stringify(teams.map(t => t.name)) !== JSON.stringify(state.teams.map(t => t.name))
+      const normalizedTeams = normalizeTeams(teams)
+      if (!normalizedTeams) {
+        respond({ ok: false, error: 'invalid-teams' })
+        return
+      }
+
+      const isNewGame = JSON.stringify(normalizedTeams.map(t => t.name)) !== JSON.stringify(state.teams.map(t => t.name))
       socket.join('host')
       if (isNewGame) {
-        state = { ...initialState(), teams }
+        state = { ...initialState(), teams: normalizedTeams }
         io.except(socket.id).emit('game:reset')
       } else {
-        state.teams = teams  // names/colors may have changed, preserve buzzer state
+        state.teams = normalizedTeams  // names/colors may have changed, preserve buzzer state
       }
-      console.log(`[host:setup] ${isNewGame ? 'new game' : 'reconnect'} — teams:`, teams.map(t => t.name).join(', '))
+      debugLog(`[host:setup] ${isNewGame ? 'new game' : 'reconnect'} — teams:`, normalizedTeams.map(t => t.name).join(', '))
       socket.emit('state:sync', state)
       broadcastMembers()
       respond({ ok: true })
@@ -73,7 +101,7 @@ export function createBuzzServer() {
         respond({ ok: false, error: 'unauthorized' })
         return
       }
-      console.log(`[host:arm] armed=${state.armed} buzzedBy=${state.buzzedBy}`)
+      debugLog(`[host:arm] armed=${state.armed} buzzedBy=${state.buzzedBy}`)
       if (state.buzzedBy !== null) {
         respond({ ok: false, error: 'buzz-locked' })
         return
@@ -92,7 +120,7 @@ export function createBuzzServer() {
         respond({ ok: false, error: 'unauthorized' })
         return
       }
-      console.log(`[host:reset]`)
+      debugLog(`[host:reset]`)
       state.armed = false
       state.buzzedBy = null
       state.buzzedMemberName = null
@@ -113,9 +141,9 @@ export function createBuzzServer() {
       const respond = typeof callback === 'function' ? callback : () => {}
       const idx = parseInt(teamIndex, 10)
       const name = (memberName || '').trim() || 'Anonymous'
-      console.log(`[member:join] socket=${socket.id} teamIndex=${idx} name="${name}"`)
+      debugLog(`[member:join] socket=${socket.id} teamIndex=${idx} name="${name}"`)
       if (isNaN(idx) || idx < 0 || idx >= state.teams.length) {
-        console.log(`[member:join] FAIL — invalid teamIndex`)
+        debugLog(`[member:join] FAIL — invalid teamIndex`)
         respond({ error: 'Invalid team.' })
         return
       }
@@ -124,7 +152,7 @@ export function createBuzzServer() {
       socket.join(`team-${idx}`)
       if (!state.members[idx]) state.members[idx] = {}
       state.members[idx][socket.id] = name
-      console.log(`[member:join] OK — joined team "${state.teams[idx].name}" as "${name}"`)
+      debugLog(`[member:join] OK — joined team "${state.teams[idx].name}" as "${name}"`)
       respond({
         team: state.teams[idx],
         teamIndex: idx,
@@ -147,7 +175,7 @@ export function createBuzzServer() {
 
     // ── Member: buzz ───────────────────────────────────────────
     socket.on('member:buzz', () => {
-      console.log(`[member:buzz] socket=${socket.id} armed=${state.armed} buzzedBy=${state.buzzedBy} teamIndex=${socket.data.teamIndex}`)
+      debugLog(`[member:buzz] socket=${socket.id} armed=${state.armed} buzzedBy=${state.buzzedBy} teamIndex=${socket.data.teamIndex}`)
       if (!state.armed)                  return
       if (state.buzzedBy !== null)       return
       const idx = socket.data.teamIndex
@@ -158,7 +186,7 @@ export function createBuzzServer() {
       state.armed = false
       state.buzzedBy = idx
       state.buzzedMemberName = socket.data.memberName
-      console.log(`[member:buzz] broadcasting buzz:winner for team "${state.teams[idx].name}" member "${socket.data.memberName}"`)
+      debugLog(`[member:buzz] broadcasting buzz:winner for team "${state.teams[idx].name}" member "${socket.data.memberName}"`)
       io.emit('buzz:winner', { teamIndex: idx, team: state.teams[idx], memberName: socket.data.memberName })
     })
   })

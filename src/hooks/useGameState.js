@@ -7,6 +7,7 @@ export function useGameState(initialTeams) {
   const [doneQuestions, setDoneQuestions] = useState(() => loadDone())
   const [flashing, setFlashing] = useState(null)
   const [doublePoints, setDoublePoints] = useState(false)
+  const [streaks, setStreaks] = useState(() => initialTeams.map(() => 0))
 
   function clearDoublePoints() {
     setDoublePoints(false)
@@ -27,8 +28,13 @@ export function useGameState(initialTeams) {
     setTeams(prev => prev.map((t, i) => i === index ? { ...t, score: t.score + effective } : t))
     setFlashing(`${index}-${effective > 0 ? 'up' : 'down'}`)
     setTimeout(() => setFlashing(null), 400)
-    if (effective > 0) playCorrect()
-    else playWrong()
+    if (effective > 0) {
+      playCorrect()
+      setStreaks(prev => prev.map((s, i) => i === index ? s + 1 : s))
+    } else {
+      playWrong()
+      setStreaks(prev => prev.map((s, i) => i === index ? 0 : s))
+    }
   }
 
   function resetScores() {
@@ -41,6 +47,7 @@ export function useGameState(initialTeams) {
   function resetForNewGame() {
     setTeams(prev => prev.map(t => ({ ...t, score: 0 })))
     setDoneQuestions(new Set())
+    setStreaks(initialTeams.map(() => 0))
     clearDoublePoints()
   }
 
@@ -62,5 +69,5 @@ export function useGameState(initialTeams) {
     })
   }
 
-  return { teams, doneQuestions, flashing, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetScores, resetForNewGame, toggleDone, markDone }
+  return { teams, streaks, doneQuestions, flashing, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetScores, resetForNewGame, toggleDone, markDone }
 }

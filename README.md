@@ -55,6 +55,12 @@ npm install
 npm run dev
 ```
 
+Optional: enable detailed socket debugging logs.
+
+```bash
+DEBUG_BUZZ=1 npm run dev
+```
+
 This starts:
 
 - Vite dev server on **http://localhost:5173**

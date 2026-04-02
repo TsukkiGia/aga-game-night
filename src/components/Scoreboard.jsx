@@ -15,7 +15,7 @@ import { clearAll } from '../storage'
 import { playGameStart } from '../sounds'
 
 export default function Scoreboard({ teams: initialTeams, onReset }) {
-  const { teams, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, toggleDone, markDone } = useGameState(initialTeams)
+  const { teams, streaks, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, toggleDone, markDone } = useGameState(initialTeams)
   const { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm } = useGameSocket(initialTeams)
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
@@ -95,6 +95,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
           questionIndex={qIdx}
           doneQuestions={doneQuestions}
           teams={teams}
+          streaks={streaks}
           buzzWinner={buzzWinner}
           armed={armed}
           onAdjust={adjust}
@@ -109,8 +110,9 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
           onNext={() => {
             const isLastQuestion = qIdx === rounds[rIdx].questions.length - 1
             const isLastRound = rIdx === rounds.length - 1
-            if (isLastQuestion && !isLastRound) navigateWithReset(rIdx + 1, null)
-            else if (!isLastQuestion) navigateWithReset(rIdx, qIdx + 1)
+            if (isLastQuestion && isLastRound) setShowWinner(true)
+            else if (isLastQuestion) navigateWithReset(rIdx + 1, null)
+            else navigateWithReset(rIdx, qIdx + 1)
           }}
           onPrev={() => navigateWithReset(rIdx, qIdx - 1)}
           onHalftime={() => setShowHalftime(true)}
