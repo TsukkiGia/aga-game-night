@@ -9,6 +9,9 @@ export default function HalftimeScreen({ teams, onClose }) {
 
   const leader = sorted[0]
   const hasScores = leader.score > 0
+  const places = sorted.map(team => sorted.filter(t => t.score > team.score).length)
+  const medals = ['🥇','🥈','🥉']
+  const topTied = hasScores ? sorted.filter(t => t.score === leader.score) : []
 
   return (
     <div className="fullscreen-overlay">
@@ -18,14 +21,15 @@ export default function HalftimeScreen({ teams, onClose }) {
 
         <div className="halftime-rows">
           {sorted.map((team, rank) => {
-            const isLeading = rank === 0 && hasScores
+            const place = places[rank]
+            const isLeading = place === 0 && hasScores
             return (
               <div
                 key={team.originalIndex}
                 className={`halftime-row color-${team.color}${isLeading ? ' leading' : ''}`}
               >
                 <span className="halftime-rank">
-                  {hasScores ? ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'][rank] : '—'}
+                  {hasScores ? (medals[place] ?? ['4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'][place - 3] ?? '—') : '—'}
                 </span>
                 <span className="halftime-name">{team.name}</span>
                 <span className="halftime-score">{team.score}</span>
@@ -36,8 +40,8 @@ export default function HalftimeScreen({ teams, onClose }) {
 
         {hasScores && (
           <div className="halftime-leader-note">
-            {sorted[0].score === sorted[1]?.score
-              ? `${sorted[0].name} and ${sorted[1].name} are tied!`
+            {topTied.length > 1
+              ? `${topTied.map(t => t.name).join(', ')} are tied!`
               : `${sorted[0].name} leads by ${sorted[0].score - (sorted[1]?.score ?? 0)} pts`}
           </div>
         )}
