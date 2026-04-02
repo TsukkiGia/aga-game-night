@@ -7,6 +7,9 @@ const TEAMS = [
   { name: 'Team A', color: 'ember' },
   { name: 'Team B', color: 'gold' },
 ]
+const HOST_PIN = 'test-pin'
+
+process.env.HOST_PIN = HOST_PIN
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -56,6 +59,11 @@ function emitAck(socket, event, ...args) {
   })
 }
 
+async function authHost(socket) {
+  const result = await emitAck(socket, 'host:auth', HOST_PIN)
+  assert.equal(result.ok, true)
+}
+
 function connectSocket(baseUrl) {
   const socket = createClient(baseUrl, {
     transports: ['websocket'],
@@ -92,6 +100,7 @@ test('first buzz wins under near-simultaneous buzzes', async () => {
     const memberA = await harness.connect()
     const memberB = await harness.connect()
 
+    await authHost(host)
     const setupResult = await emitAck(host, 'host:setup', TEAMS)
     assert.equal(setupResult.ok, true)
 
@@ -133,6 +142,7 @@ test('steal lockout rejects buzzes from the failed team', async () => {
     const memberA = await harness.connect()
     const memberB = await harness.connect()
 
+    await authHost(host)
     await emitAck(host, 'host:setup', TEAMS)
     await emitAck(memberA, 'member:join', 0, 'Alice')
     await emitAck(memberB, 'member:join', 1, 'Bob')
@@ -171,6 +181,7 @@ test('late joiners receive the original winner member name', async () => {
     const winnerSocket = await harness.connect()
     const lateJoiner = await harness.connect()
 
+    await authHost(host)
     await emitAck(host, 'host:setup', TEAMS)
     await emitAck(winnerSocket, 'member:join', 0, 'Alice')
     await emitAck(host, 'host:arm')
@@ -197,6 +208,7 @@ test('reconnected host receives authoritative state via state:sync', async () =>
     const host1 = await harness.connect()
     const memberA = await harness.connect()
 
+    await authHost(host1)
     await emitAck(host1, 'host:setup', TEAMS)
     await emitAck(memberA, 'member:join', 0, 'Alice')
     await emitAck(host1, 'host:arm')
@@ -207,6 +219,7 @@ test('reconnected host receives authoritative state via state:sync', async () =>
     host1.disconnect()
 
     const host2 = await harness.connect()
+    await authHost(host2)
     const stateSyncPromise = once(host2, 'state:sync')
     await emitAck(host2, 'host:setup', TEAMS)
     const stateSync = await stateSyncPromise
@@ -226,6 +239,7 @@ test('reconnected members still obey steal lockout while armed', async () => {
     const memberA = await harness.connect()
     const memberB = await harness.connect()
 
+    await authHost(host)
     await emitAck(host, 'host:setup', TEAMS)
     await emitAck(memberA, 'member:join', 0, 'Alice')
     await emitAck(memberB, 'member:join', 1, 'Bob')
@@ -278,6 +292,7 @@ test('member:join ack includes authoritative sync state', async () => {
     const memberB = await harness.connect()
     const memberC = await harness.connect()
 
+    await authHost(host)
     await emitAck(host, 'host:setup', TEAMS)
     await emitAck(memberA, 'member:join', 0, 'Alice')
 

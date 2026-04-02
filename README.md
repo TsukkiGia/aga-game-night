@@ -52,19 +52,21 @@ npm install
 ### Run in development
 
 ```bash
-npm run dev
+HOST_PIN=1234 npm run dev
 ```
 
 Optional: enable detailed socket debugging logs.
 
 ```bash
-DEBUG_BUZZ=1 npm run dev
+HOST_PIN=1234 DEBUG_BUZZ=1 npm run dev
 ```
 
 This starts:
 
 - Vite dev server on **http://localhost:5173**
 - Express + Socket.io server on **http://localhost:3001**
+
+On first host connection, you'll be prompted for the same `HOST_PIN`.
 
 Open `http://localhost:5173` for the host view.
 
@@ -90,7 +92,7 @@ Open `http://localhost:5173` for the host view.
 
 ```bash
 npm run build
-node server.js
+HOST_PIN=1234 node server.js
 ```
 
 The built assets go into `dist/`. `server.js` serves `dist/` as static files and handles all Socket.io traffic on port 3001 (or `$PORT`).

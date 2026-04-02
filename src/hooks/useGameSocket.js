@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { socket } from '../socket'
 import { playBuzzIn, playArm } from '../sounds'
 
+const HOST_PIN_KEY = 'scorekeeping_host_pin'
+
 export function useGameSocket(initialTeams) {
   const [armed, setArmed] = useState(false)
   const [buzzWinner, setBuzzWinner] = useState(null)
@@ -9,7 +11,66 @@ export function useGameSocket(initialTeams) {
   const [stealMode, setStealMode] = useState(false)
 
   useEffect(() => {
-    function setup() { socket.emit('host:setup', initialTeams) }
+    function getStoredHostPin() {
+      try {
+        return sessionStorage.getItem(HOST_PIN_KEY) || ''
+      } catch {
+        return ''
+      }
+    }
+
+    function storeHostPin(pin) {
+      try {
+        sessionStorage.setItem(HOST_PIN_KEY, pin)
+      } catch {
+        // ignore storage failures
+      }
+    }
+
+    function clearStoredHostPin() {
+      try {
+        sessionStorage.removeItem(HOST_PIN_KEY)
+      } catch {
+        // ignore storage failures
+      }
+    }
+
+    function requestHostPin() {
+      const entered = window.prompt('Enter host PIN')
+      return (entered || '').trim()
+    }
+
+    function authenticateAndSetup() {
+      const tryPin = (pin, canPromptAgain = true) => {
+        if (!pin) return
+        socket.emit('host:auth', pin, (authResult) => {
+          if (!authResult?.ok) {
+            clearStoredHostPin()
+            if (authResult?.error === 'host-pin-not-configured') {
+              window.alert('HOST_PIN is not configured on the server.')
+              return
+            }
+            if (canPromptAgain) {
+              const retryPin = requestHostPin()
+              if (retryPin) tryPin(retryPin, false)
+            }
+            return
+          }
+          storeHostPin(pin)
+          socket.emit('host:setup', initialTeams)
+        })
+      }
+
+      const storedPin = getStoredHostPin()
+      if (storedPin) {
+        tryPin(storedPin)
+        return
+      }
+
+      const enteredPin = requestHostPin()
+      if (enteredPin) tryPin(enteredPin)
+    }
+
     function syncState(state) {
       setArmed(Boolean(state.armed))
       setBuzzWinner(
@@ -23,8 +84,8 @@ export function useGameSocket(initialTeams) {
       )
     }
 
-    socket.on('connect', setup)
-    if (socket.connected) setup()
+    socket.on('connect', authenticateAndSetup)
+    if (socket.connected) authenticateAndSetup()
     socket.connect()
 
     socket.on('state:sync',   syncState)
@@ -34,7 +95,7 @@ export function useGameSocket(initialTeams) {
     socket.on('host:members', (data) => setMembers(data))
 
     return () => {
-      socket.off('connect', setup)
+      socket.off('connect', authenticateAndSetup)
       socket.off('state:sync', syncState)
       socket.off('buzz:armed')
       socket.off('buzz:reset')

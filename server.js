@@ -11,6 +11,14 @@ function debugLog(...args) {
   if (DEBUG_BUZZ) console.log(...args)
 }
 
+function getHostPin() {
+  return String(process.env.HOST_PIN || '').trim()
+}
+
+function isHostAuthorized(socket) {
+  return socket.data?.isHost === true
+}
+
 function initialState() {
   return {
     teams: [],       // [{ name, color }]
@@ -67,9 +75,34 @@ export function createBuzzServer() {
       }
     })
 
+    // ── Host: authenticate ────────────────────────────────────
+    socket.on('host:auth', (pin, callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      const configuredPin = getHostPin()
+      if (!configuredPin) {
+        respond({ ok: false, error: 'host-pin-not-configured' })
+        return
+      }
+
+      const providedPin = String(pin || '').trim()
+      if (!providedPin || providedPin !== configuredPin) {
+        respond({ ok: false, error: 'unauthorized' })
+        return
+      }
+
+      socket.data.isHost = true
+      socket.join('host')
+      respond({ ok: true })
+    })
+
     // ── Host: register teams ──────────────────────────────────
     socket.on('host:setup', (teams, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
+      if (!isHostAuthorized(socket)) {
+        respond({ ok: false, error: 'unauthorized' })
+        return
+      }
+
       const normalizedTeams = normalizeTeams(teams)
       if (!normalizedTeams) {
         respond({ ok: false, error: 'invalid-teams' })
@@ -77,7 +110,6 @@ export function createBuzzServer() {
       }
 
       const isNewGame = JSON.stringify(normalizedTeams.map(t => t.name)) !== JSON.stringify(state.teams.map(t => t.name))
-      socket.join('host')
       if (isNewGame) {
         state = { ...initialState(), teams: normalizedTeams }
         io.except(socket.id).emit('game:reset')
@@ -97,7 +129,7 @@ export function createBuzzServer() {
       const requestedLockout = Number.isInteger(options.lockedOutTeamIndex) ? options.lockedOutTeamIndex : null
       const allowedIndices = Array.isArray(options.allowedTeamIndices) ? new Set(options.allowedTeamIndices) : null
 
-      if (!socket.rooms.has('host')) {
+      if (!isHostAuthorized(socket)) {
         respond({ ok: false, error: 'unauthorized' })
         return
       }
@@ -116,7 +148,7 @@ export function createBuzzServer() {
     // ── Host: reset after a buzz ───────────────────────────────
     socket.on('host:reset', (callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
-      if (!socket.rooms.has('host')) {
+      if (!isHostAuthorized(socket)) {
         respond({ ok: false, error: 'unauthorized' })
         return
       }
