@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { socket } from '../socket'
 import { playBuzzIn, playArm } from '../sounds'
 
@@ -9,6 +9,7 @@ export function useGameSocket(initialTeams) {
   const [buzzWinner, setBuzzWinner] = useState(null)
   const [members, setMembers] = useState([])
   const [stealMode, setStealMode] = useState(false)
+  const [hostReady, setHostReady] = useState(false)
 
   useEffect(() => {
     function getStoredHostPin() {
@@ -45,6 +46,7 @@ export function useGameSocket(initialTeams) {
         if (!pin) return
         socket.emit('host:auth', pin, (authResult) => {
           if (!authResult?.ok) {
+            setHostReady(false)
             clearStoredHostPin()
             if (authResult?.error === 'host-pin-not-configured') {
               window.alert('HOST_PIN is not configured on the server.')
@@ -57,7 +59,9 @@ export function useGameSocket(initialTeams) {
             return
           }
           storeHostPin(pin)
-          socket.emit('host:setup', initialTeams)
+          socket.emit('host:setup', initialTeams, (setupResult) => {
+            setHostReady(Boolean(setupResult?.ok))
+          })
         })
       }
 
@@ -84,7 +88,12 @@ export function useGameSocket(initialTeams) {
       )
     }
 
+    function onDisconnect() {
+      setHostReady(false)
+    }
+
     socket.on('connect', authenticateAndSetup)
+    socket.on('disconnect', onDisconnect)
     if (socket.connected) authenticateAndSetup()
     socket.connect()
 
@@ -96,6 +105,7 @@ export function useGameSocket(initialTeams) {
 
     return () => {
       socket.off('connect', authenticateAndSetup)
+      socket.off('disconnect', onDisconnect)
       socket.off('state:sync', syncState)
       socket.off('buzz:armed')
       socket.off('buzz:reset')
@@ -145,5 +155,22 @@ export function useGameSocket(initialTeams) {
     })
   }
 
-  return { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm }
+  const syncHostQuestion = useCallback((activeQuestion) => {
+    if (!hostReady) return
+    socket.emit('host:question:set', activeQuestion)
+  }, [hostReady])
+
+  return {
+    armed,
+    buzzWinner,
+    members,
+    stealMode,
+    hostReady,
+    handleArm,
+    handleDismiss,
+    handleWrongAndSteal,
+    handleManualBuzz,
+    handleRearm,
+    syncHostQuestion,
+  }
 }

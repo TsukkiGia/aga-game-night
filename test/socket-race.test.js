@@ -313,3 +313,32 @@ test('member:join ack includes authoritative sync state', async () => {
     await harness.close()
   }
 })
+
+test('host question cursor sync requires auth and broadcasts updates', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const other = await harness.connect()
+
+    await authHost(host)
+    await emitAck(host, 'host:setup', TEAMS)
+
+    const unauthorizedSet = await emitAck(other, 'host:question:set', [1, 2])
+    assert.equal(unauthorizedSet.ok, false)
+    assert.equal(unauthorizedSet.error, 'unauthorized')
+
+    await authHost(other)
+
+    const cursorPromise = once(other, 'host:question')
+    const setResult = await emitAck(host, 'host:question:set', [1, 2])
+    assert.equal(setResult.ok, true)
+    const pushedCursor = await cursorPromise
+    assert.deepEqual(pushedCursor, [1, 2])
+
+    const getResult = await emitAck(other, 'host:question:get')
+    assert.equal(getResult.ok, true)
+    assert.deepEqual(getResult.activeQuestion, [1, 2])
+  } finally {
+    await harness.close()
+  }
+})

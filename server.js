@@ -28,7 +28,17 @@ function initialState() {
     stealLockedOutTeamIndex: null,
     allowedTeamIndices: null,  // null = all allowed, Set = only these indices
     members: {},     // { [teamIndex]: { [socketId]: memberName } }
+    hostQuestionCursor: null, // [roundIndex, questionIndex|null] | null
   }
+}
+
+function normalizeQuestionCursor(rawCursor) {
+  if (rawCursor === null) return null
+  if (!Array.isArray(rawCursor) || rawCursor.length !== 2) return null
+  const [roundIndex, questionIndex] = rawCursor
+  if (!Number.isInteger(roundIndex) || roundIndex < 0) return null
+  if (questionIndex !== null && (!Number.isInteger(questionIndex) || questionIndex < 0)) return null
+  return [roundIndex, questionIndex]
 }
 
 function normalizeTeams(rawTeams) {
@@ -118,8 +128,35 @@ export function createBuzzServer() {
       }
       debugLog(`[host:setup] ${isNewGame ? 'new game' : 'reconnect'} — teams:`, normalizedTeams.map(t => t.name).join(', '))
       socket.emit('state:sync', state)
+      io.to('host').emit('host:question', state.hostQuestionCursor)
       broadcastMembers()
       respond({ ok: true })
+    })
+
+    // ── Host: current question sync for companion view ─────────
+    socket.on('host:question:set', (rawCursor, callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      if (!isHostAuthorized(socket)) {
+        respond({ ok: false, error: 'unauthorized' })
+        return
+      }
+      const cursor = normalizeQuestionCursor(rawCursor)
+      if (cursor === null && rawCursor !== null) {
+        respond({ ok: false, error: 'invalid-cursor' })
+        return
+      }
+      state.hostQuestionCursor = cursor
+      io.to('host').emit('host:question', state.hostQuestionCursor)
+      respond({ ok: true })
+    })
+
+    socket.on('host:question:get', (callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      if (!isHostAuthorized(socket)) {
+        respond({ ok: false, error: 'unauthorized' })
+        return
+      }
+      respond({ ok: true, activeQuestion: state.hostQuestionCursor })
     })
 
     // ── Host: arm the buzzers ──────────────────────────────────

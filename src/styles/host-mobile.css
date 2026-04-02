@@ -1,0 +1,126 @@
+.host-mobile-page {
+  min-height: 100svh;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  background: linear-gradient(180deg, #f4efe6 0%, #efe8dc 100%);
+}
+
+.host-mobile-answer-card,
+.host-mobile-sounds-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  padding: 14px;
+}
+
+.host-mobile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.host-mobile-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.host-mobile-status {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f4d7d0;
+  color: #7f2d1b;
+}
+
+.host-mobile-status.on {
+  background: #d9f1dc;
+  color: #1d6a2b;
+}
+
+.host-mobile-heading {
+  font-size: 0.93rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.host-mobile-round {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.host-mobile-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.host-mobile-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: #fbfaf7;
+}
+
+.host-mobile-row-label {
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.host-mobile-row-value {
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.host-mobile-error {
+  border-radius: 10px;
+  background: #ffe5df;
+  color: #8e2a14;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  margin-bottom: 8px;
+}
+
+.host-mobile-wait {
+  color: var(--text-muted);
+  font-size: 0.94rem;
+}
+
+.host-mobile-sounds-title {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.host-mobile-sounds-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.host-mobile-sound-btn {
+  border: 1px solid #d6cec0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff 0%, #f1ece2 100%);
+  padding: 11px 8px;
+  font-weight: 700;
+  color: #2b2217;
+}
+
+.host-mobile-sound-btn:active {
+  transform: translateY(1px);
+}

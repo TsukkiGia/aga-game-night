@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import Setup from './components/Setup'
 import Scoreboard from './components/Scoreboard'
 import BuzzerPage from './components/BuzzerPage'
+import HostMobilePage from './components/HostMobilePage'
 import { TEAMS_KEY } from './storage'
 import { useWakeLock } from './hooks/useWakeLock'
 import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong } from './sounds'
 import './App.css'
 
-const isBuzzerMode = window.location.pathname.startsWith('/buzz')
+const pathname = window.location.pathname
+const isBuzzerMode = pathname.startsWith('/buzz')
+const isHostMobileMode = pathname.startsWith('/host-mobile')
 
 function loadTeams() {
   try { return JSON.parse(localStorage.getItem(TEAMS_KEY)) } catch { return null }
@@ -18,7 +21,7 @@ export default function App() {
   useWakeLock(true)
 
   useEffect(() => {
-    if (isBuzzerMode) return
+    if (isBuzzerMode || isHostMobileMode) return
 
     function onKey(e) {
       if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return
@@ -51,6 +54,10 @@ export default function App() {
 
   if (isBuzzerMode) {
     return <BuzzerPage />
+  }
+
+  if (isHostMobileMode) {
+    return <HostMobilePage />
   }
 
   return (

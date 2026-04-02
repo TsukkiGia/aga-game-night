@@ -69,6 +69,7 @@ This starts:
 On first host connection, you'll be prompted for the same `HOST_PIN`.
 
 Open `http://localhost:5173` for the host view.
+Open `http://localhost:5173/host-mobile` on a phone for the answer + sound-bites companion view.
 
 ### Sharing with remote players (ngrok)
 
