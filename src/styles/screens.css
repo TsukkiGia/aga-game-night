@@ -263,21 +263,28 @@
 
 .winner-actions {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   justify-content: center;
+  flex-wrap: wrap;
+}
+
+.winner-dismiss-btn,
+.winner-close-btn,
+.winner-tiebreaker-btn {
+  border-radius: 14px;
+  padding: 14px 28px;
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 140px;
 }
 
 .winner-dismiss-btn {
   background: transparent;
   border: 1.5px solid var(--border);
-  border-radius: 14px;
-  padding: 14px 24px;
-  font-family: var(--font);
-  font-size: 15px;
-  font-weight: 700;
   color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.2s;
 }
 .winner-dismiss-btn:hover { border-color: var(--terra); color: var(--terra); }
 
@@ -285,13 +292,6 @@
   background: var(--teal);
   color: white;
   border: none;
-  border-radius: 14px;
-  padding: 14px 36px;
-  font-family: var(--font);
-  font-size: 16px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: all 0.2s;
 }
 .winner-close-btn:hover { background: var(--teal-light); transform: translateY(-2px); }
 
@@ -547,88 +547,96 @@
 /* ══════════════════════════════════════════
    SUDDEN DEATH OVERLAY
 ══════════════════════════════════════════ */
-.sd-overlay { background: rgba(0,0,0,0.92); }
+.sd-overlay { background: rgba(0,0,0,0.96); }
 
 .sudden-death-screen {
-  background: var(--bg-card);
+  background: #0f0f0f;
+  border: 1.5px solid rgba(255,255,255,0.08);
   border-radius: 28px;
-  padding: 48px 52px;
-  max-width: 480px;
+  padding: 52px 56px;
+  max-width: 520px;
   width: 90%;
   text-align: center;
-  box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+  box-shadow: 0 0 80px rgba(217, 160, 31, 0.15), 0 32px 80px rgba(0,0,0,0.8);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
 }
 
 .sd-tag {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.25em;
   color: var(--amber);
   text-transform: uppercase;
+  animation: sd-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes sd-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .sd-heading {
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 900;
   letter-spacing: -0.02em;
   margin: 0;
+  color: #fff;
 }
 
 .sd-teams {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
   justify-content: center;
 }
 
 .sd-team-chip {
-  padding: 8px 18px;
-  border-radius: 20px;
+  padding: 10px 22px;
+  border-radius: 24px;
   font-weight: 800;
-  font-size: 15px;
-  background: var(--bg);
-  border: 2px solid var(--border);
+  font-size: 16px;
+  border: 2px solid currentColor;
+  opacity: 0.9;
 }
 
 .sd-waiting {
-  font-size: 15px;
-  color: var(--text-muted);
-  padding: 16px 0;
+  font-size: 16px;
+  color: rgba(255,255,255,0.4);
+  padding: 8px 0;
+  letter-spacing: 0.05em;
 }
 
 .sd-buzz-result {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .sd-buzzed-label {
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 900;
-  color: var(--text);
+  color: #fff;
 }
 
 .sd-buzz-sublabel {
   font-size: 14px;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .sd-buzz-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 8px;
+  gap: 12px;
+  margin-top: 12px;
 }
 
-.sd-correct-btn {
-  background: var(--teal);
-  color: white;
-  border: none;
+.sd-correct-btn,
+.sd-wrong-btn {
   border-radius: 14px;
   padding: 14px 28px;
   font-family: var(--font);
@@ -636,20 +644,20 @@
   font-weight: 800;
   cursor: pointer;
   transition: all 0.2s;
+  min-width: 140px;
+}
+
+.sd-correct-btn {
+  background: var(--teal);
+  color: white;
+  border: none;
 }
 .sd-correct-btn:hover { background: var(--teal-light); transform: translateY(-2px); }
 
 .sd-wrong-btn {
   background: transparent;
-  border: 1.5px solid var(--border);
-  border-radius: 14px;
-  padding: 14px 24px;
-  font-family: var(--font);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.2s;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.5);
 }
 .sd-wrong-btn:hover { border-color: var(--terra); color: var(--terra); }
 
@@ -657,23 +665,16 @@
   background: transparent;
   border: none;
   font-size: 13px;
-  color: var(--text-muted);
+  color: rgba(255,255,255,0.25);
   cursor: pointer;
   padding: 4px 8px;
   transition: color 0.15s;
 }
-.sd-cancel-btn:hover { color: var(--text); }
+.sd-cancel-btn:hover { color: rgba(255,255,255,0.6); }
 
 .winner-tiebreaker-btn {
   background: var(--amber);
   color: white;
   border: none;
-  border-radius: 14px;
-  padding: 14px 28px;
-  font-family: var(--font);
-  font-size: 16px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: all 0.2s;
 }
 .winner-tiebreaker-btn:hover { background: var(--amber-light); transform: translateY(-2px); }
