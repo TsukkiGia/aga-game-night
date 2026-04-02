@@ -3,7 +3,7 @@ import { playTick, stopTick, playTimeUp } from '../sounds'
 
 export default function BuzzModal({
   buzzWinner, teams, round, question,
-  stealMode, doublePoints,
+  stealMode, doublePoints, stealAllowedTeamIndices = null,
   onAdjust, onDismiss, onWrongAndSteal,
 }) {
   const [revealedInModal, setRevealedInModal] = useState(false)
@@ -96,7 +96,7 @@ export default function BuzzModal({
         </div>
 
         {!stealMode && round.scoring.some(({ label }) => label.toLowerCase().includes('steal')) && (
-          <button className="buzz-steal-btn" onClick={() => { setRevealedInModal(false); setRevealedCountry(false); onWrongAndSteal() }}>
+          <button className="buzz-steal-btn" onClick={() => { setRevealedInModal(false); setRevealedCountry(false); onWrongAndSteal(stealAllowedTeamIndices) }}>
             Open Steal
           </button>
         )}

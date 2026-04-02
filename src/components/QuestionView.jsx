@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { playPower } from '../sounds'
 import BuzzModal from './BuzzModal'
 import VideoBody from './VideoBody'
@@ -27,19 +27,22 @@ export default function QuestionView({
     : null
 
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  function defaultStealSelection() {
+    const allTeams = new Set(teams.map((_, i) => i))
+    if (!isCharades) return allTeams
+    const firstActive = (questionIndex * 2) % teams.length
+    const secondActive = (questionIndex * 2 + 1) % teams.length
+    allTeams.delete(firstActive)
+    allTeams.delete(secondActive)
+    return allTeams
+  }
+  const [stealPickerOpen, setStealPickerOpen] = useState(false)
+  const [stealSelected, setStealSelected] = useState(() => defaultStealSelection())
 
-  const questionKey = `${roundIndex}-${questionIndex}`
-  function computeInitialSelected() {
-    return isCharades
-      ? new Set(teams.map((_, i) => i).filter(i => !activePair.has(i)))
-      : new Set(teams.map((_, i) => i))
-  }
-  const [stealState, setStealState] = useState(() => ({ key: questionKey, open: false, selected: computeInitialSelected() }))
-  if (stealState.key !== questionKey) {
-    setStealState({ key: questionKey, open: false, selected: computeInitialSelected() })
-  }
-  const stealPickerOpen = stealState.key === questionKey && stealState.open
-  const stealSelected = stealState.key === questionKey ? stealState.selected : computeInitialSelected()
+  useEffect(() => {
+    setStealPickerOpen(false)
+    setStealSelected(defaultStealSelection())
+  }, [roundIndex, questionIndex, isCharades, teams.length])
 
   return (
     <div className="question-view">
@@ -91,6 +94,7 @@ export default function QuestionView({
         question={question}
         stealMode={stealMode}
         doublePoints={doublePoints}
+        stealAllowedTeamIndices={isCharades ? [...defaultStealSelection()] : null}
         onAdjust={onAdjust}
         onDismiss={onDismiss}
         onWrongAndSteal={onWrongAndSteal}
@@ -184,7 +188,7 @@ export default function QuestionView({
         {!armed && !buzzWinner && isCharades && (
           <button
             className={`steal-open-btn${stealPickerOpen ? ' active' : ''}`}
-            onClick={() => setStealState(s => ({ ...s, open: !s.open }))}
+            onClick={() => setStealPickerOpen((open) => !open)}
           >
             🔀 Open Steal
           </button>
@@ -202,10 +206,10 @@ export default function QuestionView({
                   type="checkbox"
                   checked={stealSelected.has(i)}
                   onChange={() => {
-                    setStealState(s => {
-                      const next = new Set(s.selected)
+                    setStealSelected((prev) => {
+                      const next = new Set(prev)
                       next.has(i) ? next.delete(i) : next.add(i)
-                      return { ...s, selected: next }
+                      return next
                     })
                   }}
                 />
@@ -218,7 +222,7 @@ export default function QuestionView({
             disabled={stealSelected.size === 0}
             onClick={() => {
               const allowedTeamIndices = [...stealSelected]
-              setStealState(s => ({ ...s, open: false }))
+              setStealPickerOpen(false)
               onWrongAndSteal(allowedTeamIndices)
             }}
           >
