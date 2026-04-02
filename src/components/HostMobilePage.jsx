@@ -1,36 +1,25 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import rounds from '../rounds'
 import { socket } from '../socket'
-import {
-  playAirhorn,
-  playBoo,
-  playCorrectAnswer,
-  playCrickets,
-  playFaaah,
-  playLaughter,
-  playNani,
-  playOkayy,
-  playShocked,
-  playVeryWrong,
-  playWhatTheHell,
-} from '../sounds'
-
-const HOST_PIN_KEY = 'scorekeeping_host_pin'
+import { HOST_PIN_KEY } from '../storage'
 
 const SOUND_BUTTONS = [
-  { label: 'Crickets', action: playCrickets },
-  { label: 'Faaah', action: playFaaah },
-  { label: 'Correct', action: playCorrectAnswer },
-  { label: 'Nani', action: playNani },
-  { label: 'What the hell', action: playWhatTheHell },
-  { label: 'Shocked', action: playShocked },
-  { label: 'Airhorn', action: playAirhorn },
-  { label: 'Boo', action: playBoo },
-  { label: 'Laughter', action: playLaughter },
-  { label: 'Okayy', action: playOkayy },
-  { label: 'Very wrong', action: playVeryWrong },
+  { label: 'Crickets', key: 'crickets' },
+  { label: 'Faaah', key: 'faaah' },
+  { label: 'Correct', key: 'correct_answer' },
+  { label: 'Nani', key: 'nani' },
+  { label: 'What the hell', key: 'what_the_hell' },
+  { label: 'Shocked', key: 'shocked' },
+  { label: 'Airhorn', key: 'airhorn' },
+  { label: 'Boo', key: 'boo' },
+  { label: 'Laughter', key: 'laughter' },
+  { label: 'Okayy', key: 'okayy' },
+  { label: 'Very wrong', key: 'very_wrong' },
 ]
+const SOUND_RESULT_TIMEOUT_MS = 5500
+const SOUND_STATUS_AUTO_CLEAR_MS = 2800
 
+// Mirrors normalizeQuestionCursor() in server.js — keep in sync.
 function normalizeCursor(rawCursor) {
   if (rawCursor === null) return null
   if (!Array.isArray(rawCursor) || rawCursor.length !== 2) return null
@@ -164,6 +153,33 @@ export default function HostMobilePage() {
   const [authorized, setAuthorized] = useState(false)
   const [activeQuestion, setActiveQuestion] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [soundStatus, setSoundStatus] = useState('')
+  const pendingSoundRequestIdRef = useRef('')
+  const pendingSoundTimeoutRef = useRef(null)
+  const soundStatusTimeoutRef = useRef(null)
+
+  function clearPendingSoundTimeout() {
+    if (pendingSoundTimeoutRef.current) {
+      clearTimeout(pendingSoundTimeoutRef.current)
+      pendingSoundTimeoutRef.current = null
+    }
+  }
+
+  function clearSoundStatusTimeout() {
+    if (soundStatusTimeoutRef.current) {
+      clearTimeout(soundStatusTimeoutRef.current)
+      soundStatusTimeoutRef.current = null
+    }
+  }
+
+  function setTransientSoundStatus(message) {
+    setSoundStatus(message)
+    clearSoundStatusTimeout()
+    soundStatusTimeoutRef.current = setTimeout(() => {
+      setSoundStatus('')
+      soundStatusTimeoutRef.current = null
+    }, SOUND_STATUS_AUTO_CLEAR_MS)
+  }
 
   useEffect(() => {
     function requestPin() {
@@ -186,7 +202,7 @@ export default function HostMobilePage() {
         return
       }
 
-      socket.emit('host:auth', pin, (result) => {
+      socket.emit('host:auth', { pin, role: 'companion' }, (result) => {
         if (!result?.ok) {
           clearPin()
           setAuthorized(false)
@@ -230,20 +246,70 @@ export default function HostMobilePage() {
       setActiveQuestion(normalizeCursor(cursor))
     }
 
+    function onSoundResult(result) {
+      const requestId = String(result?.requestId || '').trim()
+      if (requestId && pendingSoundRequestIdRef.current && requestId !== pendingSoundRequestIdRef.current) return
+      clearPendingSoundTimeout()
+      pendingSoundRequestIdRef.current = ''
+      if (result?.ok) {
+        setTransientSoundStatus('Played on base host.')
+      } else if (result?.error === 'audio-blocked') {
+        setTransientSoundStatus('Base host blocked audio. Tap once on the base host screen.')
+      } else if (result?.error === 'playback-timeout') {
+        setTransientSoundStatus('No playback confirmation. Refresh the base host tab and try again.')
+      } else {
+        setTransientSoundStatus('Sound failed on base host.')
+      }
+    }
+
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
     socket.on('host:question', onHostQuestion)
+    socket.on('host:sfx:result', onSoundResult)
     if (socket.connected) onConnect()
     socket.connect()
 
     return () => {
+      clearPendingSoundTimeout()
+      clearSoundStatusTimeout()
       socket.off('connect', onConnect)
       socket.off('disconnect', onDisconnect)
       socket.off('host:question', onHostQuestion)
+      socket.off('host:sfx:result', onSoundResult)
     }
   }, [])
 
   const answerView = useMemo(() => extractAnswerView(activeQuestion), [activeQuestion])
+
+  function triggerSound(soundKey) {
+    if (!authorized) return
+    clearPendingSoundTimeout()
+    clearSoundStatusTimeout()
+    setSoundStatus('Sending to base host…')
+    socket.emit('host:sfx:play', soundKey, (result) => {
+      if (result?.ok) {
+        pendingSoundRequestIdRef.current = String(result.requestId || '')
+        pendingSoundTimeoutRef.current = setTimeout(() => {
+          pendingSoundRequestIdRef.current = ''
+          setTransientSoundStatus('No playback confirmation. Refresh the base host tab and try again.')
+          pendingSoundTimeoutRef.current = null
+        }, SOUND_RESULT_TIMEOUT_MS)
+        return
+      }
+      if (result?.error === 'unauthorized') {
+        setErrorMsg('Host authorization expired. Reconnect and re-enter PIN.')
+        setSoundStatus('')
+        return
+      }
+      if (result?.error === 'no-controller') {
+        setErrorMsg('Base host controller is not connected yet.')
+        setSoundStatus('')
+      }
+      if (result?.error === 'invalid-sound') {
+        setTransientSoundStatus('Invalid sound key.')
+      }
+    })
+  }
 
   return (
     <div className="host-mobile-page">
@@ -279,12 +345,13 @@ export default function HostMobilePage() {
 
       <section className="host-mobile-sounds-card">
         <h2 className="host-mobile-sounds-title">Sound Bites</h2>
+        {soundStatus && <div className="host-mobile-sound-status">{soundStatus}</div>}
         <div className="host-mobile-sounds-grid">
           {SOUND_BUTTONS.map((sound) => (
             <button
               key={sound.label}
               className="host-mobile-sound-btn"
-              onClick={sound.action}
+              onClick={() => triggerSound(sound.key)}
               type="button"
             >
               {sound.label}

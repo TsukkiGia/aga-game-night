@@ -1,4 +1,5 @@
 const cache = {}
+let audioUnlocked = false
 
 function load(name, ext = 'wav') {
   if (!cache[name]) cache[name] = new Audio(`/sounds/${name}.${ext}`)
@@ -9,6 +10,30 @@ function play(name, ext = 'wav') {
   const audio = load(name, ext)
   audio.currentTime = 0
   audio.play().catch(() => {})
+}
+
+async function playChecked(name, ext = 'wav') {
+  const audio = load(name, ext)
+  audio.currentTime = 0
+  try {
+    await audio.play()
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function unlockAudio() {
+  if (audioUnlocked) return true
+  const audio = load('arm')
+  const originalMuted = audio.muted
+  audio.muted = true
+  const ok = await playChecked('arm')
+  audio.pause()
+  audio.currentTime = 0
+  audio.muted = originalMuted
+  audioUnlocked = ok
+  return ok
 }
 
 export function playBuzzIn()    { play('buzz_in') }
@@ -61,6 +86,28 @@ export function playBoo()           { play('boo', 'mp3') }
 export function playLaughter()      { play('laughter-short', 'mp3') }
 export function playOkayy()         { play('okay', 'mp3') }
 export function playPower()         { play('power', 'mp3') }
+
+const SOUND_BITE_ASSETS = {
+  crickets: ['crickets', 'wav'],
+  faaah: ['faaah', 'mp3'],
+  correct_answer: ['correct_answer', 'mp3'],
+  nani: ['nani', 'mp3'],
+  what_the_hell: ['what-the-hell', 'mp3'],
+  shocked: ['shocked', 'mp3'],
+  airhorn: ['airhorn', 'mp3'],
+  boo: ['boo', 'mp3'],
+  laughter: ['laughter-short', 'mp3'],
+  okayy: ['okay', 'mp3'],
+  very_wrong: ['very-wrong', 'mp3'],
+}
+
+export function playSoundBiteByKey(key) {
+  const soundKey = String(key || '').trim()
+  const asset = SOUND_BITE_ASSETS[soundKey]
+  if (!asset) return Promise.resolve(false)
+  const [name, ext] = asset
+  return playChecked(name, ext)
+}
 
 // Timer music — looping, returns a stop function
 export function playTimerMusic() {

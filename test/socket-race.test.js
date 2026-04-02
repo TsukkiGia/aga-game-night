@@ -10,6 +10,7 @@ const TEAMS = [
 const HOST_PIN = 'test-pin'
 
 process.env.HOST_PIN = HOST_PIN
+process.env.SFX_RESULT_TIMEOUT_MS = '300'
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -64,6 +65,11 @@ async function authHost(socket) {
   assert.equal(result.ok, true)
 }
 
+async function authCompanion(socket) {
+  const result = await emitAck(socket, 'host:auth', { pin: HOST_PIN, role: 'companion' })
+  assert.equal(result.ok, true)
+}
+
 function connectSocket(baseUrl) {
   const socket = createClient(baseUrl, {
     transports: ['websocket'],
@@ -90,7 +96,7 @@ async function createHarness() {
     await server.stop()
   }
 
-  return { connect, close }
+  return { connect, close, getState: server.getState }
 }
 
 test('first buzz wins under near-simultaneous buzzes', async () => {
@@ -314,6 +320,29 @@ test('member:join ack includes authoritative sync state', async () => {
   }
 })
 
+test('member switching teams does not leave ghost roster entries', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const member = await harness.connect()
+
+    await authHost(host)
+    await emitAck(host, 'host:setup', TEAMS)
+
+    const firstJoin = await emitAck(member, 'member:join', 0, 'Alice')
+    assert.equal(firstJoin.teamIndex, 0)
+
+    const secondJoin = await emitAck(member, 'member:join', 1, 'Alice')
+    assert.equal(secondJoin.teamIndex, 1)
+
+    const state = harness.getState()
+    assert.equal(state.members[0]?.[member.id], undefined)
+    assert.equal(state.members[1]?.[member.id], 'Alice')
+  } finally {
+    await harness.close()
+  }
+})
+
 test('host question cursor sync requires auth and broadcasts updates', async () => {
   const harness = await createHarness()
   try {
@@ -338,6 +367,61 @@ test('host question cursor sync requires auth and broadcasts updates', async () 
     const getResult = await emitAck(other, 'host:question:get')
     assert.equal(getResult.ok, true)
     assert.deepEqual(getResult.activeQuestion, [1, 2])
+  } finally {
+    await harness.close()
+  }
+})
+
+test('companion can trigger sound playback on host controller only', async () => {
+  const harness = await createHarness()
+  try {
+    const controller = await harness.connect()
+    const companion = await harness.connect()
+    const member = await harness.connect()
+
+    await authHost(controller)
+    await authCompanion(companion)
+
+    const controllerSound = once(controller, 'host:sfx:play')
+    const triggerResult = await emitAck(companion, 'host:sfx:play', 'nani')
+    assert.equal(triggerResult.ok, true)
+    const payload = await controllerSound
+    assert.equal(payload.soundKey, 'nani')
+    assert.ok(typeof payload.requestId === 'string' && payload.requestId.length > 0)
+
+    const companionResultPromise = once(companion, 'host:sfx:result')
+    controller.emit('host:sfx:result', {
+      requestId: payload.requestId,
+      sourceSocketId: payload.sourceSocketId,
+      ok: true,
+    })
+    const companionResult = await companionResultPromise
+    assert.equal(companionResult.requestId, payload.requestId)
+    assert.equal(companionResult.ok, true)
+
+    const unauthorized = await emitAck(member, 'host:sfx:play', 'nani')
+    assert.equal(unauthorized.ok, false)
+    assert.equal(unauthorized.error, 'unauthorized')
+  } finally {
+    await harness.close()
+  }
+})
+
+test('companion receives timeout when controller does not confirm playback', async () => {
+  const harness = await createHarness()
+  try {
+    const controller = await harness.connect()
+    const companion = await harness.connect()
+
+    await authHost(controller)
+    await authCompanion(companion)
+
+    const triggerResult = await emitAck(companion, 'host:sfx:play', 'nani')
+    assert.equal(triggerResult.ok, true)
+    const timedOut = await once(companion, 'host:sfx:result', 1000)
+    assert.equal(timedOut.requestId, triggerResult.requestId)
+    assert.equal(timedOut.ok, false)
+    assert.equal(timedOut.error, 'playback-timeout')
   } finally {
     await harness.close()
   }

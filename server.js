@@ -19,13 +19,40 @@ function isHostAuthorized(socket) {
   return socket.data?.isHost === true
 }
 
+function isHostController(socket) {
+  return socket.data?.isHost === true && socket.data?.hostRole === 'controller'
+}
+
+function normalizeHostRole(rawRole) {
+  return rawRole === 'companion' ? 'companion' : 'controller'
+}
+
+const ALLOWED_SOUND_KEYS = new Set([
+  'crickets',
+  'faaah',
+  'correct_answer',
+  'nani',
+  'what_the_hell',
+  'shocked',
+  'airhorn',
+  'boo',
+  'laughter',
+  'okayy',
+  'very_wrong',
+])
+
+function getSoundResultTimeoutMs() {
+  const raw = Number.parseInt(process.env.SFX_RESULT_TIMEOUT_MS || '', 10)
+  if (!Number.isInteger(raw) || raw < 250) return 4000
+  return raw
+}
+
 function initialState() {
   return {
     teams: [],       // [{ name, color }]
     armed: false,
     buzzedBy: null,  // teamIndex | null
     buzzedMemberName: null,
-    stealLockedOutTeamIndex: null,
     allowedTeamIndices: null,  // null = all allowed, Set = only these indices
     members: {},     // { [teamIndex]: { [socketId]: memberName } }
     hostQuestionCursor: null, // [roundIndex, questionIndex|null] | null
@@ -66,6 +93,23 @@ export function createBuzzServer() {
 
   // Game state (one game at a time)
   let state = initialState()
+  const pendingSoundResults = new Map()
+
+  function removeSocketFromAllTeamMembers(socketId) {
+    let changed = false
+    for (const [teamKey, roster] of Object.entries(state.members)) {
+      if (!roster || typeof roster !== 'object') continue
+      if (!Object.prototype.hasOwnProperty.call(roster, socketId)) continue
+      delete roster[socketId]
+      changed = true
+      if (Object.keys(roster).length === 0) delete state.members[teamKey]
+    }
+    return changed
+  }
+
+  function leaveAllTeamRooms(socket) {
+    for (let i = 0; i < state.teams.length; i++) socket.leave(`team-${i}`)
+  }
 
   function broadcastMembers() {
     // Send host a simple array-of-arrays: index = teamIndex, value = [name, ...]
@@ -78,15 +122,12 @@ export function createBuzzServer() {
 
     socket.on('disconnect', () => {
       debugLog(`[disconnect] socket=${socket.id}`)
-      const idx = socket.data.teamIndex
-      if (idx !== undefined && state.members[idx]) {
-        delete state.members[idx][socket.id]
-        broadcastMembers()
-      }
+      const removed = removeSocketFromAllTeamMembers(socket.id)
+      if (removed) broadcastMembers()
     })
 
     // ── Host: authenticate ────────────────────────────────────
-    socket.on('host:auth', (pin, callback) => {
+    socket.on('host:auth', (payload, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       const configuredPin = getHostPin()
       if (!configuredPin) {
@@ -94,14 +135,18 @@ export function createBuzzServer() {
         return
       }
 
-      const providedPin = String(pin || '').trim()
+      const providedPin = String(typeof payload === 'object' && payload !== null ? payload.pin : payload || '').trim()
       if (!providedPin || providedPin !== configuredPin) {
         respond({ ok: false, error: 'unauthorized' })
         return
       }
 
+      const role = normalizeHostRole(typeof payload === 'object' && payload !== null ? payload.role : 'controller')
       socket.data.isHost = true
+      socket.data.hostRole = role
       socket.join('host')
+      socket.leave('host-controller')
+      if (role === 'controller') socket.join('host-controller')
       respond({ ok: true })
     })
 
@@ -159,11 +204,62 @@ export function createBuzzServer() {
       respond({ ok: true, activeQuestion: state.hostQuestionCursor })
     })
 
+    socket.on('host:sfx:play', (soundKey, callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      if (!isHostAuthorized(socket)) {
+        respond({ ok: false, error: 'unauthorized' })
+        return
+      }
+      const normalizedKey = String(soundKey || '').trim()
+      if (!ALLOWED_SOUND_KEYS.has(normalizedKey)) {
+        respond({ ok: false, error: 'invalid-sound' })
+        return
+      }
+      const controllerRoom = io.sockets.adapter.rooms.get('host-controller')
+      if (!controllerRoom || controllerRoom.size === 0) {
+        respond({ ok: false, error: 'no-controller' })
+        return
+      }
+      const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      const timeout = setTimeout(() => {
+        const pending = pendingSoundResults.get(requestId)
+        if (!pending) return
+        pendingSoundResults.delete(requestId)
+        io.to(pending.sourceSocketId).emit('host:sfx:result', {
+          requestId,
+          ok: false,
+          error: 'playback-timeout',
+        })
+      }, getSoundResultTimeoutMs())
+      pendingSoundResults.set(requestId, { sourceSocketId: socket.id, timeout })
+      io.to('host-controller').emit('host:sfx:play', {
+        soundKey: normalizedKey,
+        requestId,
+        sourceSocketId: socket.id,
+      })
+      respond({ ok: true, requestId })
+    })
+
+    socket.on('host:sfx:result', (payload) => {
+      if (!isHostController(socket)) return
+      if (!payload || typeof payload !== 'object') return
+
+      const requestId = String(payload.requestId || '').trim()
+      if (!requestId) return
+      const pending = pendingSoundResults.get(requestId)
+      if (!pending) return
+      clearTimeout(pending.timeout)
+      pendingSoundResults.delete(requestId)
+
+      const ok = payload.ok === true
+      const error = ok ? null : String(payload.error || 'playback-failed')
+      io.to(pending.sourceSocketId).emit('host:sfx:result', { requestId, ok, error })
+    })
+
     // ── Host: arm the buzzers ──────────────────────────────────
     socket.on('host:arm', (arg1, arg2) => {
       const options = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}
       const respond = typeof arg1 === 'function' ? arg1 : (typeof arg2 === 'function' ? arg2 : () => {})
-      const requestedLockout = Number.isInteger(options.lockedOutTeamIndex) ? options.lockedOutTeamIndex : null
       const allowedIndices = Array.isArray(options.allowedTeamIndices) ? new Set(options.allowedTeamIndices) : null
 
       if (!isHostAuthorized(socket)) {
@@ -176,7 +272,6 @@ export function createBuzzServer() {
         return
       }
       state.armed = true
-      state.stealLockedOutTeamIndex = requestedLockout
       state.allowedTeamIndices = allowedIndices
       io.emit('buzz:armed')
       respond({ ok: true })
@@ -193,7 +288,6 @@ export function createBuzzServer() {
       state.armed = false
       state.buzzedBy = null
       state.buzzedMemberName = null
-      state.stealLockedOutTeamIndex = null
       state.allowedTeamIndices = null
       io.emit('buzz:reset')
       respond({ ok: true })
@@ -216,6 +310,8 @@ export function createBuzzServer() {
         respond({ error: 'Invalid team.' })
         return
       }
+      removeSocketFromAllTeamMembers(socket.id)
+      leaveAllTeamRooms(socket)
       socket.data.teamIndex = idx
       socket.data.memberName = name
       socket.join(`team-${idx}`)
@@ -249,7 +345,6 @@ export function createBuzzServer() {
       if (state.buzzedBy !== null)       return
       const idx = socket.data.teamIndex
       if (idx === undefined || idx === null) return
-      if (idx === state.stealLockedOutTeamIndex) return
       if (state.allowedTeamIndices !== null && !state.allowedTeamIndices.has(idx)) return
 
       state.armed = false

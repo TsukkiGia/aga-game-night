@@ -89,20 +89,20 @@ export default {
       meaning: 'A gossip, someone who spreads rumors',
     },
     {
-      id: 'r2q12',
-      term: 'Ni Kunoma',
-      language: 'Sheng',
-      country: 'Kenya',
-      sentence: "Stay away from that street, ni kunoma.",
-      meaning: "It's a problem / not safe",
-    },
-    {
       id: 'r2q11',
       term: 'Sapa',
       language: 'Nigerian Slang',
       country: 'Nigeria',
       sentence: 'This sapa is hitting different this month — I can\'t even buy data.',
       meaning: 'The state of being broke — Serious Absence of Purchasing Ability',
+    },
+     {
+      id: 'r2q12',
+      term: 'Ni Kunoma',
+      language: 'Sheng',
+      country: 'Kenya',
+      sentence: "Stay away from that street, ni kunoma.",
+      meaning: "It's a problem / not safe",
     },
   ],
 }

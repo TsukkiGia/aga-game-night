@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { socket } from '../socket'
-import { playBuzzIn, playArm } from '../sounds'
-
-const HOST_PIN_KEY = 'scorekeeping_host_pin'
+import { playBuzzIn, playArm, playSoundBiteByKey, unlockAudio } from '../sounds'
+import { HOST_PIN_KEY } from '../storage'
 
 export function useGameSocket(initialTeams) {
   const [armed, setArmed] = useState(false)
@@ -44,7 +43,7 @@ export function useGameSocket(initialTeams) {
     function authenticateAndSetup() {
       const tryPin = (pin, canPromptAgain = true) => {
         if (!pin) return
-        socket.emit('host:auth', pin, (authResult) => {
+        socket.emit('host:auth', { pin, role: 'controller' }, (authResult) => {
           if (!authResult?.ok) {
             setHostReady(false)
             clearStoredHostPin()
@@ -92,6 +91,43 @@ export function useGameSocket(initialTeams) {
       setHostReady(false)
     }
 
+    function onRemoteSound(payload) {
+      const packet = (payload && typeof payload === 'object')
+        ? payload
+        : { soundKey: payload, requestId: '', sourceSocketId: '' }
+      const soundKey = String(packet.soundKey || '').trim()
+      Promise.resolve(playSoundBiteByKey(soundKey))
+        .then((ok) => {
+          const requestId = String(packet.requestId || '').trim()
+          const sourceSocketId = String(packet.sourceSocketId || '').trim()
+          if (requestId && sourceSocketId) {
+            socket.emit('host:sfx:result', {
+              requestId,
+              sourceSocketId,
+              ok,
+              error: ok ? null : 'audio-blocked',
+            })
+          }
+          if (!ok) console.warn('[host:sfx:play] blocked by browser audio policy')
+        })
+        .catch(() => {
+          const requestId = String(packet.requestId || '').trim()
+          const sourceSocketId = String(packet.sourceSocketId || '').trim()
+          if (requestId && sourceSocketId) {
+            socket.emit('host:sfx:result', {
+              requestId,
+              sourceSocketId,
+              ok: false,
+              error: 'playback-failed',
+            })
+          }
+        })
+    }
+
+    function primeAudio() {
+      unlockAudio()
+    }
+
     socket.on('connect', authenticateAndSetup)
     socket.on('disconnect', onDisconnect)
     if (socket.connected) authenticateAndSetup()
@@ -102,6 +138,9 @@ export function useGameSocket(initialTeams) {
     socket.on('buzz:reset',   () => { setArmed(false); setBuzzWinner(null) })
     socket.on('buzz:winner',  (data) => { setArmed(false); setBuzzWinner(data); playBuzzIn() })
     socket.on('host:members', (data) => setMembers(data))
+    socket.on('host:sfx:play', onRemoteSound)
+    window.addEventListener('pointerdown', primeAudio)
+    window.addEventListener('keydown', primeAudio)
 
     return () => {
       socket.off('connect', authenticateAndSetup)
@@ -111,6 +150,9 @@ export function useGameSocket(initialTeams) {
       socket.off('buzz:reset')
       socket.off('buzz:winner')
       socket.off('host:members')
+      socket.off('host:sfx:play', onRemoteSound)
+      window.removeEventListener('pointerdown', primeAudio)
+      window.removeEventListener('keydown', primeAudio)
     }
   }, [])
 

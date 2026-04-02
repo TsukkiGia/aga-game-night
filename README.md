@@ -70,6 +70,8 @@ On first host connection, you'll be prompted for the same `HOST_PIN`.
 
 Open `http://localhost:5173` for the host view.
 Open `http://localhost:5173/host-mobile` on a phone for the answer + sound-bites companion view.
+Sound bites tapped on `/host-mobile` play through the base host app audio.
+If sounds don't fire on first try, tap anywhere once on the base host page to unlock browser audio.
 
 ### Sharing with remote players (ngrok)
 
