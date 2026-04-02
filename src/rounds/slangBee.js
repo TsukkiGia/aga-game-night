@@ -85,7 +85,7 @@ export default {
       term: 'Amebo',
       language: 'Nigerian Slang',
       country: 'Nigeria',
-      sentence: 'That girl is an amebo.',
+      sentence: 'I\'m so tired of that girl\'s antics – she is such an amebo.',
       meaning: 'A gossip, someone who spreads rumors',
     },
     {
