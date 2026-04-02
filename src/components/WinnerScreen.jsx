@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { playWinner, playWinnerMusical, playApplause } from '../sounds'
+import { useEffect, useRef, useState } from 'react'
+import { playWinner, playWinnerMusical, playApplause, stopWinnerSounds, playSuspenseSequence, stopSuspense } from '../sounds'
 
 export default function WinnerScreen({ teams, onClose, onDismiss, onTiebreaker }) {
   const canvasRef = useRef(null)
@@ -21,7 +21,17 @@ export default function WinnerScreen({ teams, onClose, onDismiss, onTiebreaker }
   // (e.g. 4 tied for 1st, 3 tied for 2nd, 4 tied for 3rd)
   const showPodium = !sorted[3] || places[3] > places[2]
 
+  const [showSuddenDeath, setShowSuddenDeath] = useState(false)
+  const [showSdButton, setShowSdButton] = useState(false)
+
   useEffect(() => { playWinner(); playWinnerMusical(); playApplause() }, [])
+
+  useEffect(() => {
+    if (!isTie || !onTiebreaker) return
+    const t1 = setTimeout(() => { setShowSuddenDeath(true); stopWinnerSounds(); playSuspenseSequence() }, 10000)
+    const t2 = setTimeout(() => setShowSdButton(true), 14000)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [isTie, onTiebreaker])
 
   // Simple confetti
   useEffect(() => {
@@ -100,13 +110,20 @@ export default function WinnerScreen({ teams, onClose, onDismiss, onTiebreaker }
 
         <div className="winner-actions">
           <button className="winner-dismiss-btn" onClick={onDismiss}>✕ Close</button>
-          {isTie && onTiebreaker && (
-            <button className="winner-tiebreaker-btn" onClick={() => onTiebreaker(winners)}>
-              ⚡ Sudden Death
-            </button>
-          )}
           <button className="winner-close-btn" onClick={onClose}>↺ Play Again</button>
         </div>
+
+        {isTie && onTiebreaker && showSuddenDeath && (
+          <div className="winner-sd-fullscreen">
+            <button className="winner-sd-close" onClick={() => { setShowSuddenDeath(false); stopSuspense() }}>✕</button>
+            <div className="winner-sd-but">...but is it really?</div>
+            {showSdButton && (
+              <button className="winner-sd-dramatic-btn" onClick={() => { stopSuspense(); onTiebreaker(winners) }}>
+                ⚡ SUDDEN DEATH ⚡
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -12,6 +12,7 @@ function initialState() {
     buzzedBy: null,  // teamIndex | null
     buzzedMemberName: null,
     stealLockedOutTeamIndex: null,
+    allowedTeamIndices: null,  // null = all allowed, Set = only these indices
     members: {},     // { [teamIndex]: { [socketId]: memberName } }
   }
 }
@@ -66,6 +67,7 @@ export function createBuzzServer() {
       const options = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}
       const respond = typeof arg1 === 'function' ? arg1 : (typeof arg2 === 'function' ? arg2 : () => {})
       const requestedLockout = Number.isInteger(options.lockedOutTeamIndex) ? options.lockedOutTeamIndex : null
+      const allowedIndices = Array.isArray(options.allowedTeamIndices) ? new Set(options.allowedTeamIndices) : null
 
       if (!socket.rooms.has('host')) {
         respond({ ok: false, error: 'unauthorized' })
@@ -78,6 +80,7 @@ export function createBuzzServer() {
       }
       state.armed = true
       state.stealLockedOutTeamIndex = requestedLockout
+      state.allowedTeamIndices = allowedIndices
       io.emit('buzz:armed')
       respond({ ok: true })
     })
@@ -94,6 +97,7 @@ export function createBuzzServer() {
       state.buzzedBy = null
       state.buzzedMemberName = null
       state.stealLockedOutTeamIndex = null
+      state.allowedTeamIndices = null
       io.emit('buzz:reset')
       respond({ ok: true })
     })
@@ -149,6 +153,7 @@ export function createBuzzServer() {
       const idx = socket.data.teamIndex
       if (idx === undefined || idx === null) return
       if (idx === state.stealLockedOutTeamIndex) return
+      if (state.allowedTeamIndices !== null && !state.allowedTeamIndices.has(idx)) return
 
       state.armed = false
       state.buzzedBy = idx

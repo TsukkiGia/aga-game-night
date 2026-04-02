@@ -85,7 +85,7 @@ export default {
       term: 'Doff',
       language: 'Wolof',
       country: 'Senegal',
-      sentence: 'Who designed this? Doff?',
+      sentence: 'What happened to you? You look like a doff o',
       meaning: 'A crazy person',
     },
   ],

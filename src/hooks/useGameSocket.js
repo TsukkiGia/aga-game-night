@@ -43,8 +43,9 @@ export function useGameSocket(initialTeams) {
     }
   }, [])
 
-  function handleArm() {
-    socket.emit('host:arm', (result) => {
+  function handleArm(options = {}) {
+    const safeOptions = (options && typeof options === 'object' && !Array.isArray(options) && !(options instanceof Event)) ? options : {}
+    socket.emit('host:arm', safeOptions, (result) => {
       if (result?.ok) playArm()
     })
   }
@@ -72,10 +73,10 @@ export function useGameSocket(initialTeams) {
     })
   }
 
-  function handleRearm() {
+  function handleRearm(options = {}) {
     socket.emit('host:reset', (resetResult) => {
       if (!resetResult?.ok) return
-      socket.emit('host:arm', (armResult) => {
+      socket.emit('host:arm', options, (armResult) => {
         if (armResult?.ok) playArm()
       })
     })

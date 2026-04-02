@@ -28,7 +28,8 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
     setShowWinner(false)
     setTiedTeams(winners)
     setSuddenDeath(true)
-    handleArm()
+    const allowedTeamIndices = winners.map(w => w.originalIndex)
+    handleArm({ allowedTeamIndices })
   }
 
   function handleSuddenDeathAward(teamIndex) {
@@ -39,7 +40,8 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
   }
 
   function handleSuddenDeathWrong() {
-    handleRearm()
+    const allowedTeamIndices = tiedTeams.map(w => w.originalIndex)
+    handleRearm({ allowedTeamIndices })
   }
 
   function handleSuddenDeathCancel() {

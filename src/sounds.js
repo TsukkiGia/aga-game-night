@@ -20,6 +20,31 @@ export function playGameStart() { play('game_start') }
 export function playWinner()        { play('winner', 'mp3') }
 export function playWinnerMusical() { play('winner_musical', 'mp3') }
 export function playApplause()       { play('applause') }
+export function stopWinnerSounds() {
+  for (const name of ['winner', 'winner_musical', 'applause']) {
+    const ext = name === 'applause' ? 'wav' : 'mp3'
+    const a = load(name, ext)
+    a.pause()
+    a.currentTime = 0
+  }
+}
+
+export function playSuspenseSequence() {
+  const s1 = load('suspense_1')
+  const s2 = load('suspense_2')
+  s2.loop = true
+  s1.currentTime = 0
+  s1.play().catch(() => {})
+  s1.onended = () => { s2.currentTime = 0; s2.play().catch(() => {}) }
+}
+
+export function stopSuspense() {
+  for (const name of ['suspense_1', 'suspense_2']) {
+    const a = load(name)
+    a.pause()
+    a.currentTime = 0
+  }
+}
 export function playWhistle()        { play('referee-whistle', 'mp3') }
 export function playTick()   { play('tick-tock') }
 export function stopTick()   { const a = load('tick-tock'); a.pause(); a.currentTime = 0 }
