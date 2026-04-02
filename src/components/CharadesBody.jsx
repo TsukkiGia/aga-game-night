@@ -6,7 +6,7 @@ export default function CharadesBody({ question }) {
   return (
     <div className="qv-charades-wrap">
       <div className="qv-charades-label">Guess the Phrase before time runs out</div>
-      <Timer seconds={90} />
+      <Timer seconds={60} />
       {!revealed ? (
         <button className="qv-reveal-btn" onClick={() => setRevealed(true)}>Reveal Phrase ▼</button>
       ) : (

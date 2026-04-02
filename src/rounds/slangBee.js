@@ -37,7 +37,7 @@ export default {
       term: 'Ngori',
       language: 'Sheng',
       country: 'Kenya',
-      sentence: "Don't go there tonight, kuna ngori.",
+      sentence: "Don't go there tonight, you will have ngori.",
       meaning: 'Trouble or difficulty',
     },
     {
@@ -58,14 +58,6 @@ export default {
     },
     {
       id: 'r2q6',
-      term: 'Chalo',
-      language: 'Zambian Slang',
-      country: 'Zambia',
-      sentence: 'The music festival last night was amazing. Zambia ku chalo!',
-      meaning: 'To the world',
-    },
-    {
-      id: 'r2q7',
       term: 'Salt Sana',
       language: 'Zambian Slang',
       country: 'Zambia',
@@ -73,11 +65,11 @@ export default {
       meaning: 'Total agreement, "exactly" — said when someone makes a point you fully agree with',
     },
     {
-      id: 'r2q8',
+      id: 'r2q7',
       term: 'Poa',
       language: 'Swahili Slang',
       country: 'Tanzania',
-      sentence: '"You good?" "Poa."',
+      sentence: 'Jonas: "You good?", Abimbola: "Poa."',
       meaning: 'Cool, fine, no worries',
     },
     {
@@ -87,6 +79,30 @@ export default {
       country: 'Senegal',
       sentence: 'What happened to you? You look like a doff o',
       meaning: 'A crazy person',
+    },
+    {
+      id: 'r2q10',
+      term: 'Amebo',
+      language: 'Nigerian Slang',
+      country: 'Nigeria',
+      sentence: 'That girl is an amebo.',
+      meaning: 'A gossip, someone who spreads rumors',
+    },
+    {
+      id: 'r2q12',
+      term: 'Ni Kunoma',
+      language: 'Sheng',
+      country: 'Kenya',
+      sentence: "Stay away from that street, ni kunoma.",
+      meaning: "It's a problem / not safe",
+    },
+    {
+      id: 'r2q11',
+      term: 'Sapa',
+      language: 'Nigerian Slang',
+      country: 'Nigeria',
+      sentence: 'This sapa is hitting different this month — I can\'t even buy data.',
+      meaning: 'The state of being broke — Serious Absence of Purchasing Ability',
     },
   ],
 }

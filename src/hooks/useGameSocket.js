@@ -44,7 +44,7 @@ export function useGameSocket(initialTeams) {
   }, [])
 
   function handleArm(options = {}) {
-    const safeOptions = (options && typeof options === 'object' && !Array.isArray(options) && !(options instanceof Event)) ? options : {}
+    const safeOptions = (options && typeof options === 'object' && !Array.isArray(options) && Array.isArray(options.allowedTeamIndices)) ? options : {}
     socket.emit('host:arm', safeOptions, (result) => {
       if (result?.ok) playArm()
     })
