@@ -10,7 +10,7 @@ export default function QuestionView({
   teams, buzzWinner, armed,
   onAdjust, onArm, onDismiss,
   stealMode, onWrongAndSteal, onManualBuzz,
-  onToggleDone, onNavigate, onBack, onNext, onPrev,
+  onMarkDone, onNavigate, onBack, onNext, onPrev,
   onHalftime, onWinner, doublePoints, onToggleDouble,
 }) {
   const round = rounds[roundIndex]
@@ -18,6 +18,8 @@ export default function QuestionView({
   const total = round.questions.length
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [revealedInModal, setRevealedInModal] = useState(false)
+  const [stealPickerOpen, setStealPickerOpen] = useState(false)
+  const [stealSelected, setStealSelected] = useState(() => new Set(teams.map((_, i) => i)))
   const [revealedCountry, setRevealedCountry] = useState(false)
   const [buzzCountdown, setBuzzCountdown] = useState(null)
   const buzzCountdownRef = useRef(null)
@@ -60,7 +62,7 @@ export default function QuestionView({
         <div className="qv-pagination">
           <span className="qv-counter">Q {questionIndex + 1} / {total}</span>
           <button className="qv-arrow" onClick={onPrev} disabled={questionIndex === 0}>‹</button>
-          <button className="qv-arrow" onClick={() => { onToggleDone(); onNext() }}>›</button>
+          <button className="qv-arrow" onClick={() => { onMarkDone(); onNext() }}>›</button>
           <button className="halftime-btn" onClick={onHalftime}>⏸ Halftime</button>
           <button className="winner-btn" onClick={onWinner}>🏆 Winner</button>
         </div>
@@ -266,7 +268,51 @@ export default function QuestionView({
         {armed && (
           <button className="arm-cancel-btn" onClick={onDismiss}>Cancel</button>
         )}
+        {!armed && !buzzWinner && (
+          <button
+            className={`steal-open-btn${stealPickerOpen ? ' active' : ''}`}
+            onClick={() => setStealPickerOpen(o => !o)}
+          >
+            🔀 Open Steal
+          </button>
+        )}
       </div>
+
+      {/* ── Steal picker ─────────────────────────────── */}
+      {stealPickerOpen && !armed && !buzzWinner && (
+        <div className="steal-picker">
+          <div className="steal-picker-label">Teams eligible to steal:</div>
+          <div className="steal-picker-teams">
+            {teams.map((t, i) => (
+              <label key={i} className={`steal-picker-chip color-${t.color}${stealSelected.has(i) ? ' selected' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={stealSelected.has(i)}
+                  onChange={() => {
+                    setStealSelected(prev => {
+                      const next = new Set(prev)
+                      next.has(i) ? next.delete(i) : next.add(i)
+                      return next
+                    })
+                  }}
+                />
+                {t.name}
+              </label>
+            ))}
+          </div>
+          <button
+            className="steal-arm-btn"
+            disabled={stealSelected.size === 0}
+            onClick={() => {
+              const allowedTeamIndices = [...stealSelected]
+              setStealPickerOpen(false)
+              onWrongAndSteal(allowedTeamIndices)
+            }}
+          >
+            Arm Steal →
+          </button>
+        </div>
+      )}
     </div>
   )
 }

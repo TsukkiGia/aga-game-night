@@ -15,7 +15,7 @@ import { clearAll } from '../storage'
 import { playGameStart } from '../sounds'
 
 export default function Scoreboard({ teams: initialTeams, onReset }) {
-  const { teams, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, toggleDone } = useGameState(initialTeams)
+  const { teams, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, toggleDone, markDone } = useGameState(initialTeams)
   const { armed, buzzWinner, members, stealMode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm } = useGameSocket(initialTeams)
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
@@ -60,6 +60,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
     }
     function navigateWithReset(ri, qi = null) {
       clearDoublePoints()
+      handleDismiss()
       navigate(ri, qi, rounds)
     }
     function goBack() {
@@ -100,9 +101,9 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
           onArm={handleArm}
           onDismiss={dismissBuzzAndResetMultiplier}
           stealMode={stealMode}
-          onWrongAndSteal={handleWrongAndSteal}
+          onWrongAndSteal={(allowedTeamIndices) => handleWrongAndSteal(allowedTeamIndices)}
           onManualBuzz={(i) => handleManualBuzz(i, teams)}
-          onToggleDone={() => toggleDone(rIdx, qIdx)}
+          onMarkDone={() => markDone(rIdx, qIdx)}
           onNavigate={navigateWithReset}
           onBack={goBack}
           onNext={() => {

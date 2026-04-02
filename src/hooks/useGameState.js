@@ -53,5 +53,14 @@ export function useGameState(initialTeams) {
     })
   }
 
-  return { teams, doneQuestions, flashing, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetScores, resetForNewGame, toggleDone }
+  function markDone(rIdx, qIdx) {
+    const key = `${rIdx}-${qIdx}`
+    setDoneQuestions(prev => {
+      const next = new Set(prev)
+      next.add(key)
+      return next
+    })
+  }
+
+  return { teams, doneQuestions, flashing, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetScores, resetForNewGame, toggleDone, markDone }
 }

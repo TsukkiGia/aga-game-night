@@ -321,6 +321,86 @@
   background: var(--bg-card);
 }
 
+.steal-open-btn {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.steal-open-btn:hover,
+.steal-open-btn.active {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: rgba(217, 160, 31, 0.06);
+}
+
+.steal-picker {
+  padding: 12px 24px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.steal-picker-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.steal-picker-teams {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.steal-picker-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.steal-picker-chip input { display: none; }
+.steal-picker-chip.selected {
+  border-color: currentColor;
+  opacity: 1;
+}
+.steal-picker-chip:not(.selected) { opacity: 0.4; }
+
+.steal-arm-btn {
+  background: var(--amber);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 18px;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.steal-arm-btn:disabled { opacity: 0.4; cursor: default; }
+.steal-arm-btn:not(:disabled):hover { background: var(--amber-light); }
+
 /* ── Question view sidebar ── */
 .qv-main {
   display: flex;

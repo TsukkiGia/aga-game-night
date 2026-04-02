@@ -31,7 +31,7 @@ export default {
     { id: 'c12', phrase: 'Waving Down a Taxi' },
     { id: 'c13', phrase: 'Waiting in a Long Queue' },
     { id: 'c14', phrase: 'Sweeping the Compound' },
-    { id: 'c15', phrase: 'Sewing Clothes' },
+    { id: 'c15', phrase: 'Roadside Hawkers / Street Sellers' },
     { id: 'c16', phrase: 'Dodging Potholes' },
   ],
 }

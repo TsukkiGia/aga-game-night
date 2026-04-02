@@ -61,12 +61,12 @@ export function useGameSocket(initialTeams) {
     })
   }
 
-  function handleWrongAndSteal() {
-    const lockedOutTeamIndex = buzzWinner?.teamIndex ?? null
+  function handleWrongAndSteal(allowedTeamIndices = null) {
     socket.emit('host:reset', (resetResult) => {
       if (!resetResult?.ok) return
       setStealMode(true)
-      socket.emit('host:arm', { lockedOutTeamIndex }, (armResult) => {
+      const armOptions = allowedTeamIndices ? { allowedTeamIndices } : {}
+      socket.emit('host:arm', armOptions, (armResult) => {
         if (armResult?.ok) playArm()
         else setStealMode(false)
       })
@@ -74,6 +74,8 @@ export function useGameSocket(initialTeams) {
   }
 
   function handleRearm(options = {}) {
+    setBuzzWinner(null)
+    setStealMode(false)
     socket.emit('host:reset', (resetResult) => {
       if (!resetResult?.ok) return
       socket.emit('host:arm', options, (armResult) => {
