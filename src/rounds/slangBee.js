@@ -106,5 +106,13 @@ export default {
       sentence: "Stay away from that street, ni kunoma.",
       meaning: "It's a problem / not safe",
     },
+    {
+      id: 'r2q13',
+      term: 'Miswa iwe',
+      language: 'Shona Slang',
+      country: 'Zimbabwe',
+      sentence: 'You want to fight over a parking spot at the braai? Miswa iwe.',
+      meaning: 'Relax / bro chill',
+    },
   ],
 }
