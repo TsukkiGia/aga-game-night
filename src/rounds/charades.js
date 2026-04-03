@@ -6,7 +6,7 @@ export default {
   rules: [
     'Round robin — one person from each team acts while their team guesses',
     'No speaking, mouthing words, or spelling things out',
-    '90 seconds on the timer — start it when the phrase is revealed',
+    '60 seconds on the timer — start it when the phrase is revealed',
     'Correct answer: +3 pts',
     'If time runs out, one steal is open — buzz in to attempt',
     'Correct steal: +2 pts — wrong steal: no penalty',
