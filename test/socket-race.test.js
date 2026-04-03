@@ -405,6 +405,34 @@ test('host question cursor sync requires auth and broadcasts updates', async () 
   }
 })
 
+test('companion can trigger timer stop and restart on host controller only', async () => {
+  const harness = await createHarness()
+  try {
+    const controller = await harness.connect()
+    const companion = await harness.connect()
+    const member = await harness.connect()
+
+    await authHost(controller)
+    await authCompanion(companion)
+
+    const stopEvent = once(controller, 'host:timer:stop')
+    const stopResult = await emitAck(companion, 'host:timer:stop')
+    assert.equal(stopResult.ok, true)
+    await stopEvent
+
+    const restartEvent = once(controller, 'host:timer:restart')
+    const restartResult = await emitAck(companion, 'host:timer:restart')
+    assert.equal(restartResult.ok, true)
+    await restartEvent
+
+    const unauthorizedStop = await emitAck(member, 'host:timer:stop')
+    assert.equal(unauthorizedStop.ok, false)
+    assert.equal(unauthorizedStop.error, 'unauthorized')
+  } finally {
+    await harness.close()
+  }
+})
+
 test('companion can trigger sound playback on host controller only', async () => {
   const harness = await createHarness()
   try {

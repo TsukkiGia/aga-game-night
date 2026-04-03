@@ -152,3 +152,8 @@
   transform: translateY(1px);
   opacity: 0.9;
 }
+
+.host-mobile-timer-stop-btn:disabled {
+  background: #aaa;
+  cursor: not-allowed;
+}

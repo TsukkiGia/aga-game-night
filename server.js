@@ -298,6 +298,22 @@ export function createBuzzServer() {
       respond({ ok: true })
     })
 
+    socket.on('host:timer:restart', (callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      if (!isHostAuthorized(socket)) {
+        respond({ ok: false, error: 'unauthorized' })
+        return
+      }
+      io.to('host-controller').emit('host:timer:restart')
+      respond({ ok: true })
+    })
+
+    // Controller notifies companions when countdown naturally expires
+    socket.on('host:timer:expired', () => {
+      if (!isHostController(socket)) return
+      io.to('host').emit('host:timer:expired')
+    })
+
     // ── Host: arm the buzzers ──────────────────────────────────
     socket.on('host:arm', (arg1, arg2) => {
       const options = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}

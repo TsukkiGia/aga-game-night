@@ -162,6 +162,8 @@ export default function HostMobilePage() {
   const [connected, setConnected] = useState(false)
   const [authorized, setAuthorized] = useState(false)
   const [activeQuestion, setActiveQuestion] = useState(null)
+  const [buzzActive, setBuzzActive] = useState(false)
+  const [timerRunning, setTimerRunning] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [soundStatus, setSoundStatus] = useState('')
   const pendingSoundRequestIdRef = useRef('')
@@ -277,6 +279,9 @@ export default function HostMobilePage() {
     socket.on('disconnect', onDisconnect)
     socket.on('host:question', onHostQuestion)
     socket.on('host:sfx:result', onSoundResult)
+    socket.on('buzz:winner', () => { setBuzzActive(true); setTimerRunning(true) })
+    socket.on('buzz:reset', () => { setBuzzActive(false); setTimerRunning(false) })
+    socket.on('host:timer:expired', () => setTimerRunning(false))
     if (socket.connected) onConnect()
     socket.connect()
 
@@ -287,6 +292,9 @@ export default function HostMobilePage() {
       socket.off('disconnect', onDisconnect)
       socket.off('host:question', onHostQuestion)
       socket.off('host:sfx:result', onSoundResult)
+      socket.off('buzz:winner')
+      socket.off('buzz:reset')
+      socket.off('host:timer:expired')
     }
   }, [])
 
@@ -359,9 +367,19 @@ export default function HostMobilePage() {
           <button
             className="host-mobile-timer-stop-btn"
             type="button"
-            onClick={() => socket.emit('host:timer:stop')}
+            disabled={!timerRunning}
+            onClick={() => { socket.emit('host:timer:stop'); setTimerRunning(false) }}
           >
             ⏹ Stop Timer
+          </button>
+          <button
+            className="host-mobile-timer-stop-btn"
+            type="button"
+            disabled={!buzzActive || timerRunning}
+            onClick={() => { socket.emit('host:timer:restart'); setTimerRunning(true) }}
+            style={{ marginTop: 8, background: '#1a7f4b' }}
+          >
+            ▶ Restart Timer
           </button>
         </section>
       )}

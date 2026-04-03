@@ -12,7 +12,7 @@ export default function QuestionView({
   onAdjust, onArm, onDismiss,
   stealMode, onWrongAndSteal, onManualBuzz,
   onMarkDone, onNavigate, onBack, onNext, onPrev,
-  onHalftime, doublePoints, onToggleDouble, timerStopSignal,
+  onHalftime, doublePoints, onToggleDouble, timerControlSignal, onTimerExpired,
 }) {
   const round = rounds[roundIndex]
   const question = round.questions[questionIndex]
@@ -102,7 +102,8 @@ export default function QuestionView({
         onAdjust={onAdjust}
         onDismiss={onDismiss}
         onWrongAndSteal={onWrongAndSteal}
-        timerStopSignal={timerStopSignal}
+        timerControlSignal={timerControlSignal}
+        onTimerExpired={onTimerExpired}
       />
 
       {/* ── Main area: sidebar + body ───────────────── */}

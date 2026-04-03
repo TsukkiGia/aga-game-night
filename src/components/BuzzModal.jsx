@@ -1,23 +1,28 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { playTick, stopTick, playTimeUp } from '../sounds'
 
 export default function BuzzModal({
   buzzWinner, teams, round, question,
   stealMode, doublePoints, stealAllowedTeamIndices = null,
-  onAdjust, onDismiss, onWrongAndSteal, timerStopSignal,
+  onAdjust, onDismiss, onWrongAndSteal, timerControlSignal, onTimerExpired,
 }) {
   const [revealedInModal, setRevealedInModal] = useState(false)
   const [revealedCountry, setRevealedCountry] = useState(false)
   const [buzzCountdown, setBuzzCountdown] = useState(null)
   const buzzCountdownRef = useRef(null)
+  const lastHandledTimerSignalRef = useRef(0)
+  const onTimerExpiredRef = useRef(onTimerExpired)
+  onTimerExpiredRef.current = onTimerExpired
 
-  useEffect(() => {
-    if (!timerStopSignal) return
-    stopCountdown()
-  }, [timerStopSignal])
+  const stopCountdown = useCallback(() => {
+    clearInterval(buzzCountdownRef.current)
+    stopTick()
+    setBuzzCountdown(null)
+  }, [])
 
-  useEffect(() => {
-    if (!buzzWinner || buzzWinner.manual) { setBuzzCountdown(null); return }
+  const startCountdown = useCallback(() => {
+    clearInterval(buzzCountdownRef.current)
+    stopTick()
     setBuzzCountdown(10)
     let count = 10
     buzzCountdownRef.current = setInterval(() => {
@@ -29,16 +34,33 @@ export default function BuzzModal({
         stopTick()
         playTimeUp()
         clearInterval(buzzCountdownRef.current)
+        onTimerExpiredRef.current?.()
       }
     }, 1000)
-    return () => { clearInterval(buzzCountdownRef.current); stopTick(); setBuzzCountdown(null) }
-  }, [buzzWinner])
+  }, [])
 
-  function stopCountdown() {
-    clearInterval(buzzCountdownRef.current)
-    stopTick()
-    setBuzzCountdown(null)
-  }
+  useEffect(() => {
+    if (!buzzWinner || buzzWinner.manual) { setBuzzCountdown(null); return }
+    startCountdown()
+    return () => { clearInterval(buzzCountdownRef.current); stopTick(); setBuzzCountdown(null) }
+  }, [buzzWinner, startCountdown])
+
+  useEffect(() => {
+    const sequence = Number(timerControlSignal?.sequence || 0)
+    if (sequence <= 0) return
+    if (sequence === lastHandledTimerSignalRef.current) return
+    lastHandledTimerSignalRef.current = sequence
+
+    if (timerControlSignal.action === 'stop') {
+      stopCountdown()
+      return
+    }
+
+    if (timerControlSignal.action === 'restart') {
+      if (!buzzWinner || buzzWinner.manual) return
+      startCountdown()
+    }
+  }, [timerControlSignal, buzzWinner, stopCountdown, startCountdown])
 
   function handleDismiss() {
     setRevealedInModal(false)
