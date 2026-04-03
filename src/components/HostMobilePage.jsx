@@ -354,6 +354,18 @@ export default function HostMobilePage() {
         )}
       </section>
 
+      {authorized && (
+        <section className="host-mobile-timer-card">
+          <button
+            className="host-mobile-timer-stop-btn"
+            type="button"
+            onClick={() => socket.emit('host:timer:stop')}
+          >
+            ⏹ Stop Timer
+          </button>
+        </section>
+      )}
+
       <section className="host-mobile-sounds-card">
         <h2 className="host-mobile-sounds-title">Sound Bites</h2>
         {SHOW_SOUND_STATUS && soundStatus && <div className="host-mobile-sound-status">{soundStatus}</div>}

@@ -287,6 +287,17 @@ export function createBuzzServer() {
       io.to(pending.sourceSocketId).emit('host:sfx:result', { requestId, ok, error })
     })
 
+    // ── Host: stop countdown timer (from companion) ───────────
+    socket.on('host:timer:stop', (callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      if (!isHostAuthorized(socket)) {
+        respond({ ok: false, error: 'unauthorized' })
+        return
+      }
+      io.to('host-controller').emit('host:timer:stop')
+      respond({ ok: true })
+    })
+
     // ── Host: arm the buzzers ──────────────────────────────────
     socket.on('host:arm', (arg1, arg2) => {
       const options = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}

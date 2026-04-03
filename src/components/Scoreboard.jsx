@@ -16,7 +16,7 @@ import { playGameStart } from '../sounds'
 
 export default function Scoreboard({ teams: initialTeams, onReset }) {
   const { teams, streaks, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, toggleDone, markDone } = useGameState(initialTeams)
-  const { armed, buzzWinner, members, stealMode, hostReady, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion } = useGameSocket(initialTeams)
+  const { armed, buzzWinner, members, stealMode, hostReady, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerStopSignal } = useGameSocket(initialTeams)
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
   const [showWinner, setShowWinner] = useState(false)
@@ -105,6 +105,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
           onAdjust={adjust}
           onArm={handleArm}
           onDismiss={dismissBuzzAndResetMultiplier}
+          timerStopSignal={timerStopSignal}
           stealMode={stealMode}
           onWrongAndSteal={(allowedTeamIndices) => handleWrongAndSteal(allowedTeamIndices)}
           onManualBuzz={(i) => handleManualBuzz(i, teams)}

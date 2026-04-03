@@ -4,12 +4,17 @@ import { playTick, stopTick, playTimeUp } from '../sounds'
 export default function BuzzModal({
   buzzWinner, teams, round, question,
   stealMode, doublePoints, stealAllowedTeamIndices = null,
-  onAdjust, onDismiss, onWrongAndSteal,
+  onAdjust, onDismiss, onWrongAndSteal, timerStopSignal,
 }) {
   const [revealedInModal, setRevealedInModal] = useState(false)
   const [revealedCountry, setRevealedCountry] = useState(false)
   const [buzzCountdown, setBuzzCountdown] = useState(null)
   const buzzCountdownRef = useRef(null)
+
+  useEffect(() => {
+    if (!timerStopSignal) return
+    stopCountdown()
+  }, [timerStopSignal])
 
   useEffect(() => {
     if (!buzzWinner || buzzWinner.manual) { setBuzzCountdown(null); return }

@@ -9,6 +9,7 @@ export function useGameSocket(initialTeams) {
   const [members, setMembers] = useState([])
   const [stealMode, setStealMode] = useState(false)
   const [hostReady, setHostReady] = useState(false)
+  const [timerStopSignal, setTimerStopSignal] = useState(0)
 
   useEffect(() => {
     function getStoredHostPin() {
@@ -139,6 +140,7 @@ export function useGameSocket(initialTeams) {
     socket.on('buzz:winner',  (data) => { setArmed(false); setBuzzWinner(data); playBuzzIn() })
     socket.on('host:members', (data) => setMembers(data))
     socket.on('host:sfx:play', onRemoteSound)
+    socket.on('host:timer:stop', () => setTimerStopSignal(n => n + 1))
     window.addEventListener('pointerdown', primeAudio)
     window.addEventListener('keydown', primeAudio)
 
@@ -151,6 +153,7 @@ export function useGameSocket(initialTeams) {
       socket.off('buzz:winner')
       socket.off('host:members')
       socket.off('host:sfx:play', onRemoteSound)
+      socket.off('host:timer:stop')
       window.removeEventListener('pointerdown', primeAudio)
       window.removeEventListener('keydown', primeAudio)
     }
@@ -225,5 +228,6 @@ export function useGameSocket(initialTeams) {
     handleManualBuzz,
     handleRearm,
     syncHostQuestion,
+    timerStopSignal,
   }
 }
