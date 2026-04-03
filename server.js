@@ -235,6 +235,20 @@ export function createBuzzServer() {
       respond({ ok: true, activeQuestion: state.hostQuestionCursor })
     })
 
+    socket.on('host:new-game', (callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      if (!isHostAuthorized(socket)) {
+        respond({ ok: false, error: 'unauthorized' })
+        return
+      }
+      state = initialState()
+      io.except(socket.id).emit('game:reset')
+      io.to('host').emit('host:question', state.hostQuestionCursor)
+      broadcastMembers()
+      socket.emit('state:sync', state)
+      respond({ ok: true })
+    })
+
     socket.on('host:sfx:play', (soundKey, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       if (!isHostAuthorized(socket)) {

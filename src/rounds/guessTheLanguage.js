@@ -184,7 +184,7 @@ export default {
       video: 'Kinyarwanda.mp4',
       answer: 'Kinyarwanda',
       countries: ['Rwanda', 'Uganda', 'DRC'],
-      explanation: 'Kinyarwanda is the national language of Rwanda, spoken by virtually the entire population — one of the rare African countries where a single indigenous language unites the nation. A Bantu language closely related to Kirundi (Burundi). Rwanda\'s remarkable post-1994 recovery has made Kinyarwanda a symbol of resilience and national identity.',
+      explanation: 'Kinyarwanda is the national language of Rwanda, spoken by virtually the entire population — one of the rare African countries where a single indigenous language unites the nation. A Bantu language closely related to Kirundi (Burundi).',
     },
     {
       id: 'gtl-malagasy',
@@ -212,7 +212,7 @@ export default {
       video: 'oromo.mp4',
       answer: 'Oromo',
       countries: ['Ethiopia', 'Kenya'],
-      explanation: 'Oromo (Afaan Oromoo) is a Cushitic language and the most widely spoken language in Ethiopia, with over 40 million native speakers. The Oromo are Ethiopia\'s largest ethnic group. Despite its size, Oromo was suppressed for much of Ethiopia\'s modern history — it was only officially standardized and given equal status with Amharic in the late 20th century. Written in the Latin-based Qubee script.',
+      explanation: 'Oromo (Afaan Oromoo) is a Cushitic language and the most widely spoken language in Ethiopia, with over 40 million native speakers. The Oromo are Ethiopia\'s largest ethnic group. It was officially standardized and given equal status with Amharic in the late 20th century. Written in the Latin-based Qubee script.',
     },
     {
       id: 'gtl-hausa',

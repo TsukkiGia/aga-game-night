@@ -405,6 +405,36 @@ test('host question cursor sync requires auth and broadcasts updates', async () 
   }
 })
 
+test('host:new-game clears server state and broadcasts game reset', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const member = await harness.connect()
+
+    await authHost(host)
+    await emitAck(host, 'host:setup', TEAMS)
+    await emitAck(member, 'member:join', 0, 'Alice')
+
+    const memberReset = once(member, 'game:reset')
+    const resetResult = await emitAck(host, 'host:new-game')
+    assert.equal(resetResult.ok, true)
+    await memberReset
+
+    const state = harness.getState()
+    assert.deepEqual(state.teams, [])
+    assert.equal(state.armed, false)
+    assert.equal(state.buzzedBy, null)
+    assert.equal(state.hostQuestionCursor, null)
+    assert.deepEqual(state.members, {})
+
+    const unauthorized = await emitAck(member, 'host:new-game')
+    assert.equal(unauthorized.ok, false)
+    assert.equal(unauthorized.error, 'unauthorized')
+  } finally {
+    await harness.close()
+  }
+})
+
 test('companion can trigger timer stop and restart on host controller only', async () => {
   const harness = await createHarness()
   try {

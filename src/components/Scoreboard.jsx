@@ -144,6 +144,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
   function handleNewGame() {
     clearDoublePoints()
     handleDismiss()
+    socket.emit('host:new-game')
     clearAll()
     onReset()
   }
