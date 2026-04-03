@@ -6,16 +6,16 @@ export default {
   rules: [
     'Give the language or country',
     'No word-for-word translation needed — capturing the vibe counts',
-    'Buzz in to answer — correct language scores 3pts, correct country scores 1pt',
-    'A steal is always available after any answer — +2 correct, −1 wrong',
+    'Buzz in to answer — correct language: +3 pts, correct country: +1 pt, wrong answer: −1 pt',
+    'A steal is always available after any answer — +2 correct, no penalty for wrong steal. You can only steal with a language guess.',
     'Host reveals the answer with a short explanation',
   ],
   scoring: [
     { label: 'Correct language', points: 3 },
     { label: 'Correct country',  points: 1 },
-    { label: 'Wrong answer',  points: 0 },
+    { label: 'Wrong answer',  points: -1 },
     { label: 'Correct steal',    points: 2 },
-    { label: 'Wrong steal',      points: -1 },
+    { label: 'Wrong steal',      points: 0 },
   ],
   questions: [
     {

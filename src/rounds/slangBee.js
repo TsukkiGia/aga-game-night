@@ -6,14 +6,16 @@ export default {
   rules: [
     'Host reads the term, example sentence, and country of origin',
     'Buzz in to give the meaning — correct answer: +3 pts',
+    'Wrong answer: −1 pt',
     'Bonus +1 if your answer is especially funny (host decides)',
-    'One steal allowed after a miss — +2 correct, −1 wrong',
+    'One steal allowed after a miss — +2 correct, no penalty for wrong steal',
   ],
   scoring: [
     { label: 'Correct meaning', points: 3 },
     { label: 'Funny bonus',     points: 1 },
+    { label: 'Wrong answer',  points: -1 },
     { label: 'Correct steal',   points: 2 },
-    { label: 'Wrong steal',     points: -1 },
+    { label: 'Wrong steal',     points: 0 },
   ],
   questions: [
     {
@@ -82,11 +84,11 @@ export default {
     },
     {
       id: 'r2q10',
-      term: 'Amebo',
+      term: 'JJC',
       language: 'Nigerian Slang',
       country: 'Nigeria',
-      sentence: 'I\'m so tired of that girl\'s antics – she is such an amebo.',
-      meaning: 'A gossip, someone who spreads rumors',
+      sentence: 'Don\'t send him to go and price anything at the market, he will pay full price like a JJC.',
+      meaning: 'A novice or newcomer who doesn\'t know how things work (short for Johnny Just Come)',
     },
     {
       id: 'r2q11',

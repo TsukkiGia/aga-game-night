@@ -9,12 +9,13 @@ export default {
     '90 seconds on the timer — start it when the phrase is revealed',
     'Correct answer: +3 pts',
     'If time runs out, one steal is open — buzz in to attempt',
-    'Correct steal: +2 pts — wrong steal: −1 pt',
+    'Correct steal: +2 pts — wrong steal: no penalty',
   ],
   scoring: [
     { label: 'Correct answer', points: 3 },
+    { label: 'Wrong answer',  points: 0 },
     { label: 'Correct steal',  points: 2 },
-    { label: 'Wrong steal',    points: -1 },
+    { label: 'Wrong steal',    points: 0 },
   ],
   questions: [
     { id: 'c1', phrase: 'Braiding Hair' },

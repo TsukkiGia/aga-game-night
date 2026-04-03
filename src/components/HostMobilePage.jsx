@@ -88,9 +88,9 @@ function extractAnswerView(activeQuestion) {
   if (questionIndex === null) {
     return {
       status: 'intro',
-      heading: `${round.label} intro`,
-      roundLabel: round.name,
-      rows: [{ label: 'Status', value: 'Round intro on base app (no answer yet)' }],
+      heading: `${round.label} — ${round.name}`,
+      roundLabel: round.intro,
+      rows: round.rules.map((rule, i) => ({ label: `${i + 1}.`, value: rule })),
     }
   }
 
