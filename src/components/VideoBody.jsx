@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { playTransition } from '../sounds'
 
 export default function VideoBody({ question, paused }) {
   const videoRef = useRef(null)
@@ -14,7 +15,7 @@ export default function VideoBody({ question, paused }) {
     <div className="qv-video-wrap">
       <video ref={videoRef} className="qv-video" src={`/videos/${question.video}`} controls />
       {!revealed ? (
-        <button className="qv-reveal-btn" onClick={() => setRevealed(true)}>Reveal Answer ▼</button>
+        <button className="qv-reveal-btn" onClick={() => { playTransition(); setRevealed(true) }}>Reveal Answer ▼</button>
       ) : (
         <div className="buzz-popup-answer">
           <div className="buzz-popup-answer-label">Answer</div>

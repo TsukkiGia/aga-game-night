@@ -144,13 +144,13 @@ export default {
       countries: ['Botswana', 'South Africa'],
       explanation: 'Setswana is a Bantu language and the national language of Botswana, also widely spoken in South Africa. About 5 million speakers. Closely related to Sesotho and Sepedi — together these are called the Sotho-Tswana languages.',
     },
-    {
-      id: 'gtl-ibibio',
-      video: 'Ibibio.mp4',
-      answer: 'Ibibio',
-      countries: ['Nigeria'],
-      explanation: 'Ibibio is spoken by the Ibibio people of southeastern Nigeria, primarily in Akwa Ibom State. About 4 million speakers. It\'s closely related to Efik and part of the Cross River language group.',
-    },
+    // {
+    //   id: 'gtl-ibibio',
+    //   video: 'Ibibio.mp4',
+    //   answer: 'Ibibio',
+    //   countries: ['Nigeria'],
+    //   explanation: 'Ibibio is spoken by the Ibibio people of southeastern Nigeria, primarily in Akwa Ibom State. About 4 million speakers. It\'s closely related to Efik and part of the Cross River language group.',
+    // },
     {
       id: 'gtl-kikuyu',
       video: 'Kikuyu.mp4',
@@ -164,6 +164,20 @@ export default {
       answer: 'Meru',
       countries: ['Kenya'],
       explanation: 'Kimeru is a Bantu language spoken by the Meru people of central Kenya, on the eastern slopes of Mount Kenya. About 2 million speakers. Closely related to Kikuyu and Embu, but distinct enough to be its own language.',
+    },
+    {
+      id: 'gtl-tamazight',
+      video: 'Amazigh.mp4',
+      answer: 'Tamazight',
+      countries: ['Morocco', 'Algeria', 'Libya', 'Tunisia', 'Mali', 'Niger'],
+      explanation: 'Tamazight (Amazigh) is a family of Berber languages indigenous to North Africa, predating the Arab conquests by thousands of years. Spoken by tens of millions across Morocco, Algeria, and the broader Sahara region. Tifinagh, its ancient script, was recently revived and is now used in official contexts in Morocco.',
+    },
+    {
+      id: 'gtl-ga',
+      video: 'Ga.mp4',
+      answer: 'Ga',
+      countries: ['Ghana'],
+      explanation: 'Ga is a Kwa language spoken primarily in the Greater Accra region of Ghana, especially in and around the capital. About 745,000 native speakers. It\'s the home language of the Ga people and distinct from the Akan languages like Twi that dominate much of southern Ghana.',
     },
   ],
 }
