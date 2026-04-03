@@ -96,7 +96,18 @@ export default function BuzzModal({
         </div>
 
         {!stealMode && round.scoring.some(({ label }) => label.toLowerCase().includes('steal')) && (
-          <button className="buzz-steal-btn" onClick={() => { setRevealedInModal(false); setRevealedCountry(false); onWrongAndSteal(stealAllowedTeamIndices) }}>
+          <button
+            className="buzz-steal-btn"
+            onClick={() => {
+              setRevealedInModal(false)
+              setRevealedCountry(false)
+              const explicit = Array.isArray(stealAllowedTeamIndices)
+                ? stealAllowedTeamIndices
+                : teams.map((_, i) => i)
+              const filtered = explicit.filter((i) => i !== buzzWinner.teamIndex)
+              onWrongAndSteal(filtered)
+            }}
+          >
             Open Steal
           </button>
         )}

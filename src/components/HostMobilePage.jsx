@@ -14,10 +14,20 @@ const SOUND_BUTTONS = [
   { label: 'Boo', key: 'boo' },
   { label: 'Laughter', key: 'laughter' },
   { label: 'Okayy', key: 'okayy' },
-  { label: 'Very wrong', key: 'very_wrong' },
+  { label: 'Very wrong',     key: 'very_wrong' },
+  { label: 'Hello get down', key: 'hello_get_down' },
+  { label: 'Oh no no',       key: 'oh_no_no' },
+  { label: "Don't provoke me",    key: 'dont_provoke_me' },
+  { label: 'Why are you running', key: 'why_are_you_running' },
 ]
 const SOUND_RESULT_TIMEOUT_MS = 5500
 const SOUND_STATUS_AUTO_CLEAR_MS = 2800
+const SHOW_SOUND_STATUS = (() => {
+  const envDebug = String(import.meta.env.VITE_DEBUG_BUZZ || '').trim()
+  if (/^(1|true|yes)$/i.test(envDebug)) return true
+  const queryDebug = new URLSearchParams(window.location.search).get('debug') || ''
+  return /^(1|true|yes)$/i.test(queryDebug.trim())
+})()
 
 // Mirrors normalizeQuestionCursor() in server.js — keep in sync.
 function normalizeCursor(rawCursor) {
@@ -173,6 +183,7 @@ export default function HostMobilePage() {
   }
 
   function setTransientSoundStatus(message) {
+    if (!SHOW_SOUND_STATUS) return
     setSoundStatus(message)
     clearSoundStatusTimeout()
     soundStatusTimeoutRef.current = setTimeout(() => {
@@ -285,7 +296,7 @@ export default function HostMobilePage() {
     if (!authorized) return
     clearPendingSoundTimeout()
     clearSoundStatusTimeout()
-    setSoundStatus('Sending to base host…')
+    if (SHOW_SOUND_STATUS) setSoundStatus('Sending to base host…')
     socket.emit('host:sfx:play', soundKey, (result) => {
       if (result?.ok) {
         pendingSoundRequestIdRef.current = String(result.requestId || '')
@@ -298,12 +309,12 @@ export default function HostMobilePage() {
       }
       if (result?.error === 'unauthorized') {
         setErrorMsg('Host authorization expired. Reconnect and re-enter PIN.')
-        setSoundStatus('')
+        if (SHOW_SOUND_STATUS) setSoundStatus('')
         return
       }
       if (result?.error === 'no-controller') {
         setErrorMsg('Base host controller is not connected yet.')
-        setSoundStatus('')
+        if (SHOW_SOUND_STATUS) setSoundStatus('')
       }
       if (result?.error === 'invalid-sound') {
         setTransientSoundStatus('Invalid sound key.')
@@ -345,7 +356,7 @@ export default function HostMobilePage() {
 
       <section className="host-mobile-sounds-card">
         <h2 className="host-mobile-sounds-title">Sound Bites</h2>
-        {soundStatus && <div className="host-mobile-sound-status">{soundStatus}</div>}
+        {SHOW_SOUND_STATUS && soundStatus && <div className="host-mobile-sound-status">{soundStatus}</div>}
         <div className="host-mobile-sounds-grid">
           {SOUND_BUTTONS.map((sound) => (
             <button

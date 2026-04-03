@@ -15,12 +15,18 @@ function clearPlayer() {
   localStorage.removeItem(STORAGE_KEY)
 }
 
+function isEligibleDuringArmedState(sync, teamIndex) {
+  if (!Number.isInteger(teamIndex)) return false
+  if (Array.isArray(sync?.allowedTeamIndices)) return sync.allowedTeamIndices.includes(teamIndex)
+  return true
+}
+
 function deriveStatusFromSync(sync, teamIndex, memberName) {
   if (sync?.buzzedBy !== null && sync?.buzzedBy !== undefined) {
     if (sync.buzzedBy !== teamIndex) return 'locked-out'
     return sync.buzzedMemberName === memberName ? 'i-buzzed' : 'team-buzzed'
   }
-  if (sync?.armed) return 'armed'
+  if (sync?.armed) return isEligibleDuringArmedState(sync, teamIndex) ? 'armed' : 'locked-out'
   return 'waiting'
 }
 
@@ -75,7 +81,15 @@ export default function BuzzerPage() {
       setSelectedIndex(null)
       setStatus('join')
     })
-    socket.on('buzz:armed', () => setStatus('armed'))
+    socket.on('buzz:armed', (payload) => {
+      const sync = (payload && typeof payload === 'object')
+        ? { ...payload, armed: true, buzzedBy: null, buzzedMemberName: null }
+        : { armed: true, buzzedBy: null, buzzedMemberName: null }
+      setStatus((prev) => {
+        if (prev === 'join' || prev === 'loading') return prev
+        return deriveStatusFromSync(sync, teamIndexRef.current, nameRef.current)
+      })
+    })
     socket.on('buzz:reset', () => setStatus(s => s === 'join' || s === 'loading' ? s : 'waiting'))
     socket.on('buzz:winner', (data) => {
       setStatus(prev => {
