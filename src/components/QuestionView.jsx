@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { playPower } from '../sounds'
 import BuzzModal from './BuzzModal'
 import VideoBody from './VideoBody'
@@ -18,12 +18,12 @@ export default function QuestionView({
   const question = round.questions[questionIndex]
   const total = round.questions.length
   const isCharades = round.type === 'charades'
+  const isThesis   = round.type === 'thesis'
 
   const activePair = isCharades
-    ? new Set([
-        (questionIndex * 2) % teams.length,
-        (questionIndex * 2 + 1) % teams.length,
-      ])
+    ? new Set([(questionIndex * 2) % teams.length, (questionIndex * 2 + 1) % teams.length])
+    : isThesis
+    ? new Set([questionIndex % teams.length])
     : null
 
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -36,13 +36,17 @@ export default function QuestionView({
     allTeams.delete(secondActive)
     return allTeams
   }
+  const questionKey = `${roundIndex}-${questionIndex}`
+  const [lastKey, setLastKey] = useState(questionKey)
   const [stealPickerOpen, setStealPickerOpen] = useState(false)
   const [stealSelected, setStealSelected] = useState(() => defaultStealSelection())
-
-  useEffect(() => {
+  const [correctGiven, setCorrectGiven] = useState(false)
+  if (lastKey !== questionKey) {
+    setLastKey(questionKey)
     setStealPickerOpen(false)
     setStealSelected(defaultStealSelection())
-  }, [roundIndex, questionIndex, isCharades, teams.length])
+    setCorrectGiven(false)
+  }
 
   return (
     <div className="question-view">
@@ -161,7 +165,28 @@ export default function QuestionView({
               <CharadesBody key={question.id} question={question} />
             </div>
           )}
-          {round.type === 'thesis'   && <ThesisBody   key={question.id} question={question} />}
+          {isThesis && (
+            <div className="charades-wrap">
+              <div className="charades-active-teams">
+                {[...activePair].map(i => (
+                  <button
+                    key={i}
+                    className={`charades-active-chip color-${teams[i].color}`}
+                    onClick={() => {
+                      const pts = round.scoring.find(s => s.points > 0)?.points ?? 3
+                      onAdjust(i, pts)
+                      setCorrectGiven(true)
+                    }}
+                    title={`Award ${teams[i].name} majority vote points`}
+                  >
+                    {teams[i].name}
+                  </button>
+                ))}
+                <span className="charades-active-label">is up</span>
+              </div>
+              <ThesisBody key={question.id} question={question} />
+            </div>
+          )}
         </div>
 
       </div>
@@ -185,7 +210,7 @@ export default function QuestionView({
         {armed && (
           <button className="arm-cancel-btn" onClick={onDismiss}>Cancel</button>
         )}
-        {!armed && !buzzWinner && isCharades && (
+        {!armed && !buzzWinner && !correctGiven && isCharades && (
           <button
             className={`steal-open-btn${stealPickerOpen ? ' active' : ''}`}
             onClick={() => setStealPickerOpen((open) => !open)}

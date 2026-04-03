@@ -160,7 +160,8 @@ test('steal lockout rejects buzzes from the failed team', async () => {
     assert.equal(firstWinner.teamIndex, 0)
 
     await emitAck(host, 'host:reset')
-    await emitAck(host, 'host:arm', { lockedOutTeamIndex: firstWinner.teamIndex })
+    const stealEligible = TEAMS.map((_, i) => i).filter((i) => i !== firstWinner.teamIndex)
+    await emitAck(host, 'host:arm', { allowedTeamIndices: stealEligible })
 
     const winners = []
     const collectWinner = (payload) => winners.push(payload)
@@ -257,7 +258,8 @@ test('reconnected members still obey steal lockout while armed', async () => {
     assert.equal(firstWinner.teamIndex, 0)
 
     await emitAck(host, 'host:reset')
-    await emitAck(host, 'host:arm', { lockedOutTeamIndex: firstWinner.teamIndex })
+    const stealEligible = TEAMS.map((_, i) => i).filter((i) => i !== firstWinner.teamIndex)
+    await emitAck(host, 'host:arm', { allowedTeamIndices: stealEligible })
 
     memberA.disconnect()
     memberB.disconnect()
@@ -306,6 +308,7 @@ test('member:join ack includes authoritative sync state', async () => {
     const armedJoin = await emitAck(memberB, 'member:join', 1, 'Bob')
     assert.equal(armedJoin.sync.armed, true)
     assert.equal(armedJoin.sync.buzzedBy, null)
+    assert.equal(armedJoin.sync.allowedTeamIndices, null)
 
     const winnerPromise = once(host, 'buzz:winner')
     memberA.emit('member:buzz')
@@ -315,6 +318,36 @@ test('member:join ack includes authoritative sync state', async () => {
     assert.equal(postBuzzJoin.sync.armed, false)
     assert.equal(postBuzzJoin.sync.buzzedBy, 0)
     assert.equal(postBuzzJoin.sync.buzzedMemberName, 'Alice')
+    assert.equal(postBuzzJoin.sync.allowedTeamIndices, null)
+  } finally {
+    await harness.close()
+  }
+})
+
+test('late join sync carries eligibility metadata', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const lockedOutLateJoiner = await harness.connect()
+    const eligibleLateJoiner = await harness.connect()
+
+    await authHost(host)
+    await emitAck(host, 'host:setup', TEAMS)
+    await emitAck(host, 'host:arm', { allowedTeamIndices: [1] })
+
+    const lockedOutArmed = once(lockedOutLateJoiner, 'buzz:armed')
+    const lockedOutJoin = await emitAck(lockedOutLateJoiner, 'member:join', 0, 'Alice')
+    const lockedOutPayload = await lockedOutArmed
+    assert.equal(lockedOutJoin.sync.armed, true)
+    assert.deepEqual(lockedOutJoin.sync.allowedTeamIndices, [1])
+    assert.deepEqual(lockedOutPayload.allowedTeamIndices, [1])
+
+    const eligibleArmed = once(eligibleLateJoiner, 'buzz:armed')
+    const eligibleJoin = await emitAck(eligibleLateJoiner, 'member:join', 1, 'Bob')
+    const eligiblePayload = await eligibleArmed
+    assert.equal(eligibleJoin.sync.armed, true)
+    assert.deepEqual(eligibleJoin.sync.allowedTeamIndices, [1])
+    assert.deepEqual(eligiblePayload.allowedTeamIndices, [1])
   } finally {
     await harness.close()
   }

@@ -517,8 +517,16 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.round-intro-score-row.pos .round-intro-score-pts { color: var(--teal); }
-.round-intro-score-row.neg .round-intro-score-pts { color: var(--terra); }
+.round-intro-score-row.pos .round-intro-score-pts     { color: var(--teal); }
+.round-intro-score-row.neg .round-intro-score-pts     { color: var(--terra); }
+.round-intro-score-row.neutral .round-intro-score-pts { color: var(--text-muted); }
+
+.round-intro-steal-note {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
 
 .round-intro-score-label {
   font-size: 15px;

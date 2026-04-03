@@ -157,7 +157,10 @@ export function useGameSocket(initialTeams) {
   }, [])
 
   function handleArm(options = {}) {
-    const safeOptions = (options && typeof options === 'object' && !Array.isArray(options) && Array.isArray(options.allowedTeamIndices)) ? options : {}
+    const safeOptions = {}
+    if (options && typeof options === 'object' && !Array.isArray(options)) {
+      if (Array.isArray(options.allowedTeamIndices)) safeOptions.allowedTeamIndices = options.allowedTeamIndices
+    }
     socket.emit('host:arm', safeOptions, (result) => {
       if (result?.ok) playArm()
     })
@@ -174,11 +177,19 @@ export function useGameSocket(initialTeams) {
     })
   }
 
-  function handleWrongAndSteal(allowedTeamIndices = null) {
+  function handleWrongAndSteal(config = null) {
+    let allowedTeamIndices = null
+    if (Array.isArray(config)) {
+      allowedTeamIndices = config
+    } else if (config && typeof config === 'object' && !Array.isArray(config)) {
+      if (Array.isArray(config.allowedTeamIndices)) allowedTeamIndices = config.allowedTeamIndices
+    }
+
     socket.emit('host:reset', (resetResult) => {
       if (!resetResult?.ok) return
       setStealMode(true)
-      const armOptions = allowedTeamIndices ? { allowedTeamIndices } : {}
+      const armOptions = {}
+      if (allowedTeamIndices) armOptions.allowedTeamIndices = allowedTeamIndices
       socket.emit('host:arm', armOptions, (armResult) => {
         if (armResult?.ok) playArm()
         else setStealMode(false)

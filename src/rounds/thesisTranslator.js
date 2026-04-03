@@ -10,13 +10,10 @@ export default {
     'Choose from: Family-friendly English, Slang, or Exaggerated academic jargon',
     '90 seconds — timer starts when the title is revealed',
     'Crowd votes on the best translation — winning team gets +3 pts',
-    'One steal is open after — buzz in to attempt',
-    'Correct steal: +2 pts — wrong steal: −1 pt',
   ],
   scoring: [
-    { label: 'Majority vote', points: 3 },
-    { label: 'Correct steal', points: 2 },
-    { label: 'Wrong steal',   points: -1 },
+    { label: 'Funny', points: 3 },
+    { label: 'Not Funny',  points: 0 },
   ],
   questions: [
     {

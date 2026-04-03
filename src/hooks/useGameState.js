@@ -30,7 +30,7 @@ export function useGameState(initialTeams) {
     setTimeout(() => setFlashing(null), 400)
     if (effective > 0) {
       playCorrect()
-      setStreaks(prev => prev.map((s, i) => i === index ? s + 1 : s))
+      setStreaks(prev => prev.map((s, i) => i === index ? s + 1 : 0))
     } else {
       playWrong()
       setStreaks(prev => prev.map((s, i) => i === index ? 0 : s))

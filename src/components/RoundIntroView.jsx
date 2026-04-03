@@ -49,12 +49,17 @@ export default function RoundIntroView({
               <div className="round-intro-section-label">Scoring</div>
               <div className="round-intro-scoring">
                 {round.scoring.map(({ label, points }) => (
-                  <div key={label} className={`round-intro-score-row ${points < 0 ? 'neg' : 'pos'}`}>
-                    <span className="round-intro-score-pts">{points > 0 ? `+${points}` : points}</span>
+                  <div key={label} className={`round-intro-score-row ${points < 0 ? 'neg' : points === 0 ? 'neutral' : 'pos'}`}>
+                    <span className="round-intro-score-pts">{points > 0 ? `+${points}` : points === 0 ? '—' : points}</span>
                     <span className="round-intro-score-label">{label}</span>
                   </div>
                 ))}
               </div>
+              {round.type === 'video' && (
+                <p className="round-intro-steal-note">
+                  Steal is always for the <strong>language</strong> (+2 pts), regardless of what the buzzing team got wrong. Country (+1) is only for the team that buzzed in — no country steal.
+                </p>
+              )}
             </div>
 
             <button
