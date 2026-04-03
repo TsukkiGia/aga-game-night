@@ -39,6 +39,10 @@ const ALLOWED_SOUND_KEYS = new Set([
   'laughter',
   'okayy',
   'very_wrong',
+  'hello_get_down',
+  'oh_no_no',
+  'dont_provoke_me',
+  'why_are_you_running',
 ])
 
 function getSoundResultTimeoutMs() {
@@ -56,6 +60,21 @@ function initialState() {
     allowedTeamIndices: null,  // null = all allowed, Set = only these indices
     members: {},     // { [teamIndex]: { [socketId]: memberName } }
     hostQuestionCursor: null, // [roundIndex, questionIndex|null] | null
+  }
+}
+
+function serializeEligibilityState(state) {
+  return {
+    allowedTeamIndices: state.allowedTeamIndices ? [...state.allowedTeamIndices] : null,
+  }
+}
+
+function serializeMemberSyncState(state) {
+  return {
+    armed: state.armed,
+    buzzedBy: state.buzzedBy,
+    buzzedMemberName: state.buzzedMemberName,
+    ...serializeEligibilityState(state),
   }
 }
 
@@ -82,6 +101,18 @@ function normalizeTeams(rawTeams) {
 
   if (normalized.some((team) => team === null)) return null
   return normalized
+}
+
+function normalizeAllowedTeamIndices(rawIndices, teamCount) {
+  if (rawIndices === undefined || rawIndices === null) return null
+  if (!Array.isArray(rawIndices)) return null
+  const next = new Set()
+  for (const value of rawIndices) {
+    if (!Number.isInteger(value)) continue
+    if (value < 0 || value >= teamCount) continue
+    next.add(value)
+  }
+  return next
 }
 
 export function createBuzzServer() {
@@ -260,7 +291,7 @@ export function createBuzzServer() {
     socket.on('host:arm', (arg1, arg2) => {
       const options = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}
       const respond = typeof arg1 === 'function' ? arg1 : (typeof arg2 === 'function' ? arg2 : () => {})
-      const allowedIndices = Array.isArray(options.allowedTeamIndices) ? new Set(options.allowedTeamIndices) : null
+      const allowedIndices = normalizeAllowedTeamIndices(options.allowedTeamIndices, state.teams.length)
 
       if (!isHostAuthorized(socket)) {
         respond({ ok: false, error: 'unauthorized' })
@@ -273,7 +304,7 @@ export function createBuzzServer() {
       }
       state.armed = true
       state.allowedTeamIndices = allowedIndices
-      io.emit('buzz:armed')
+      io.emit('buzz:armed', serializeEligibilityState(state))
       respond({ ok: true })
     })
 
@@ -321,16 +352,12 @@ export function createBuzzServer() {
       respond({
         team: state.teams[idx],
         teamIndex: idx,
-        sync: {
-          armed: state.armed,
-          buzzedBy: state.buzzedBy,
-          buzzedMemberName: state.buzzedMemberName,
-        },
+        sync: serializeMemberSyncState(state),
       })
       broadcastMembers()
 
       // Sync state for late joiners
-      if (state.armed)             socket.emit('buzz:armed')
+      if (state.armed)             socket.emit('buzz:armed', serializeEligibilityState(state))
       if (state.buzzedBy !== null) socket.emit('buzz:winner', {
         teamIndex: state.buzzedBy,
         team: state.teams[state.buzzedBy],

@@ -5,7 +5,7 @@ import BuzzerPage from './components/BuzzerPage'
 import HostMobilePage from './components/HostMobilePage'
 import { TEAMS_KEY } from './storage'
 import { useWakeLock } from './hooks/useWakeLock'
-import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong } from './sounds'
+import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong, playHelloGetDown, playOhNoNo, playDontProvokeMe, playWhyAreYouRunning } from './sounds'
 import './App.css'
 
 const pathname = window.location.pathname
@@ -42,6 +42,10 @@ export default function App() {
       if (key === 'L') playLaughter()
       if (key === 'O') playOkayy()
       if (key === 'V') playVeryWrong()
+      if (key === 'G') playHelloGetDown()
+      if (key === 'H') playOhNoNo()
+      if (key === 'D') playDontProvokeMe()
+      if (key === 'Y') playWhyAreYouRunning()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

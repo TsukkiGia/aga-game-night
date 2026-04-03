@@ -85,7 +85,11 @@ export function playAirhorn()       { play('airhorn', 'mp3') }
 export function playBoo()           { play('boo', 'mp3') }
 export function playLaughter()      { play('laughter-short', 'mp3') }
 export function playOkayy()         { play('okay', 'mp3') }
-export function playPower()         { play('power', 'mp3') }
+export function playPower()          { play('power', 'mp3') }
+export function playHelloGetDown()  { play('hello_get_down') }
+export function playOhNoNo()        { play('oh-no-no', 'mp3') }
+export function playDontProvokeMe() { play('dont-provoke-me', 'mp3') }
+export function playWhyAreYouRunning() { play('why-are', 'mp3') }
 
 const SOUND_BITE_ASSETS = {
   crickets: ['crickets', 'wav'],
@@ -99,6 +103,10 @@ const SOUND_BITE_ASSETS = {
   laughter: ['laughter-short', 'mp3'],
   okayy: ['okay', 'mp3'],
   very_wrong: ['very-wrong', 'mp3'],
+  hello_get_down: ['hello_get_down', 'wav'],
+  oh_no_no: ['oh-no-no', 'mp3'],
+  dont_provoke_me: ['dont-provoke-me', 'mp3'],
+  why_are_you_running: ['why-are', 'mp3'],
 }
 
 export function playSoundBiteByKey(key) {
