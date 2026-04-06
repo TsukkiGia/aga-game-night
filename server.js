@@ -249,6 +249,30 @@ export function createBuzzServer() {
       respond({ ok: true })
     })
 
+    socket.on('host:streak', (payload, callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      if (!isHostController(socket)) {
+        respond({ ok: false, error: 'unauthorized' })
+        return
+      }
+      const teamIndex = Number.parseInt(payload?.teamIndex, 10)
+      const streakCount = Number.parseInt(payload?.streakCount, 10)
+      if (!Number.isInteger(teamIndex) || teamIndex < 0 || teamIndex >= state.teams.length) {
+        respond({ ok: false, error: 'invalid-team' })
+        return
+      }
+      if (!Number.isInteger(streakCount) || streakCount < 1) {
+        respond({ ok: false, error: 'invalid-streak' })
+        return
+      }
+      io.to('host').emit('host:streak', {
+        teamIndex,
+        teamName: state.teams[teamIndex]?.name || '',
+        streakCount,
+      })
+      respond({ ok: true })
+    })
+
     socket.on('host:sfx:play', (soundKey, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       if (!isHostAuthorized(socket)) {

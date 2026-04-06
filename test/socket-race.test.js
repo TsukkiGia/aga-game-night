@@ -405,6 +405,32 @@ test('host question cursor sync requires auth and broadcasts updates', async () 
   }
 })
 
+test('controller can broadcast streak status to host companions', async () => {
+  const harness = await createHarness()
+  try {
+    const controller = await harness.connect()
+    const companion = await harness.connect()
+
+    await authHost(controller)
+    await authCompanion(companion)
+    await emitAck(controller, 'host:setup', TEAMS)
+
+    const streakEvent = once(companion, 'host:streak')
+    const streakResult = await emitAck(controller, 'host:streak', { teamIndex: 1, streakCount: 3 })
+    assert.equal(streakResult.ok, true)
+    const payload = await streakEvent
+    assert.equal(payload.teamIndex, 1)
+    assert.equal(payload.teamName, TEAMS[1].name)
+    assert.equal(payload.streakCount, 3)
+
+    const unauthorized = await emitAck(companion, 'host:streak', { teamIndex: 1, streakCount: 3 })
+    assert.equal(unauthorized.ok, false)
+    assert.equal(unauthorized.error, 'unauthorized')
+  } finally {
+    await harness.close()
+  }
+})
+
 test('host:new-game clears server state and broadcasts game reset', async () => {
   const harness = await createHarness()
   try {

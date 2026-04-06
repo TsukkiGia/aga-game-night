@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import QuestionView from './QuestionView'
 import RoundIntroView from './RoundIntroView'
 import HalftimeScreen from './HalftimeScreen'
@@ -16,7 +16,10 @@ import { clearAll } from '../storage'
 import { playGameStart } from '../sounds'
 
 export default function Scoreboard({ teams: initialTeams, onReset }) {
-  const { teams, streaks, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, toggleDone, markDone } = useGameState(initialTeams)
+  const emitStreak = useCallback(({ teamIndex, streakCount }) => {
+    socket.emit('host:streak', { teamIndex, streakCount })
+  }, [])
+  const { teams, streaks, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, toggleDone, markDone } = useGameState(initialTeams, { onStreak: emitStreak })
   const { armed, buzzWinner, members, stealMode, hostReady, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal } = useGameSocket(initialTeams)
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)

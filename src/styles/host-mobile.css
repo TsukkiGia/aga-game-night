@@ -95,6 +95,16 @@
   margin-bottom: 8px;
 }
 
+.host-mobile-streak-status {
+  border-radius: 10px;
+  background: #fff2cc;
+  color: #6f4b00;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
 .host-mobile-wait {
   color: var(--text-muted);
   font-size: 0.94rem;

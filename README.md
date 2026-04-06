@@ -8,13 +8,13 @@ Built with **React + Vite** on the frontend and **Express + Socket.io** on the b
 
 ## Features
 
-- **Live scoreboard** — track scores for up to 8 teams with +/- controls and color-coded strips.
+- **Live scoreboard** — track scores for up to 8 teams with +/− controls and color-coded strips.
 - **Team buzzers on phones** — players select their team and enter their name; first buzz wins, others are locked out.
 - **Round intro + question views** — per-round explainer pages with rules and scoring, then full-screen question views with answer reveals.
 - **Flexible scoring presets** — host taps context-specific score buttons (correct, steals, bonuses) instead of doing math.
 - **Double points** — toggle 2× multiplier on any question for drama.
 - **Steal mechanic** — wrong answers open a steal opportunity for other teams, with the wrong team locked out server-side.
-- **Halftime + winner screens** — one-click halftime view and animated game-over screen with confetti and podium; tie-aware medal placement.
+- **Halftime + game-over screens** — one-click halftime view and animated game-over screen with confetti and podium; tie-aware medal placement. Game-over triggers automatically after the last question.
 - **Sudden death tiebreaker** — on a tie, a dramatic black-screen "...but is it really?" animation appears after 10 seconds with suspense music, then a glowing Sudden Death button; only tied teams can buzz in.
 - **Question sidebar & progress** — collapsible sidebar with "mark done" tracking so you don't repeat questions.
 - **Collapsible QR sidebar** — on the round intro screen, shows QR code, buzzer URL, and live team member roster.
@@ -22,17 +22,21 @@ Built with **React + Vite** on the frontend and **Express + Socket.io** on the b
 
   | Key | Sound |
   |-----|-------|
-  | C | Crickets |
-  | F | Faaah |
-  | R | Correct answer |
-  | N | Nani |
-  | W | What the hell |
-  | S | Shocked |
   | A | Airhorn |
   | B | Boo |
+  | C | Crickets |
+  | D | Don't Provoke Me |
+  | F | Faaah |
+  | G | Hello Get Down |
+  | H | Oh No No |
   | L | Laughter |
+  | N | Nani |
   | O | Okayy |
+  | R | Correct answer |
+  | S | Shocked |
   | V | Very wrong |
+  | W | What the hell |
+  | Y | Why Are You Running |
 
 - **Persistent buzzer sessions** — players' name and team are saved in `localStorage` so reconnecting after a dropped connection rejoins automatically.
 - **Persistent host state** — teams, scores, and completed questions are stored in `localStorage` so a page refresh won't wipe the game.
@@ -69,7 +73,7 @@ This starts:
 On first host connection, you'll be prompted for the same `HOST_PIN`.
 
 Open `http://localhost:5173` for the host view.
-Open `http://localhost:5173/host-mobile` on a phone for the answer + sound-bites companion view.
+Open `http://localhost:5173/host-mobile` on a phone for the host companion view — shows current round/question state, rules on round intro pages, answer reveal, sound bite buttons, and Stop/Restart Timer controls during a buzz countdown.
 Sound bites tapped on `/host-mobile` play through the base host app audio.
 If sounds don't fire on first try, tap anywhere once on the base host page to unlock browser audio.
 
@@ -113,9 +117,8 @@ The built assets go into `dist/`. `server.js` serves `dist/` as static files and
 5. Before each question, click **🎯 Arm Buzzers**. First buzz wins; a modal shows the team/member name and a 10-second countdown.
 6. Tap a **scoring preset** button in the modal to award points. Use **Open Steal** to let other teams attempt.
 7. Toggle **2×** for double points on any question.
-8. At any time:
-   - **⏸ Halftime** → ranked scoreboard overlay.
-   - **🏆 Winner** → confetti and podium; on a tie, waits 10 seconds then reveals a dramatic Sudden Death screen.
+8. At any time, click **⏸ Halftime** for a ranked scoreboard overlay.
+9. Navigate past the last question to trigger the game-over screen — confetti, podium, and tie-aware Sudden Death if needed.
 
 ### Player / buzzer flow
 
@@ -130,10 +133,10 @@ The built assets go into `dist/`. `server.js` serves `dist/` as static files and
 
 | Round | Type | Description |
 |-------|------|-------------|
-| Round 1 — Guess the Language | `video` | Watch a video clip and identify the language being spoken. |
-| Round 2 — Charades | `charades` | Act out an African/diasporic cultural phrase; team guesses before the timer runs out. |
-| Round 3 — Slang Bee | `slang` | Guess the meaning of slang from African and diasporic communities. |
-| Round 4 — Title Translator | `thesis` | Translate a real academic paper title into a chosen register (family-friendly, slang, or exaggerated academic). |
+| Round 1 — Guess the Language | `video` | Watch a comedic video clip and identify the language, register, or slang variety. Steal is always open and must be a language guess. |
+| Round 2 — Charades | `charades` | Round-robin — two teams per question, acting out African/diasporic cultural phrases. |
+| Round 3 — Slang Bee | `slang` | Buzz in to define slang from African and diasporic communities. |
+| Round 4 — Title Translator | `thesis` | Round-robin — one team per question translates a real academic paper title into a chosen register (family-friendly, slang, or exaggerated academic). Crowd votes. |
 
 Round content lives in `src/rounds/`. Each file exports `{ label, name, type, intro, rules, scoring, questions }`.
 
@@ -147,10 +150,10 @@ Place `.mp4` files in `public/videos/`. Reference them by filename in `src/round
 
 Each round's `scoring` array drives the buzz modal buttons:
 
-- **Guess the Language**: Correct language +3, Correct country +1, Correct steal +2, Wrong steal −1
-- **Charades**: Correct answer +3, Correct steal +2, Wrong steal −1
-- **Slang Bee**: Correct meaning +3, Funny bonus +1, Correct steal +2, Wrong steal −1
-- **Title Translator**: Majority vote +3, Correct steal +2, Wrong steal −1
+- **Guess the Language**: Correct language +3, Correct country +1, Wrong answer −1, Correct steal +2, Wrong steal 0
+- **Charades**: Correct answer +3, Wrong answer 0, Correct steal +2, Wrong steal 0
+- **Slang Bee**: Correct meaning +3, Funny bonus +1, Wrong answer −1, Correct steal +2, Wrong steal 0
+- **Title Translator**: Crowd favourite +3, Not funny 0
 
 Manual +1/−1 buttons are always available per team in the question view.
 

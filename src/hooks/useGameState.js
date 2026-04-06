@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react'
 import { SCORES_KEY, DONE_KEY, loadScores, loadDone, clearAll } from '../storage'
 import { playCorrect, playWrong } from '../sounds'
 
-export function useGameState(initialTeams) {
+const STREAK_THRESHOLD = 3
+
+export function useGameState(initialTeams, options = {}) {
+  const onStreak = typeof options.onStreak === 'function' ? options.onStreak : null
   const [teams, setTeams] = useState(() => loadScores(initialTeams))
   const [doneQuestions, setDoneQuestions] = useState(() => loadDone())
   const [flashing, setFlashing] = useState(null)
@@ -30,7 +33,14 @@ export function useGameState(initialTeams) {
     setTimeout(() => setFlashing(null), 400)
     if (effective > 0) {
       playCorrect()
-      setStreaks(prev => prev.map((s, i) => i === index ? s + 1 : 0))
+      setStreaks(prev => {
+        const next = prev.map((s, i) => i === index ? s + 1 : 0)
+        const nextStreak = next[index] ?? 0
+        if (onStreak && nextStreak === STREAK_THRESHOLD) {
+          onStreak({ teamIndex: index, streakCount: nextStreak })
+        }
+        return next
+      })
     } else {
       playWrong()
       setStreaks(prev => prev.map((s, i) => i === index ? 0 : s))

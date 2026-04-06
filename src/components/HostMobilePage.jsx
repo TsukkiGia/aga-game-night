@@ -22,6 +22,7 @@ const SOUND_BUTTONS = [
 ]
 const SOUND_RESULT_TIMEOUT_MS = 5500
 const SOUND_STATUS_AUTO_CLEAR_MS = 2800
+const STREAK_STATUS_AUTO_CLEAR_MS = 3500
 const SHOW_SOUND_STATUS = (() => {
   const envDebug = String(import.meta.env.VITE_DEBUG_BUZZ || '').trim()
   if (/^(1|true|yes)$/i.test(envDebug)) return true
@@ -166,9 +167,11 @@ export default function HostMobilePage() {
   const [timerRunning, setTimerRunning] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [soundStatus, setSoundStatus] = useState('')
+  const [streakStatus, setStreakStatus] = useState('')
   const pendingSoundRequestIdRef = useRef('')
   const pendingSoundTimeoutRef = useRef(null)
   const soundStatusTimeoutRef = useRef(null)
+  const streakStatusTimeoutRef = useRef(null)
 
   function clearPendingSoundTimeout() {
     if (pendingSoundTimeoutRef.current) {
@@ -184,6 +187,13 @@ export default function HostMobilePage() {
     }
   }
 
+  function clearStreakStatusTimeout() {
+    if (streakStatusTimeoutRef.current) {
+      clearTimeout(streakStatusTimeoutRef.current)
+      streakStatusTimeoutRef.current = null
+    }
+  }
+
   function setTransientSoundStatus(message) {
     if (!SHOW_SOUND_STATUS) return
     setSoundStatus(message)
@@ -192,6 +202,15 @@ export default function HostMobilePage() {
       setSoundStatus('')
       soundStatusTimeoutRef.current = null
     }, SOUND_STATUS_AUTO_CLEAR_MS)
+  }
+
+  function setTransientStreakStatus(message) {
+    setStreakStatus(message)
+    clearStreakStatusTimeout()
+    streakStatusTimeoutRef.current = setTimeout(() => {
+      setStreakStatus('')
+      streakStatusTimeoutRef.current = null
+    }, STREAK_STATUS_AUTO_CLEAR_MS)
   }
 
   useEffect(() => {
@@ -275,10 +294,18 @@ export default function HostMobilePage() {
       }
     }
 
+    function onHostStreak(payload) {
+      const streakCount = Number.parseInt(payload?.streakCount, 10)
+      const teamName = String(payload?.teamName || '').trim() || 'A team'
+      if (!Number.isInteger(streakCount) || streakCount < 1) return
+      setTransientStreakStatus(`${teamName} is on a ${streakCount}-answer streak`)
+    }
+
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
     socket.on('host:question', onHostQuestion)
     socket.on('host:sfx:result', onSoundResult)
+    socket.on('host:streak', onHostStreak)
     socket.on('buzz:winner', () => { setBuzzActive(true); setTimerRunning(true) })
     socket.on('buzz:reset', () => { setBuzzActive(false); setTimerRunning(false) })
     socket.on('host:timer:expired', () => setTimerRunning(false))
@@ -288,10 +315,12 @@ export default function HostMobilePage() {
     return () => {
       clearPendingSoundTimeout()
       clearSoundStatusTimeout()
+      clearStreakStatusTimeout()
       socket.off('connect', onConnect)
       socket.off('disconnect', onDisconnect)
       socket.off('host:question', onHostQuestion)
       socket.off('host:sfx:result', onSoundResult)
+      socket.off('host:streak', onHostStreak)
       socket.off('buzz:winner')
       socket.off('buzz:reset')
       socket.off('host:timer:expired')
@@ -340,6 +369,7 @@ export default function HostMobilePage() {
           </div>
         </div>
         {errorMsg && <div className="host-mobile-error">{errorMsg}</div>}
+        {streakStatus && <div className="host-mobile-streak-status">{streakStatus} 🔥</div>}
         {!authorized ? (
           <div className="host-mobile-wait">Waiting for host authorization…</div>
         ) : (
