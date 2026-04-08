@@ -125,6 +125,9 @@ export function createBuzzServer() {
   const ctrlRoom       = (code) => `ctrl:${code}`
   const memberTeamRoom = (code, i) => `${code}:team-${i}`
 
+  // ── REST: health check ───────────────────────────────────────────────────
+  app.get('/api/health', (_req, res) => res.json({ ok: true }))
+
   // ── REST: create session ────────────────────────────────────────────────
   app.post('/api/sessions', async (req, res) => {
     try {

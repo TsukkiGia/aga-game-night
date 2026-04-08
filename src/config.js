@@ -1,8 +1,5 @@
-// ─────────────────────────────────────────────────────────────
-//  Edit ENDPOINT before sharing with team members via ngrok.
+// In production (Railway), set VITE_ENDPOINT to your Railway public URL, e.g.:
+//   VITE_ENDPOINT=https://sankofa-showdown.up.railway.app
 //
-//  When running locally:      leave as empty string ""
-//  When running via ngrok:    paste your ngrok URL, e.g.
-//                             "https://abc123.ngrok-free.app"
-// ─────────────────────────────────────────────────────────────
-export const ENDPOINT = "https://sankofa.ngrok.app"
+// Locally with ngrok, you can set VITE_ENDPOINT in .env or leave blank to use localhost.
+export const ENDPOINT = import.meta.env.VITE_ENDPOINT || ''
