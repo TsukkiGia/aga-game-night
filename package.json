@@ -5,16 +5,18 @@
   "type": "module",
   "scripts": {
     "start": "npm run build && node server.js",
-    "dev": "concurrently -n \"server,vite\" -c \"yellow,cyan\" \"nodemon --watch server.js server.js\" \"vite\"",
-    "server": "nodemon --watch server.js server.js",
+    "dev": "concurrently -n \"server,vite\" -c \"yellow,cyan\" \"nodemon --watch server.js --env-file=.env server.js\" \"vite\"",
+    "server": "nodemon --watch server.js --env-file=.env server.js",
     "test": "node --test",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "concurrently": "^9.2.1",
     "express": "^5.2.1",
+    "pg": "^8.20.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
