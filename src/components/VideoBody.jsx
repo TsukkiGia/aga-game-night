@@ -48,6 +48,9 @@ function toYouTubeEmbedUrl(rawUrl) {
   const parsed = getYouTubeIdAndParams(rawUrl)
   if (!parsed) return null
   const params = new URLSearchParams({
+    controls: '1',
+    disablekb: '1',
+    iv_load_policy: '3',
     rel: '0',
     modestbranding: '1',
     playsinline: '1',
@@ -88,15 +91,17 @@ export default function VideoBody({ question, paused }) {
   return (
     <div className="qv-video-wrap">
       {isYouTube ? (
-        <iframe
-          ref={iframeRef}
-          className="qv-video"
-          src={youtubeEmbedUrl}
-          title={question?.id || 'YouTube video'}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          referrerPolicy="strict-origin-when-cross-origin"
-          allowFullScreen
-        />
+        <div className="qv-video-yt-mask">
+          <iframe
+            ref={iframeRef}
+            className="qv-video-yt-frame"
+            src={youtubeEmbedUrl}
+            title={question?.id || 'YouTube video'}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
+        </div>
       ) : (
         <video ref={videoRef} className="qv-video" src={videoSrc} controls />
       )}
