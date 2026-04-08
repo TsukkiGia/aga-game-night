@@ -184,3 +184,38 @@
 }
 .start-btn:hover { background: var(--terra-light); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(201,75,44,0.35); }
 .start-btn:active { transform: translateY(0); }
+.start-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* Session gate */
+.session-gate-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+.session-gate-actions .start-btn,
+.session-gate-actions .back-btn {
+  width: 240px;
+  font-size: 15px;
+}
+.session-gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+.session-gate-input {
+  width: 100%;
+  text-align: center;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+}
+.session-gate-error {
+  font-size: 13px;
+  color: var(--terra);
+  font-weight: 700;
+  margin: 0;
+}

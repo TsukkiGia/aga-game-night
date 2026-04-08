@@ -3,6 +3,7 @@ import Setup from './components/Setup'
 import Scoreboard from './components/Scoreboard'
 import BuzzerPage from './components/BuzzerPage'
 import HostMobilePage from './components/HostMobilePage'
+import SessionGate from './components/SessionGate'
 import { TEAMS_KEY } from './storage'
 import { useWakeLock } from './hooks/useWakeLock'
 import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong, playHelloGetDown, playOhNoNo, playDontProvokeMe, playWhyAreYouRunning } from './sounds'
@@ -17,6 +18,7 @@ function loadTeams() {
 }
 
 export default function App() {
+  const [session, setSession] = useState(null) // { code, pin }
   const [teams, setTeams] = useState(() => loadTeams())
   useWakeLock(true)
 
@@ -77,7 +79,9 @@ export default function App() {
       </header>
 
       <main className="app-main">
-        {!teams ? (
+        {!session ? (
+          <SessionGate onSession={(code, pin) => setSession({ code, pin })} />
+        ) : !teams ? (
           <Setup onStart={handleStart} />
         ) : (
           <Scoreboard teams={teams} onReset={() => setTeams(null)} />
