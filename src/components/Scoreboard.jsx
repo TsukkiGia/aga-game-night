@@ -20,7 +20,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
     socket.emit('host:streak', { teamIndex, streakCount })
   }, [])
   const { teams, streaks, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, toggleDone, markDone } = useGameState(initialTeams, { onStreak: emitStreak })
-  const { armed, buzzWinner, members, stealMode, hostReady, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal } = useGameSocket(initialTeams)
+  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal } = useGameSocket(initialTeams)
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
   const [showWinner, setShowWinner] = useState(false)
@@ -58,7 +58,7 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
     setShowWinner(true)
   }
 
-  const buzzerUrl = `${ENDPOINT || window.location.origin}/buzz`
+  const buzzerUrl = `${ENDPOINT || window.location.origin}/buzz${sessionCode ? `?s=${sessionCode}` : ''}`
 
   if (activeQuestion !== null) {
     const [rIdx, qIdx] = activeQuestion

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import rounds from '../rounds'
 import { socket } from '../socket'
-import { HOST_PIN_KEY } from '../storage'
+import { HOST_PIN_KEY, SESSION_CODE_KEY } from '../storage'
 
 const SOUND_BUTTONS = [
   { label: 'Crickets', key: 'crickets' },
@@ -40,28 +40,14 @@ function normalizeCursor(rawCursor) {
   return [roundIndex, questionIndex]
 }
 
-function getStoredPin() {
-  try {
-    return sessionStorage.getItem(HOST_PIN_KEY) || ''
-  } catch {
-    return ''
-  }
+function getStored(key) {
+  try { return sessionStorage.getItem(key) || '' } catch { return '' }
 }
-
-function storePin(pin) {
-  try {
-    sessionStorage.setItem(HOST_PIN_KEY, pin)
-  } catch {
-    // ignore storage failures
-  }
+function setStored(key, val) {
+  try { sessionStorage.setItem(key, val) } catch { /* ignore */ }
 }
-
-function clearPin() {
-  try {
-    sessionStorage.removeItem(HOST_PIN_KEY)
-  } catch {
-    // ignore storage failures
-  }
+function clearStored(...keys) {
+  try { keys.forEach(k => sessionStorage.removeItem(k)) } catch { /* ignore */ }
 }
 
 function extractAnswerView(activeQuestion) {
@@ -214,11 +200,6 @@ export default function HostMobilePage() {
   }
 
   useEffect(() => {
-    function requestPin() {
-      const entered = window.prompt('Enter host PIN')
-      return (entered || '').trim()
-    }
-
     function afterAuth() {
       setAuthorized(true)
       setErrorMsg('')
@@ -227,46 +208,40 @@ export default function HostMobilePage() {
       })
     }
 
-    function attemptAuth(pin, canRetry = true) {
-      if (!pin) {
-        setAuthorized(false)
-        setErrorMsg('Host PIN is required')
-        return
-      }
-
-      socket.emit('host:auth', { pin, role: 'companion' }, (result) => {
+    function tryAuth(code, pin, canPrompt) {
+      socket.emit('host:auth', { sessionCode: code, pin, role: 'companion' }, (result) => {
         if (!result?.ok) {
-          clearPin()
+          clearStored(SESSION_CODE_KEY, HOST_PIN_KEY)
           setAuthorized(false)
-          if (result?.error === 'host-pin-not-configured') {
-            setErrorMsg('HOST_PIN is not configured on the server')
-            return
+          if (!canPrompt) { setErrorMsg('Invalid session code or PIN'); return }
+          if (result?.error === 'session-not-found') {
+            setErrorMsg('Session not found. Check the session code.')
+          } else {
+            setErrorMsg('Incorrect PIN.')
           }
-          if (canRetry) {
-            const retryPin = requestPin()
-            if (retryPin) {
-              attemptAuth(retryPin, false)
-              return
-            }
-          }
-          setErrorMsg('Invalid host PIN')
+          promptAndAuth()
           return
         }
-        storePin(pin)
+        setStored(SESSION_CODE_KEY, code)
+        setStored(HOST_PIN_KEY, pin)
         afterAuth()
       })
     }
 
+    function promptAndAuth() {
+      const code = (window.prompt('Enter session code') || '').trim().toUpperCase()
+      if (!code) { setErrorMsg('Session code is required'); return }
+      const pin = (window.prompt('Enter host PIN') || '').trim()
+      if (!pin) { setErrorMsg('Host PIN is required'); return }
+      tryAuth(code, pin, false)
+    }
+
     function onConnect() {
       setConnected(true)
-      const stored = getStoredPin()
-      if (stored) {
-        attemptAuth(stored)
-        return
-      }
-      const entered = requestPin()
-      if (entered) attemptAuth(entered)
-      else setErrorMsg('Host PIN is required')
+      const code = getStored(SESSION_CODE_KEY)
+      const pin  = getStored(HOST_PIN_KEY)
+      if (code && pin) { tryAuth(code, pin, true); return }
+      promptAndAuth()
     }
 
     function onDisconnect() {

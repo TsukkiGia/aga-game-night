@@ -4,6 +4,7 @@ import { socket } from '../socket'
 // status: 'loading' | 'join' | 'waiting' | 'armed' | 'i-buzzed' | 'team-buzzed' | 'locked-out'
 
 const STORAGE_KEY = 'sankofa_player'
+const sessionCode = new URLSearchParams(window.location.search).get('s')?.trim().toUpperCase() || ''
 
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null }
@@ -51,14 +52,14 @@ export default function BuzzerPage() {
       setConnected(true)
 
       // Always fetch teams for the join screen
-      socket.emit('member:get-teams', (res) => {
+      socket.emit('member:get-teams', sessionCode, (res) => {
         if (res?.teams) setAvailableTeams(res.teams)
       })
 
       // Auto-rejoin from saved data on initial connect
       const saved = loadSaved()
       if (saved && teamIndexRef.current === null) {
-        socket.emit('member:join', saved.teamIndex, saved.name, (res) => {
+        socket.emit('member:join', sessionCode, saved.teamIndex, saved.name, (res) => {
           if (res?.error) {
             clearPlayer()
             setStatus('join')
@@ -119,7 +120,7 @@ export default function BuzzerPage() {
     if (teamIndex === null) return
     function rejoin() {
       const memberName = nameRef.current || 'Anonymous'
-      socket.emit('member:join', teamIndex, memberName, (res) => {
+      socket.emit('member:join', sessionCode, teamIndex, memberName, (res) => {
         if (res?.error) { clearPlayer(); setStatus('join'); return }
         if (res?.team) setTeam(res.team)
         if (res?.teamIndex !== undefined) {
@@ -135,7 +136,7 @@ export default function BuzzerPage() {
     e.preventDefault()
     if (selectedIndex === null) return
     const memberName = name.trim() || 'Anonymous'
-    socket.emit('member:join', selectedIndex, memberName, (res) => {
+    socket.emit('member:join', sessionCode, selectedIndex, memberName, (res) => {
       if (res?.error) return
       savePlayer(res.teamIndex, memberName)
       setTeam(res.team)

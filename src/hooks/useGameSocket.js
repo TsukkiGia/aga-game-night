@@ -221,6 +221,7 @@ export function useGameSocket(initialTeams) {
     members,
     stealMode,
     hostReady,
+    sessionCode: (() => { try { return sessionStorage.getItem(SESSION_CODE_KEY) || '' } catch { return '' } })(),
     handleArm,
     handleDismiss,
     handleWrongAndSteal,
