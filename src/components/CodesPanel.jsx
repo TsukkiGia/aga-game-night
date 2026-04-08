@@ -9,8 +9,7 @@ export default function CodesPanel({ teams, members, buzzerUrl }) {
     QRCode.toDataURL(buzzerUrl, { width: 300, margin: 1 }).then(setQrSrc)
   }, [buzzerUrl])
 
-  // Bare URL without protocol for display
-  const displayUrl = buzzerUrl.replace(/^https?:\/\//, '')
+  const displayUrl = buzzerUrl
 
   return (
     <div className="codes-panel">

@@ -18,7 +18,7 @@
 
 .home-screen .codes-body {
   flex: 1;
-  justify-content: space-between;
+  justify-content: center;
 }
 .home-screen.launching {
   opacity: 0;
