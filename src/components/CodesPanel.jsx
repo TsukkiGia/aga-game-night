@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import MemberRoster from './MemberRoster'
 
-export default function CodesPanel({ teams, members, buzzerUrl, sessionCode }) {
+export default function CodesPanel({ teams, members, buzzerUrl }) {
   const [qrSrc, setQrSrc] = useState('')
 
   useEffect(() => {

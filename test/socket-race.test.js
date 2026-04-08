@@ -9,8 +9,41 @@ const TEAMS = [
 ]
 const HOST_PIN = 'test-pin'
 
-process.env.HOST_PIN = HOST_PIN
 process.env.SFX_RESULT_TIMEOUT_MS = '300'
+
+function createFakeQuery() {
+  const sessions = new Map()
+
+  return async function fakeQuery(text, params = []) {
+    if (text.includes('INSERT INTO sessions')) {
+      const [id, pinHash] = params
+      if (sessions.has(id)) {
+        const err = new Error('duplicate key value violates unique constraint')
+        err.code = '23505'
+        throw err
+      }
+      sessions.set(id, { pin_hash: pinHash, status: 'active' })
+      return { rows: [], rowCount: 1 }
+    }
+
+    if (text.includes("SELECT pin_hash FROM sessions WHERE id = $1 AND status = 'active'")) {
+      const [id] = params
+      const session = sessions.get(id)
+      if (!session || session.status !== 'active') return { rows: [], rowCount: 0 }
+      return { rows: [{ pin_hash: session.pin_hash }], rowCount: 1 }
+    }
+
+    if (text.includes("UPDATE sessions SET status = 'ended' WHERE id = $1")) {
+      const [id] = params
+      const session = sessions.get(id)
+      if (!session) return { rows: [], rowCount: 0 }
+      session.status = 'ended'
+      return { rows: [], rowCount: 1 }
+    }
+
+    throw new Error(`Unsupported query in test fake: ${text}`)
+  }
+}
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -60,13 +93,13 @@ function emitAck(socket, event, ...args) {
   })
 }
 
-async function authHost(socket) {
-  const result = await emitAck(socket, 'host:auth', HOST_PIN)
+async function authHost(socket, sessionCode, pin) {
+  const result = await emitAck(socket, 'host:auth', { sessionCode, pin, role: 'controller' })
   assert.equal(result.ok, true)
 }
 
-async function authCompanion(socket) {
-  const result = await emitAck(socket, 'host:auth', { pin: HOST_PIN, role: 'companion' })
+async function authCompanion(socket, sessionCode, pin) {
+  const result = await emitAck(socket, 'host:auth', { sessionCode, pin, role: 'companion' })
   assert.equal(result.ok, true)
 }
 
@@ -80,7 +113,8 @@ function connectSocket(baseUrl) {
 }
 
 async function createHarness() {
-  const server = createBuzzServer()
+  const fakeQuery = createFakeQuery()
+  const server = createBuzzServer({ queryFn: fakeQuery })
   const address = await server.start(0, '127.0.0.1')
   const baseUrl = `http://127.0.0.1:${address.port}`
   const sockets = []
@@ -91,12 +125,24 @@ async function createHarness() {
     return socket
   }
 
+  async function createSession(pin = HOST_PIN) {
+    const res = await fetch(`${baseUrl}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    })
+    const data = await res.json()
+    assert.equal(res.ok, true)
+    assert.ok(typeof data.sessionCode === 'string' && data.sessionCode.length === 6)
+    return { sessionCode: data.sessionCode, pin }
+  }
+
   async function close() {
     for (const socket of sockets) socket.disconnect()
     await server.stop()
   }
 
-  return { connect, close, getState: server.getState }
+  return { connect, close, createSession, getState: server.getState }
 }
 
 test('first buzz wins under near-simultaneous buzzes', async () => {
@@ -105,13 +151,14 @@ test('first buzz wins under near-simultaneous buzzes', async () => {
     const host = await harness.connect()
     const memberA = await harness.connect()
     const memberB = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(host)
+    await authHost(host, sessionCode, pin)
     const setupResult = await emitAck(host, 'host:setup', TEAMS)
     assert.equal(setupResult.ok, true)
 
-    const joinA = await emitAck(memberA, 'member:join', 0, 'Alice')
-    const joinB = await emitAck(memberB, 'member:join', 1, 'Bob')
+    const joinA = await emitAck(memberA, 'member:join', sessionCode, 0, 'Alice')
+    const joinB = await emitAck(memberB, 'member:join', sessionCode, 1, 'Bob')
     assert.equal(joinA.teamIndex, 0)
     assert.equal(joinB.teamIndex, 1)
 
@@ -147,11 +194,12 @@ test('steal lockout rejects buzzes from the failed team', async () => {
     const host = await harness.connect()
     const memberA = await harness.connect()
     const memberB = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(host)
+    await authHost(host, sessionCode, pin)
     await emitAck(host, 'host:setup', TEAMS)
-    await emitAck(memberA, 'member:join', 0, 'Alice')
-    await emitAck(memberB, 'member:join', 1, 'Bob')
+    await emitAck(memberA, 'member:join', sessionCode, 0, 'Alice')
+    await emitAck(memberB, 'member:join', sessionCode, 1, 'Bob')
 
     await emitAck(host, 'host:arm')
     const firstWinnerPromise = once(host, 'buzz:winner')
@@ -187,10 +235,11 @@ test('late joiners receive the original winner member name', async () => {
     const host = await harness.connect()
     const winnerSocket = await harness.connect()
     const lateJoiner = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(host)
+    await authHost(host, sessionCode, pin)
     await emitAck(host, 'host:setup', TEAMS)
-    await emitAck(winnerSocket, 'member:join', 0, 'Alice')
+    await emitAck(winnerSocket, 'member:join', sessionCode, 0, 'Alice')
     await emitAck(host, 'host:arm')
 
     const winnerBroadcast = once(host, 'buzz:winner')
@@ -198,7 +247,7 @@ test('late joiners receive the original winner member name', async () => {
     await winnerBroadcast
 
     const syncWinnerPromise = once(lateJoiner, 'buzz:winner')
-    const joinLate = await emitAck(lateJoiner, 'member:join', 0, 'Bob')
+    const joinLate = await emitAck(lateJoiner, 'member:join', sessionCode, 0, 'Bob')
     assert.equal(joinLate.teamIndex, 0)
     const syncWinner = await syncWinnerPromise
 
@@ -214,10 +263,11 @@ test('reconnected host receives authoritative state via state:sync', async () =>
   try {
     const host1 = await harness.connect()
     const memberA = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(host1)
+    await authHost(host1, sessionCode, pin)
     await emitAck(host1, 'host:setup', TEAMS)
-    await emitAck(memberA, 'member:join', 0, 'Alice')
+    await emitAck(memberA, 'member:join', sessionCode, 0, 'Alice')
     await emitAck(host1, 'host:arm')
     const winnerPromise = once(host1, 'buzz:winner')
     memberA.emit('member:buzz')
@@ -226,7 +276,7 @@ test('reconnected host receives authoritative state via state:sync', async () =>
     host1.disconnect()
 
     const host2 = await harness.connect()
-    await authHost(host2)
+    await authHost(host2, sessionCode, pin)
     const stateSyncPromise = once(host2, 'state:sync')
     await emitAck(host2, 'host:setup', TEAMS)
     const stateSync = await stateSyncPromise
@@ -245,11 +295,12 @@ test('reconnected members still obey steal lockout while armed', async () => {
     const host = await harness.connect()
     const memberA = await harness.connect()
     const memberB = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(host)
+    await authHost(host, sessionCode, pin)
     await emitAck(host, 'host:setup', TEAMS)
-    await emitAck(memberA, 'member:join', 0, 'Alice')
-    await emitAck(memberB, 'member:join', 1, 'Bob')
+    await emitAck(memberA, 'member:join', sessionCode, 0, 'Alice')
+    await emitAck(memberB, 'member:join', sessionCode, 1, 'Bob')
 
     await emitAck(host, 'host:arm')
     const firstWinnerPromise = once(host, 'buzz:winner')
@@ -269,8 +320,8 @@ test('reconnected members still obey steal lockout while armed', async () => {
 
     const armedA = once(memberARejoined, 'buzz:armed')
     const armedB = once(memberBRejoined, 'buzz:armed')
-    await emitAck(memberARejoined, 'member:join', 0, 'Alice2')
-    await emitAck(memberBRejoined, 'member:join', 1, 'Bob2')
+    await emitAck(memberARejoined, 'member:join', sessionCode, 0, 'Alice2')
+    await emitAck(memberBRejoined, 'member:join', sessionCode, 1, 'Bob2')
     await armedA
     await armedB
 
@@ -299,13 +350,14 @@ test('member:join ack includes authoritative sync state', async () => {
     const memberA = await harness.connect()
     const memberB = await harness.connect()
     const memberC = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(host)
+    await authHost(host, sessionCode, pin)
     await emitAck(host, 'host:setup', TEAMS)
-    await emitAck(memberA, 'member:join', 0, 'Alice')
+    await emitAck(memberA, 'member:join', sessionCode, 0, 'Alice')
 
     await emitAck(host, 'host:arm')
-    const armedJoin = await emitAck(memberB, 'member:join', 1, 'Bob')
+    const armedJoin = await emitAck(memberB, 'member:join', sessionCode, 1, 'Bob')
     assert.equal(armedJoin.sync.armed, true)
     assert.equal(armedJoin.sync.buzzedBy, null)
     assert.equal(armedJoin.sync.allowedTeamIndices, null)
@@ -314,7 +366,7 @@ test('member:join ack includes authoritative sync state', async () => {
     memberA.emit('member:buzz')
     await winnerPromise
 
-    const postBuzzJoin = await emitAck(memberC, 'member:join', 1, 'Cara')
+    const postBuzzJoin = await emitAck(memberC, 'member:join', sessionCode, 1, 'Cara')
     assert.equal(postBuzzJoin.sync.armed, false)
     assert.equal(postBuzzJoin.sync.buzzedBy, 0)
     assert.equal(postBuzzJoin.sync.buzzedMemberName, 'Alice')
@@ -330,20 +382,21 @@ test('late join sync carries eligibility metadata', async () => {
     const host = await harness.connect()
     const lockedOutLateJoiner = await harness.connect()
     const eligibleLateJoiner = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(host)
+    await authHost(host, sessionCode, pin)
     await emitAck(host, 'host:setup', TEAMS)
     await emitAck(host, 'host:arm', { allowedTeamIndices: [1] })
 
     const lockedOutArmed = once(lockedOutLateJoiner, 'buzz:armed')
-    const lockedOutJoin = await emitAck(lockedOutLateJoiner, 'member:join', 0, 'Alice')
+    const lockedOutJoin = await emitAck(lockedOutLateJoiner, 'member:join', sessionCode, 0, 'Alice')
     const lockedOutPayload = await lockedOutArmed
     assert.equal(lockedOutJoin.sync.armed, true)
     assert.deepEqual(lockedOutJoin.sync.allowedTeamIndices, [1])
     assert.deepEqual(lockedOutPayload.allowedTeamIndices, [1])
 
     const eligibleArmed = once(eligibleLateJoiner, 'buzz:armed')
-    const eligibleJoin = await emitAck(eligibleLateJoiner, 'member:join', 1, 'Bob')
+    const eligibleJoin = await emitAck(eligibleLateJoiner, 'member:join', sessionCode, 1, 'Bob')
     const eligiblePayload = await eligibleArmed
     assert.equal(eligibleJoin.sync.armed, true)
     assert.deepEqual(eligibleJoin.sync.allowedTeamIndices, [1])
@@ -358,17 +411,18 @@ test('member switching teams does not leave ghost roster entries', async () => {
   try {
     const host = await harness.connect()
     const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(host)
+    await authHost(host, sessionCode, pin)
     await emitAck(host, 'host:setup', TEAMS)
 
-    const firstJoin = await emitAck(member, 'member:join', 0, 'Alice')
+    const firstJoin = await emitAck(member, 'member:join', sessionCode, 0, 'Alice')
     assert.equal(firstJoin.teamIndex, 0)
 
-    const secondJoin = await emitAck(member, 'member:join', 1, 'Alice')
+    const secondJoin = await emitAck(member, 'member:join', sessionCode, 1, 'Alice')
     assert.equal(secondJoin.teamIndex, 1)
 
-    const state = harness.getState()
+    const state = harness.getState(sessionCode)
     assert.equal(state.members[0]?.[member.id], undefined)
     assert.equal(state.members[1]?.[member.id], 'Alice')
   } finally {
@@ -381,15 +435,16 @@ test('host question cursor sync requires auth and broadcasts updates', async () 
   try {
     const host = await harness.connect()
     const other = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(host)
+    await authHost(host, sessionCode, pin)
     await emitAck(host, 'host:setup', TEAMS)
 
     const unauthorizedSet = await emitAck(other, 'host:question:set', [1, 2])
     assert.equal(unauthorizedSet.ok, false)
     assert.equal(unauthorizedSet.error, 'unauthorized')
 
-    await authHost(other)
+    await authHost(other, sessionCode, pin)
 
     const cursorPromise = once(other, 'host:question')
     const setResult = await emitAck(host, 'host:question:set', [1, 2])
@@ -410,9 +465,10 @@ test('controller can broadcast streak status to host companions', async () => {
   try {
     const controller = await harness.connect()
     const companion = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(controller)
-    await authCompanion(companion)
+    await authHost(controller, sessionCode, pin)
+    await authCompanion(companion, sessionCode, pin)
     await emitAck(controller, 'host:setup', TEAMS)
 
     const streakEvent = once(companion, 'host:streak')
@@ -436,17 +492,18 @@ test('host:new-game clears server state and broadcasts game reset', async () => 
   try {
     const host = await harness.connect()
     const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(host)
+    await authHost(host, sessionCode, pin)
     await emitAck(host, 'host:setup', TEAMS)
-    await emitAck(member, 'member:join', 0, 'Alice')
+    await emitAck(member, 'member:join', sessionCode, 0, 'Alice')
 
     const memberReset = once(member, 'game:reset')
     const resetResult = await emitAck(host, 'host:new-game')
     assert.equal(resetResult.ok, true)
     await memberReset
 
-    const state = harness.getState()
+    const state = harness.getState(sessionCode)
     assert.deepEqual(state.teams, [])
     assert.equal(state.armed, false)
     assert.equal(state.buzzedBy, null)
@@ -467,9 +524,10 @@ test('companion can trigger timer stop and restart on host controller only', asy
     const controller = await harness.connect()
     const companion = await harness.connect()
     const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(controller)
-    await authCompanion(companion)
+    await authHost(controller, sessionCode, pin)
+    await authCompanion(companion, sessionCode, pin)
 
     const stopEvent = once(controller, 'host:timer:stop')
     const stopResult = await emitAck(companion, 'host:timer:stop')
@@ -495,9 +553,10 @@ test('companion can trigger sound playback on host controller only', async () =>
     const controller = await harness.connect()
     const companion = await harness.connect()
     const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(controller)
-    await authCompanion(companion)
+    await authHost(controller, sessionCode, pin)
+    await authCompanion(companion, sessionCode, pin)
 
     const controllerSound = once(controller, 'host:sfx:play')
     const triggerResult = await emitAck(companion, 'host:sfx:play', 'nani')
@@ -529,9 +588,10 @@ test('companion receives timeout when controller does not confirm playback', asy
   try {
     const controller = await harness.connect()
     const companion = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
 
-    await authHost(controller)
-    await authCompanion(companion)
+    await authHost(controller, sessionCode, pin)
+    await authCompanion(companion, sessionCode, pin)
 
     const triggerResult = await emitAck(companion, 'host:sfx:play', 'nani')
     assert.equal(triggerResult.ok, true)

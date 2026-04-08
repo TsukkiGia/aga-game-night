@@ -26,8 +26,6 @@ export default function Setup({ onStart }) {
     })))
   }
 
-  const allFilled = names.every((_, i) => true) // names are optional, default fills in
-
   return (
     <div className="setup-container">
       {step === 'count' ? (

@@ -39,10 +39,16 @@ export default function BuzzerPage() {
   const [teamIndex, setTeamIndex] = useState(null)
   const [status, setStatus] = useState(() => loadSaved() ? 'loading' : 'join')
   const [connected, setConnected] = useState(true)
-  const teamIndexRef = useRef(null)
-  const nameRef = useRef('')
-  teamIndexRef.current = teamIndex
-  nameRef.current = name
+  const teamIndexRef = useRef(teamIndex)
+  const nameRef = useRef(name)
+
+  useEffect(() => {
+    teamIndexRef.current = teamIndex
+  }, [teamIndex])
+
+  useEffect(() => {
+    nameRef.current = name
+  }, [name])
 
   // Effect 1: socket lifecycle
   useEffect(() => {

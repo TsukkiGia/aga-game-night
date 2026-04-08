@@ -105,7 +105,7 @@ function normalizeAllowedTeamIndices(rawIndices, teamCount) {
   return next
 }
 
-export function createBuzzServer() {
+export function createBuzzServer({ queryFn = query } = {}) {
   const app = express()
   app.use(express.json())
   const httpServer = createServer(app)
@@ -139,7 +139,7 @@ export function createBuzzServer() {
       for (let attempt = 0; attempt < 5; attempt++) {
         code = generateSessionCode()
         try {
-          await query('INSERT INTO sessions (id, pin_hash) VALUES ($1, $2)', [
+          await queryFn('INSERT INTO sessions (id, pin_hash) VALUES ($1, $2)', [
             code, await bcrypt.hash(pin, 10),
           ])
           inserted = true
@@ -204,7 +204,7 @@ export function createBuzzServer() {
         return
       }
       try {
-        const { rows } = await query(
+        const { rows } = await queryFn(
           "SELECT pin_hash FROM sessions WHERE id = $1 AND status = 'active'",
           [code]
         )
@@ -273,7 +273,7 @@ export function createBuzzServer() {
       if (!isHostAuthorized(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
       const code = socket.data.sessionCode
       try {
-        await query("UPDATE sessions SET status = 'ended' WHERE id = $1", [code])
+        await queryFn("UPDATE sessions SET status = 'ended' WHERE id = $1", [code])
         sessions.delete(code)
         io.to(hostRoom(code)).emit('game:reset')
         io.to(`${code}:members`).emit('game:reset')
@@ -494,7 +494,15 @@ export function createBuzzServer() {
     })
   }
 
-  return { app, io, httpServer, start, stop, getSessions: () => sessions }
+  return {
+    app,
+    io,
+    httpServer,
+    start,
+    stop,
+    getSessions: () => sessions,
+    getState: (code) => sessions.get(code),
+  }
 }
 
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
