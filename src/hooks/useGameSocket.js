@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { socket } from '../socket'
 import { playBuzzIn, playArm, playSoundBiteByKey, unlockAudio } from '../sounds'
-import { HOST_PIN_KEY } from '../storage'
+import { HOST_PIN_KEY, SESSION_CODE_KEY } from '../storage'
 
 export function useGameSocket(initialTeams) {
   const [armed, setArmed] = useState(false)
@@ -12,67 +12,56 @@ export function useGameSocket(initialTeams) {
   const [timerControlSignal, setTimerControlSignal] = useState({ sequence: 0, action: null })
 
   useEffect(() => {
-    function getStoredHostPin() {
-      try {
-        return sessionStorage.getItem(HOST_PIN_KEY) || ''
-      } catch {
-        return ''
-      }
+    function getStored(key) {
+      try { return sessionStorage.getItem(key) || '' } catch { return '' }
     }
-
-    function storeHostPin(pin) {
-      try {
-        sessionStorage.setItem(HOST_PIN_KEY, pin)
-      } catch {
-        // ignore storage failures
-      }
+    function setStored(key, val) {
+      try { sessionStorage.setItem(key, val) } catch { /* ignore */ }
     }
-
-    function clearStoredHostPin() {
-      try {
-        sessionStorage.removeItem(HOST_PIN_KEY)
-      } catch {
-        // ignore storage failures
-      }
-    }
-
-    function requestHostPin() {
-      const entered = window.prompt('Enter host PIN')
-      return (entered || '').trim()
+    function clearStored(...keys) {
+      try { keys.forEach(k => sessionStorage.removeItem(k)) } catch { /* ignore */ }
     }
 
     function authenticateAndSetup() {
-      const tryPin = (pin, canPromptAgain = true) => {
-        if (!pin) return
-        socket.emit('host:auth', { pin, role: 'controller' }, (authResult) => {
-          if (!authResult?.ok) {
-            setHostReady(false)
-            clearStoredHostPin()
-            if (authResult?.error === 'host-pin-not-configured') {
-              window.alert('HOST_PIN is not configured on the server.')
-              return
-            }
-            if (canPromptAgain) {
-              const retryPin = requestHostPin()
-              if (retryPin) tryPin(retryPin, false)
-            }
-            return
-          }
-          storeHostPin(pin)
-          socket.emit('host:setup', initialTeams, (setupResult) => {
-            setHostReady(Boolean(setupResult?.ok))
-          })
-        })
-      }
+      const sessionCode = getStored(SESSION_CODE_KEY)
+      const pin = getStored(HOST_PIN_KEY)
 
-      const storedPin = getStoredHostPin()
-      if (storedPin) {
-        tryPin(storedPin)
+      if (sessionCode && pin) {
+        tryAuth(sessionCode, pin, /* canPrompt */ true)
         return
       }
 
-      const enteredPin = requestHostPin()
-      if (enteredPin) tryPin(enteredPin)
+      promptAndAuth()
+    }
+
+    function tryAuth(sessionCode, pin, canPrompt) {
+      socket.emit('host:auth', { sessionCode, pin, role: 'controller' }, (authResult) => {
+        if (!authResult?.ok) {
+          setHostReady(false)
+          clearStored(SESSION_CODE_KEY, HOST_PIN_KEY)
+          if (!canPrompt) return
+          if (authResult?.error === 'session-not-found') {
+            window.alert('Session not found. Check the session code.')
+          } else {
+            window.alert('Incorrect PIN.')
+          }
+          promptAndAuth()
+          return
+        }
+        setStored(SESSION_CODE_KEY, sessionCode)
+        setStored(HOST_PIN_KEY, pin)
+        socket.emit('host:setup', initialTeams, (setupResult) => {
+          setHostReady(Boolean(setupResult?.ok))
+        })
+      })
+    }
+
+    function promptAndAuth() {
+      const sessionCode = (window.prompt('Enter session code') || '').trim().toUpperCase()
+      if (!sessionCode) return
+      const pin = (window.prompt('Enter host PIN') || '').trim()
+      if (!pin) return
+      tryAuth(sessionCode, pin, /* canPrompt */ false)
     }
 
     function syncState(state) {

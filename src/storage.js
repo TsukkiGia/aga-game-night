@@ -1,7 +1,8 @@
-export const TEAMS_KEY    = 'scorekeeping_teams'
-export const SCORES_KEY   = 'scorekeeping_scores'
-export const DONE_KEY     = 'scorekeeping_done'
-export const HOST_PIN_KEY = 'scorekeeping_host_pin'
+export const TEAMS_KEY        = 'scorekeeping_teams'
+export const SCORES_KEY       = 'scorekeeping_scores'
+export const DONE_KEY         = 'scorekeeping_done'
+export const HOST_PIN_KEY     = 'scorekeeping_host_pin'
+export const SESSION_CODE_KEY = 'scorekeeping_session_code'
 
 export function loadScores(initialTeams) {
   try {

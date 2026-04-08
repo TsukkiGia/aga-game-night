@@ -3,6 +3,8 @@ import { createServer } from 'http'
 import { Server } from 'socket.io'
 import { fileURLToPath } from 'url'
 import { dirname, join, resolve } from 'path'
+import bcrypt from 'bcryptjs'
+import { runMigrations, query } from './src/db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DEBUG_BUZZ = /^(1|true|yes)$/i.test(process.env.DEBUG_BUZZ || '')
@@ -11,8 +13,12 @@ function debugLog(...args) {
   if (DEBUG_BUZZ) console.log(...args)
 }
 
-function getHostPin() {
-  return String(process.env.HOST_PIN || '').trim()
+// Session code — 6 chars, unambiguous alphabet (no 0/O/1/I/L)
+const SESSION_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+function generateSessionCode() {
+  let code = ''
+  for (let i = 0; i < 6; i++) code += SESSION_CHARS[Math.floor(Math.random() * SESSION_CHARS.length)]
+  return code
 }
 
 function isHostAuthorized(socket) {
@@ -53,13 +59,13 @@ function getSoundResultTimeoutMs() {
 
 function initialState() {
   return {
-    teams: [],       // [{ name, color }]
+    teams: [],
     armed: false,
-    buzzedBy: null,  // teamIndex | null
+    buzzedBy: null,
     buzzedMemberName: null,
-    allowedTeamIndices: null,  // null = all allowed, Set = only these indices
-    members: {},     // { [teamIndex]: { [socketId]: memberName } }
-    hostQuestionCursor: null, // [roundIndex, questionIndex|null] | null
+    allowedTeamIndices: null,
+    members: {},
+    hostQuestionCursor: null,
   }
 }
 
@@ -117,14 +123,47 @@ function normalizeAllowedTeamIndices(rawIndices, teamCount) {
 
 export function createBuzzServer() {
   const app = express()
+  app.use(express.json())
   const httpServer = createServer(app)
   const io = new Server(httpServer, {
     cors: { origin: '*' }
   })
 
-  // Game state (one game at a time)
+  // Game state (one game at a time — scoped to sessions in Phase 3)
   let state = initialState()
   const pendingSoundResults = new Map()
+
+  // ── REST: create session ──────────────────────────────────────────────────
+  app.post('/api/sessions', async (req, res) => {
+    try {
+      const pin = String(req.body?.pin || '').trim()
+      if (!pin || pin.length < 4 || pin.length > 8) {
+        return res.status(400).json({ error: 'invalid-pin' })
+      }
+
+      // Retry on collision (extremely unlikely but handled)
+      let code, inserted = false
+      for (let attempt = 0; attempt < 5; attempt++) {
+        code = generateSessionCode()
+        try {
+          await query('INSERT INTO sessions (id, pin_hash) VALUES ($1, $2)', [
+            code,
+            await bcrypt.hash(pin, 10),
+          ])
+          inserted = true
+          break
+        } catch (err) {
+          if (err.code !== '23505') throw err // re-throw non-unique-violation errors
+        }
+      }
+      if (!inserted) return res.status(500).json({ error: 'could-not-generate-code' })
+
+      res.json({ sessionCode: code })
+    } catch (err) {
+      console.error('[POST /api/sessions]', err)
+      res.status(500).json({ error: 'server-error' })
+    }
+  })
 
   function removeSocketFromAllTeamMembers(socketId) {
     let changed = false
@@ -143,7 +182,6 @@ export function createBuzzServer() {
   }
 
   function broadcastMembers() {
-    // Send host a simple array-of-arrays: index = teamIndex, value = [name, ...]
     const memberNames = state.teams.map((_, i) => Object.values(state.members[i] || {}))
     io.to('host').emit('host:members', memberNames)
   }
@@ -157,31 +195,48 @@ export function createBuzzServer() {
       if (removed) broadcastMembers()
     })
 
-    // ── Host: authenticate ────────────────────────────────────
-    socket.on('host:auth', (payload, callback) => {
+    // ── Host: authenticate ────────────────────────────────────────────────
+    socket.on('host:auth', async (payload, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
-      const configuredPin = getHostPin()
-      if (!configuredPin) {
-        respond({ ok: false, error: 'host-pin-not-configured' })
+      const sessionCode = String(payload?.sessionCode || '').trim().toUpperCase()
+      const providedPin = String(payload?.pin || '').trim()
+      const role = normalizeHostRole(payload?.role)
+
+      if (!sessionCode || !providedPin) {
+        respond({ ok: false, error: 'missing-credentials' })
         return
       }
 
-      const providedPin = String(typeof payload === 'object' && payload !== null ? payload.pin : payload || '').trim()
-      if (!providedPin || providedPin !== configuredPin) {
-        respond({ ok: false, error: 'unauthorized' })
-        return
-      }
+      try {
+        const { rows } = await query(
+          "SELECT pin_hash FROM sessions WHERE id = $1 AND status = 'active'",
+          [sessionCode]
+        )
+        if (rows.length === 0) {
+          respond({ ok: false, error: 'session-not-found' })
+          return
+        }
+        const valid = await bcrypt.compare(providedPin, rows[0].pin_hash)
+        if (!valid) {
+          respond({ ok: false, error: 'unauthorized' })
+          return
+        }
 
-      const role = normalizeHostRole(typeof payload === 'object' && payload !== null ? payload.role : 'controller')
-      socket.data.isHost = true
-      socket.data.hostRole = role
-      socket.join('host')
-      socket.leave('host-controller')
-      if (role === 'controller') socket.join('host-controller')
-      respond({ ok: true })
+        socket.data.isHost = true
+        socket.data.hostRole = role
+        socket.data.sessionCode = sessionCode
+        socket.join('host')
+        socket.leave('host-controller')
+        if (role === 'controller') socket.join('host-controller')
+
+        respond({ ok: true })
+      } catch (err) {
+        console.error('[host:auth]', err)
+        respond({ ok: false, error: 'server-error' })
+      }
     })
 
-    // ── Host: register teams ──────────────────────────────────
+    // ── Host: register teams ──────────────────────────────────────────────
     socket.on('host:setup', (teams, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       if (!isHostAuthorized(socket)) {
@@ -200,7 +255,7 @@ export function createBuzzServer() {
         state = { ...initialState(), teams: normalizedTeams }
         io.except(socket.id).emit('game:reset')
       } else {
-        state.teams = normalizedTeams  // names/colors may have changed, preserve buzzer state
+        state.teams = normalizedTeams
       }
       debugLog(`[host:setup] ${isNewGame ? 'new game' : 'reconnect'} — teams:`, normalizedTeams.map(t => t.name).join(', '))
       socket.emit('state:sync', state)
@@ -209,7 +264,7 @@ export function createBuzzServer() {
       respond({ ok: true })
     })
 
-    // ── Host: current question sync for companion view ─────────
+    // ── Host: current question sync for companion view ────────────────────
     socket.on('host:question:set', (rawCursor, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       if (!isHostAuthorized(socket)) {
@@ -325,7 +380,7 @@ export function createBuzzServer() {
       io.to(pending.sourceSocketId).emit('host:sfx:result', { requestId, ok, error })
     })
 
-    // ── Host: stop countdown timer (from companion) ───────────
+    // ── Host: timer controls (from companion) ─────────────────────────────
     socket.on('host:timer:stop', (callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       if (!isHostAuthorized(socket)) {
@@ -346,13 +401,12 @@ export function createBuzzServer() {
       respond({ ok: true })
     })
 
-    // Controller notifies companions when countdown naturally expires
     socket.on('host:timer:expired', () => {
       if (!isHostController(socket)) return
       io.to('host').emit('host:timer:expired')
     })
 
-    // ── Host: arm the buzzers ──────────────────────────────────
+    // ── Host: arm the buzzers ─────────────────────────────────────────────
     socket.on('host:arm', (arg1, arg2) => {
       const options = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}
       const respond = typeof arg1 === 'function' ? arg1 : (typeof arg2 === 'function' ? arg2 : () => {})
@@ -373,7 +427,7 @@ export function createBuzzServer() {
       respond({ ok: true })
     })
 
-    // ── Host: reset after a buzz ───────────────────────────────
+    // ── Host: reset after a buzz ──────────────────────────────────────────
     socket.on('host:reset', (callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       if (!isHostAuthorized(socket)) {
@@ -389,13 +443,13 @@ export function createBuzzServer() {
       respond({ ok: true })
     })
 
-    // ── Member: get teams list ────────────────────────────────
+    // ── Member: get teams list ────────────────────────────────────────────
     socket.on('member:get-teams', (callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       respond({ teams: state.teams.map(({ name, color }) => ({ name, color })) })
     })
 
-    // ── Member: join with teamIndex + name ────────────────────
+    // ── Member: join with teamIndex + name ────────────────────────────────
     socket.on('member:join', (teamIndex, memberName, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       const idx = parseInt(teamIndex, 10)
@@ -421,7 +475,6 @@ export function createBuzzServer() {
       })
       broadcastMembers()
 
-      // Sync state for late joiners
       if (state.armed)             socket.emit('buzz:armed', serializeEligibilityState(state))
       if (state.buzzedBy !== null) socket.emit('buzz:winner', {
         teamIndex: state.buzzedBy,
@@ -430,7 +483,7 @@ export function createBuzzServer() {
       })
     })
 
-    // ── Member: buzz ───────────────────────────────────────────
+    // ── Member: buzz ──────────────────────────────────────────────────────
     socket.on('member:buzz', () => {
       debugLog(`[member:buzz] socket=${socket.id} armed=${state.armed} buzzedBy=${state.buzzedBy} teamIndex=${socket.data.teamIndex}`)
       if (!state.armed)                  return
@@ -484,11 +537,13 @@ const isDirectRun = process.argv[1] && resolve(process.argv[1]) === fileURLToPat
 
 if (isDirectRun) {
   const PORT = process.env.PORT || 3001
-  const server = createBuzzServer()
-  server.start(PORT, '0.0.0.0').then(() => {
-    console.log(`\n  Buzz server ->  http://localhost:${PORT}\n`)
-  }).catch((err) => {
-    console.error(err)
-    process.exit(1)
-  })
+  runMigrations()
+    .then(() => createBuzzServer().start(PORT, '0.0.0.0'))
+    .then(() => {
+      console.log(`\n  Buzz server ->  http://localhost:${PORT}\n`)
+    })
+    .catch((err) => {
+      console.error(err)
+      process.exit(1)
+    })
 }
