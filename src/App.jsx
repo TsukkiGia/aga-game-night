@@ -4,6 +4,7 @@ import Scoreboard from './components/Scoreboard'
 import BuzzerPage from './components/BuzzerPage'
 import HostMobilePage from './components/HostMobilePage'
 import SessionGate from './components/SessionGate'
+import SplashScreen from './components/SplashScreen'
 import { TEAMS_KEY } from './storage'
 import { useWakeLock } from './hooks/useWakeLock'
 import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong, playHelloGetDown, playOhNoNo, playDontProvokeMe, playWhyAreYouRunning } from './sounds'
@@ -18,7 +19,8 @@ function loadTeams() {
 }
 
 export default function App() {
-  const [session, setSession] = useState(null) // { code, pin }
+  const [splashDone, setSplashDone] = useState(false)
+  const [session, setSession] = useState(null) // { code, pin } | null
   const [teams, setTeams] = useState(() => loadTeams())
   useWakeLock(true)
 
@@ -58,13 +60,9 @@ export default function App() {
     setTeams(newTeams)
   }
 
-  if (isBuzzerMode) {
-    return <BuzzerPage />
-  }
-
-  if (isHostMobileMode) {
-    return <HostMobilePage />
-  }
+  if (isBuzzerMode) return <BuzzerPage />
+  if (isHostMobileMode) return <HostMobilePage />
+  if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />
 
   return (
     <div className="app">
@@ -84,7 +82,7 @@ export default function App() {
         ) : !teams ? (
           <Setup onStart={handleStart} />
         ) : (
-          <Scoreboard teams={teams} onReset={() => setTeams(null)} />
+          <Scoreboard teams={teams} onReset={() => setTeams(null)} onEndSession={() => { setTeams(null); setSession(null) }} />
         )}
       </main>
 

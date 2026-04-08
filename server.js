@@ -265,6 +265,22 @@ export function createBuzzServer() {
       respond({ ok: true, activeQuestion: getState(socket.data.sessionCode).hostQuestionCursor })
     })
 
+    socket.on('host:end-session', async (callback) => {
+      const respond = typeof callback === 'function' ? callback : () => {}
+      if (!isHostAuthorized(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
+      const code = socket.data.sessionCode
+      try {
+        await query("UPDATE sessions SET status = 'ended' WHERE id = $1", [code])
+        sessions.delete(code)
+        io.to(hostRoom(code)).emit('game:reset')
+        io.to(`${code}:members`).emit('game:reset')
+        respond({ ok: true })
+      } catch (err) {
+        console.error('[host:end-session]', err)
+        respond({ ok: false, error: 'server-error' })
+      }
+    })
+
     socket.on('host:new-game', (callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
       if (!isHostAuthorized(socket)) { respond({ ok: false, error: 'unauthorized' }); return }

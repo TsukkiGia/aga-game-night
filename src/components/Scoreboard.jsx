@@ -15,7 +15,7 @@ import { useNavigation } from '../hooks/useNavigation'
 import { clearAll } from '../storage'
 import { playGameStart } from '../sounds'
 
-export default function Scoreboard({ teams: initialTeams, onReset }) {
+export default function Scoreboard({ teams: initialTeams, onReset, onEndSession }) {
   const emitStreak = useCallback(({ teamIndex, streakCount }) => {
     socket.emit('host:streak', { teamIndex, streakCount })
   }, [])
@@ -152,6 +152,15 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
     onReset()
   }
 
+  function handleEndSession() {
+    if (!window.confirm('End this session? The session code will stop working and players will be disconnected.')) return
+    socket.emit('host:end-session', () => {
+      clearAll()
+      try { sessionStorage.clear() } catch { /* ignore */ }
+      onEndSession?.()
+    })
+  }
+
   return (
     <>
       {buzzWinner?.team && (
@@ -175,24 +184,21 @@ export default function Scoreboard({ teams: initialTeams, onReset }) {
       )}
 
       <div className={`home-screen${launching ? ' launching' : ''}`}>
-        <CodesPanel teams={teams} members={members} buzzerUrl={buzzerUrl} />
+        <CodesPanel teams={teams} members={members} buzzerUrl={buzzerUrl} sessionCode={sessionCode} />
 
-        <div className="home-hero">
-          <div className="home-actions-row">
-            <button className="home-new-game-btn" onClick={handleNewGame}>
-              ↺ New Game
-            </button>
-
-            <button className="home-start-game-btn" onClick={handleStart}>
-              ▶ Start Game
-            </button>
-
+        <div className="home-actions-bar">
+          <div className="home-actions-secondary">
+            <button className="home-new-game-btn" onClick={handleNewGame}>↺ New Game</button>
+            <button className="home-end-session-btn" onClick={handleEndSession}>✕ End Session</button>
+          </div>
+          <div className="home-actions-primary">
+            <button className="home-start-game-btn" onClick={handleStart}>▶ Start Game</button>
             <button
               className={`arm-btn ${armed ? 'armed' : ''}`}
               onClick={handleArm}
               disabled={armed || buzzWinner !== null}
             >
-              {armed ? '🔴 Listening for buzz…' : '🎯 Arm Buzzers'}
+              {armed ? '🔴 Listening…' : '🎯 Arm Buzzers'}
             </button>
             {armed && (
               <button className="arm-cancel-btn" onClick={handleDismiss}>Cancel</button>
