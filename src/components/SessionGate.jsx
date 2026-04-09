@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { SESSION_CODE_KEY, HOST_PIN_KEY } from '../storage'
 
 function getStored(key) {
-  try { return sessionStorage.getItem(key) || '' } catch { return '' }
+  try { return localStorage.getItem(key) || '' } catch { return '' }
 }
 function setStored(key, val) {
-  try { sessionStorage.setItem(key, val) } catch { /* ignore */ }
+  try { localStorage.setItem(key, val) } catch { /* ignore */ }
 }
 function clearStored(...keys) {
-  try { keys.forEach(k => sessionStorage.removeItem(k)) } catch { /* ignore */ }
+  try { keys.forEach(k => localStorage.removeItem(k)) } catch { /* ignore */ }
 }
 
 // 'create' | 'resume'

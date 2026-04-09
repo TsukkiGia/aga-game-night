@@ -33,13 +33,13 @@ const SHOW_SOUND_STATUS = (() => {
 const normalizeCursor = normalizeQuestionCursor
 
 function getStored(key) {
-  try { return sessionStorage.getItem(key) || '' } catch { return '' }
+  try { return localStorage.getItem(key) || '' } catch { return '' }
 }
 function setStored(key, val) {
-  try { sessionStorage.setItem(key, val) } catch { /* ignore */ }
+  try { localStorage.setItem(key, val) } catch { /* ignore */ }
 }
 function clearStored(...keys) {
-  try { keys.forEach(k => sessionStorage.removeItem(k)) } catch { /* ignore */ }
+  try { keys.forEach(k => localStorage.removeItem(k)) } catch { /* ignore */ }
 }
 
 function extractAnswerView(activeQuestion) {

@@ -15,7 +15,7 @@ import rounds from '../rounds'
 import { useGameState } from '../hooks/useGameState'
 import { useGameSocket } from '../hooks/useGameSocket'
 import { useNavigation } from '../hooks/useNavigation'
-import { clearAll } from '../storage'
+import { clearAll, SESSION_CODE_KEY, HOST_PIN_KEY } from '../storage'
 import { playGameStart } from '../sounds'
 
 export default function Scoreboard({ teams: initialTeams, onReset, onEndSession }) {
@@ -308,7 +308,10 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
       }
 
       clearAll()
-      try { sessionStorage.clear() } catch { /* ignore */ }
+      try {
+        localStorage.removeItem(SESSION_CODE_KEY)
+        localStorage.removeItem(HOST_PIN_KEY)
+      } catch { /* ignore */ }
       setReactionStats({})
       onEndSession?.()
     })

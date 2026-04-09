@@ -33,7 +33,7 @@ export function normalizeSavedTeams(raw) {
 
 function currentSessionCode() {
   try {
-    return (sessionStorage.getItem(SESSION_CODE_KEY) || '').trim().toUpperCase()
+    return (localStorage.getItem(SESSION_CODE_KEY) || '').trim().toUpperCase()
   } catch {
     return ''
   }
