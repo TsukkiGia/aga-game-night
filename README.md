@@ -1,205 +1,144 @@
 # Sankofa Showdown
 
-An African- and diaspora-centric live game show with team buzzers, custom rounds, and a host-facing control panel. The host runs the scoreboard on a laptop/projector; players join from their phones to buzz in.
+Live team game show app for host + players:
+- Host controls gameplay on the main screen (`/`)
+- Optional host companion controls on phone (`/host-mobile`)
+- Players join and buzz from phones (`/buzz?s=<SESSION_CODE>`)
 
-Built with **React + Vite** on the frontend and **Express + Socket.io** on the backend.
+Tech stack: React 19 + Vite 6 frontend, Express + Socket.IO backend, Postgres persistence.
 
----
+## Current Capabilities
 
-## Features
+- Team setup (1-8 teams), live score controls, round/question navigation
+- Session + host PIN auth
+- Buzzer join with required player name + team selection
+- First-buzz wins, lockout, steal flow, reaction-time tracking
+- Runtime state persistence in Postgres (scores, question cursor, buzz state, done questions, streaks, double points)
+- Host companion tools (timer stop/restart, SFX trigger, answer view)
+- End session fully kills the session code (cannot be reused)
 
-- **Live scoreboard** — track scores for up to 8 teams with +/− controls and color-coded strips.
-- **Team buzzers on phones** — players select their team and enter their name; first buzz wins, others are locked out.
-- **Round intro + question views** — per-round explainer pages with rules and scoring, then full-screen question views with answer reveals.
-- **Flexible scoring presets** — host taps context-specific score buttons (correct, steals, bonuses) instead of doing math.
-- **Double points** — toggle 2× multiplier on any question for drama.
-- **Steal mechanic** — wrong answers open a steal opportunity for other teams, with the wrong team locked out server-side.
-- **Halftime + game-over screens** — one-click halftime view and animated game-over screen with confetti and podium; tie-aware medal placement. Game-over triggers automatically after the last question.
-- **Sudden death tiebreaker** — on a tie, a dramatic black-screen "...but is it really?" animation appears after 10 seconds with suspense music, then a glowing Sudden Death button; only tied teams can buzz in.
-- **Question sidebar & progress** — collapsible sidebar with "mark done" tracking so you don't repeat questions.
-- **Collapsible QR sidebar** — on the round intro screen, shows QR code, buzzer URL, and live team member roster.
-- **Soundboard for vibes** — trigger sound effects via keyboard shortcuts (Shift + key):
+## Prerequisites
 
-  | Key | Sound |
-  |-----|-------|
-  | A | Airhorn |
-  | B | Boo |
-  | C | Crickets |
-  | D | Don't Provoke Me |
-  | F | Faaah |
-  | G | Hello Get Down |
-  | H | Oh No No |
-  | L | Laughter |
-  | N | Nani |
-  | O | Okayy |
-  | R | Correct answer |
-  | S | Shocked |
-  | V | Very wrong |
-  | W | What the hell |
-  | Y | Why Are You Running |
+- Node `>=20.19.0 <23` (repo pins `22.12.0` in `.nvmrc`)
+- Postgres 16+ (local Docker setup included)
 
-- **Persistent buzzer sessions** — players' name and team are saved in `localStorage` so reconnecting after a dropped connection rejoins automatically.
-- **Persistent host state** — teams, scores, and completed questions are stored in `localStorage` so a page refresh won't wipe the game.
+## Environment
 
----
+Copy `.env.example` to `.env` and set values:
 
-## Getting Started
+```bash
+cp .env.example .env
+```
 
-Prerequisite: Node 20.19+ (or Node 22.12+).
+Minimum required locally:
 
-### Install dependencies
+```env
+DATABASE_URL=postgresql://sankofa:sankofa@localhost:5432/sankofa_showdown
+VITE_ENDPOINT=
+```
+
+Notes:
+- `VITE_ENDPOINT` should be your public app URL in production/ngrok (used for QR/buzzer links).
+- Leave `VITE_ENDPOINT` blank for localhost.
+
+## Local Development
+
+Start Postgres:
+
+```bash
+docker compose up -d
+```
+
+Install deps + run app:
 
 ```bash
 npm install
+npm run dev
 ```
 
-### Run in development
+This runs:
+- Frontend: `http://localhost:5173`
+- Backend API/Socket server: `http://localhost:3001`
+
+### First-time host flow
+
+1. Open `http://localhost:5173`
+2. Create session or resume session in Session Gate
+3. Enter teams and start game
+4. Share `/buzz?s=<SESSION_CODE>` URL/QR with players
+
+## Production / Railway
+
+This repo is configured for Railway via `railway.toml`:
+- Build: `npm run build`
+- Start: `node server.js`
+- Healthcheck: `GET /api/health`
+
+Required Railway variables:
+- `DATABASE_URL`
+- `VITE_ENDPOINT=https://<your-service-domain>`
+
+Railway provides `PORT`; server binds to it automatically.
+
+## Auth and Session Model
+
+- Host auth is socket-based via `host:auth` with role:
+  - `controller` (main host screen)
+  - `companion` (host mobile page)
+- Credentials are localStorage-backed for reconnect UX.
+- Player join requires:
+  - valid session code
+  - valid team index
+  - non-empty name
+
+### End Session behavior
+
+- `host:end-session` marks DB session as `ended`
+- In-memory state is dropped
+- Host/companion auth is revoked for sockets in that session
+- Session code is dead (subsequent host auth/member join returns `session-not-found`)
+
+## Persistence Model
+
+Persisted in Postgres:
+- `sessions`: session code + PIN hash + status
+- `teams`: team metadata + score
+- `game_state`: cursor + armed flag + streaks + done questions + double points
+- `buzz_state`: winner + winner member + steal eligibility indices
+
+Persisted in browser localStorage:
+- Host credentials (session + pin)
+- Session-scoped UI convenience state (teams/scores/done cursor for host UX)
+- Player buzzer identity for reconnect
+
+## Testing
+
+Run tests:
 
 ```bash
-HOST_PIN=1234 npm run dev
+npm test
 ```
 
-Optional: enable detailed socket debugging logs.
+Current suite includes socket race/auth/reconnect/runtime persistence coverage.
 
-```bash
-HOST_PIN=1234 DEBUG_BUZZ=1 npm run dev
-```
-
-This starts:
-
-- Vite dev server on **http://localhost:5173**
-- Express + Socket.io server on **http://localhost:3001**
-
-On first host connection, you'll be prompted for the same `HOST_PIN`.
-
-Open `http://localhost:5173` for the host view.
-Open `http://localhost:5173/host-mobile` on a phone for the host companion view — shows current round/question state, rules on round intro pages, answer reveal, sound bite buttons, and Stop/Restart Timer controls during a buzz countdown.
-Sound bites tapped on `/host-mobile` play through the base host app audio.
-If sounds don't fire on first try, tap anywhere once on the base host page to unlock browser audio.
-
-### Sharing with remote players (ngrok)
-
-1. Run ngrok pointed at the Express server (not Vite):
-   ```bash
-   ngrok http 3001 --domain your-domain.ngrok-free.app
-   ```
-2. Update `src/config.js`:
-   ```js
-   export const ENDPOINT = "https://your-domain.ngrok-free.app"
-   ```
-3. Build the app so ngrok serves the latest version:
-   ```bash
-   npm run build
-   ```
-4. Share `<ngrok-url>/buzz` with players.
-
-> **Note:** `npm run dev` does not update the built files. Run `npm run build` any time you want ngrok to reflect your latest changes.
-
-### Production build
+Build check:
 
 ```bash
 npm run build
-HOST_PIN=1234 node server.js
 ```
 
-The built assets go into `dist/`. `server.js` serves `dist/` as static files and handles all Socket.io traffic on port 3001 (or `$PORT`).
+## Project Structure
 
----
+- `server.js` - server bootstrap, routes, socket wiring
+- `backend/socket/*` - host/member socket handlers and room/member utilities
+- `backend/state/*` - runtime state shape and DB hydration/persistence
+- `src/components/*` - host, companion, buzzer, and gameplay UI
+- `src/hooks/*` - host socket/game state/navigation hooks
+- `src/rounds/*` - round/question content (Guess the Language now uses YouTube URLs)
+- `migrations/*` - schema and runtime persistence migrations
 
-## Game Flow
+## Helpful URLs
 
-### Host flow
-
-1. Open the app and set up teams (name + color, up to 8).
-2. Share the QR code or buzzer URL — players visit `<url>/buzz` on their phones.
-3. As teams join, member names appear in the team roster on the home screen and round intro sidebars.
-4. Click **▶ Start Game** to begin. Navigate rounds via the left sidebar or arrow buttons.
-5. Before each question, click **🎯 Arm Buzzers**. First buzz wins; a modal shows the team/member name and a 10-second countdown.
-6. Tap a **scoring preset** button in the modal to award points. Use **Open Steal** to let other teams attempt.
-7. Toggle **2×** for double points on any question.
-8. At any time, click **⏸ Halftime** for a ranked scoreboard overlay.
-9. Navigate past the last question to trigger the game-over screen — confetti, podium, and tie-aware Sudden Death if needed.
-
-### Player / buzzer flow
-
-1. On your phone, go to `<host-url>/buzz`.
-2. Select your **team** and enter your **name**.
-3. When the host arms the buzzers, the screen switches to **BUZZ NOW!** — tap to buzz in.
-4. Your session is saved — if you disconnect, returning to the page will rejoin your team automatically.
-
----
-
-## Rounds
-
-| Round | Type | Description |
-|-------|------|-------------|
-| Round 1 — Guess the Language | `video` | Watch a comedic video clip and identify the language, register, or slang variety. Steal is always open and must be a language guess. |
-| Round 2 — Charades | `charades` | Round-robin — two teams per question, acting out African/diasporic cultural phrases. |
-| Round 3 — Slang Bee | `slang` | Buzz in to define slang from African and diasporic communities. |
-| Round 4 — Title Translator | `thesis` | Round-robin — one team per question translates a real academic paper title into a chosen register (family-friendly, slang, or exaggerated academic). Crowd votes. |
-
-Round content lives in `src/rounds/`. Each file exports `{ label, name, type, intro, rules, scoring, questions }`.
-
-### Videos (Guess the Language)
-
-Place `.mp4` files in `public/videos/`. Reference them by filename in `src/rounds/guessTheLanguage.js`. Videos are gitignored — they must be added manually to the server running the app.
-
----
-
-## Scoring
-
-Each round's `scoring` array drives the buzz modal buttons:
-
-- **Guess the Language**: Correct language +3, Correct country +1, Wrong answer −1, Correct steal +2, Wrong steal 0
-- **Charades**: Correct answer +3, Wrong answer 0, Correct steal +2, Wrong steal 0
-- **Slang Bee**: Correct meaning +3, Funny bonus +1, Wrong answer −1, Correct steal +2, Wrong steal 0
-- **Title Translator**: Crowd favourite +3, Not funny 0
-
-Manual +1/−1 buttons are always available per team in the question view.
-
----
-
-## Architecture
-
-```text
-browser (host)          browser (player)
-     │                          │
-     └──────────┬───────────────┘
-                │
-         ngrok / LAN
-                │
-       Express + Socket.io :3001
-          serves dist/ (built React app)
-```
-
-**Key files**
-
-| File | Purpose |
-|------|---------|
-| `server.js` | Express + Socket.io; holds game state (teams, armed/buzzed, allowed buzzers) and handles all buzzer events. |
-| `src/config.js` | `ENDPOINT` — the public-facing URL shown in QR code and buzzer link. |
-| `src/App.jsx` | App shell; routes between host view and `/buzz`; keyboard soundboard shortcuts. |
-| `src/components/Scoreboard.jsx` | Main host orchestrator — navigation, scoring, sudden death, halftime, winner. |
-| `src/components/QuestionView.jsx` | Full-screen question UI with scoring controls, buzzer modal, and collapsible question sidebar. |
-| `src/components/RoundIntroView.jsx` | Per-round intro with rules, scoring summary, and collapsible QR/team sidebar. |
-| `src/components/BuzzerPage.jsx` | Player buzzer client with team selection and localStorage session persistence. |
-| `src/components/WinnerScreen.jsx` | Game-over overlay with confetti, tie-aware podium, and sudden death reveal animation. |
-| `src/components/SuddenDeathOverlay.jsx` | Sudden death screen — shows tied teams, buzz result, correct/wrong actions. |
-| `src/components/HalftimeScreen.jsx` | Halftime overlay with tie-aware ranked scores. |
-| `src/hooks/useGameSocket.js` | Host-side socket wiring for buzzers, member lists, arm/reset/rearm. |
-| `src/hooks/useGameState.js` | Score, done-questions, and double-points state (persisted to `localStorage`). |
-| `src/hooks/useNavigation.js` | Round/question navigation with transition animations. |
-| `src/rounds/*.js` | Round metadata and question content. |
-| `src/sounds.js` | Audio helpers, soundboard functions, suspense sequence. |
-| `src/storage.js` | `localStorage` helpers for teams, scores, and done questions. |
-
----
-
-## NPM Scripts
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start Vite (frontend) and Express (backend) concurrently in development mode. |
-| `npm run build` | Build the React app into `dist/` for production/ngrok. |
-| `npm start` | Build and start the production server. |
-| `npm run preview` | Preview the production build locally. |
+- Host: `http://localhost:5173/`
+- Host companion: `http://localhost:5173/host-mobile`
+- Buzzer page: `http://localhost:5173/buzz?s=<SESSION_CODE>`

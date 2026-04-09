@@ -133,6 +133,11 @@ export default function BuzzerPage() {
   useEffect(() => {
     if (teamIndex === null) return
     function rejoin() {
+      const saved = loadBuzzerIdentity(sessionCode)
+      if (!saved || Number.parseInt(saved.teamIndex, 10) !== teamIndex) {
+        setStatus('join')
+        return
+      }
       const memberName = String(nameRef.current || '').trim()
       if (!memberName) {
         clearBuzzerIdentity(sessionCode)
@@ -192,6 +197,9 @@ export default function BuzzerPage() {
 
   function handleSwitchTeam() {
     clearBuzzerIdentity(sessionCode)
+    setTeam(null)
+    setTeamIndex(null)
+    teamIndexRef.current = null
     setJoinError('')
     setSelectedIndex(null)
     setStatus('join')
