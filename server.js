@@ -5,34 +5,14 @@ import { fileURLToPath } from 'url'
 import { dirname, join, resolve } from 'path'
 import bcrypt from 'bcryptjs'
 import { runMigrations, query } from './src/db.js'
+import { generateSessionCode } from './backend/sessionCode.js'
+import { isHostAuthorized, isHostController, normalizeHostRole } from './backend/hostAuth.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DEBUG_BUZZ = /^(1|true|yes)$/i.test(process.env.DEBUG_BUZZ || '')
 
 function debugLog(...args) {
   if (DEBUG_BUZZ) console.log(...args)
-}
-
-// Session code — 6 chars, unambiguous alphabet (no 0/O/1/I/L)
-const SESSION_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-function generateSessionCode() {
-  let code = ''
-  for (let i = 0; i < 6; i++) code += SESSION_CHARS[Math.floor(Math.random() * SESSION_CHARS.length)]
-  return code
-}
-
-function isHostAuthorized(socket) {
-  return socket.data?.isHost === true
-}
-
-function isHostController(socket) {
-  return socket.data?.isHost === true && socket.data?.hostRole === 'controller'
-}
-
-function normalizeHostRole(rawRole) {
-  if (rawRole === 'companion') return 'companion'
-  if (rawRole === 'controller') return 'controller'
-  return null
 }
 
 const ALLOWED_SOUND_KEYS = new Set([

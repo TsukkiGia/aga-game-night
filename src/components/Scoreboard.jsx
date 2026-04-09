@@ -4,8 +4,11 @@ import RoundIntroView from './RoundIntroView'
 import HalftimeScreen from './HalftimeScreen'
 import WinnerScreen from './WinnerScreen'
 import SuddenDeathOverlay from './SuddenDeathOverlay'
-import CodesPanel from './CodesPanel'
 import RoundTransitionScreen from './RoundTransitionScreen'
+import ReactionLeaderboardModal from './scoreboard/ReactionLeaderboardModal'
+import HostHelpModal from './scoreboard/HostHelpModal'
+import HomeLobbyView from './scoreboard/HomeLobbyView'
+import HomeBuzzOverlay from './scoreboard/HomeBuzzOverlay'
 import { ENDPOINT } from '../config'
 import { socket } from '../socket'
 import rounds from '../rounds'
@@ -205,7 +208,11 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
             onBack={goBack}
           />
           {transition && <RoundTransitionScreen round={transition} onDone={dismissTransition} />}
-          {renderReactionLeaderboardModal()}
+          <ReactionLeaderboardModal
+            open={showReactionLeaderboard}
+            rows={reactionRows}
+            onClose={() => setShowReactionLeaderboard(false)}
+          />
         </>
       )
     }
@@ -250,7 +257,11 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
         {showHalftime && <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />}
         {showWinner   && <WinnerScreen   teams={teams} onDismiss={() => setShowWinner(false)} onClose={() => { setShowWinner(false); clearAll(); onReset() }} onTiebreaker={handleTiebreaker} />}
         {suddenDeath  && <SuddenDeathOverlay tiedTeams={tiedTeams} buzzWinner={buzzWinner} onAward={handleSuddenDeathAward} onWrong={handleSuddenDeathWrong} onCancel={handleSuddenDeathCancel} />}
-        {renderReactionLeaderboardModal()}
+        <ReactionLeaderboardModal
+          open={showReactionLeaderboard}
+          rows={reactionRows}
+          onClose={() => setShowReactionLeaderboard(false)}
+        />
       </>
     )
   }
@@ -303,166 +314,35 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
     })
   }
 
-  function formatMs(ms) {
-    if (!Number.isFinite(ms)) return '—'
-    if (ms < 1000) return `${ms} ms`
-    return `${(ms / 1000).toFixed(3)} s`
-  }
-
-  function renderReactionLeaderboardModal() {
-    if (!showReactionLeaderboard) return null
-    return (
-      <div className="help-overlay" onClick={() => setShowReactionLeaderboard(false)}>
-        <div className="reaction-popup" onClick={(e) => e.stopPropagation()}>
-          <div className="help-popup-head">
-              <div>
-                <div className="help-popup-tag">Reaction Leaderboard</div>
-                <h2 className="help-popup-title">Fastest Buzzers</h2>
-              </div>
-              <button className="help-close-btn" onClick={() => setShowReactionLeaderboard(false)}>✕</button>
-            </div>
-          <div className="reaction-sub">Most recent question only • Shortcut: <strong>Shift + T</strong></div>
-          {reactionRows.length === 0 ? (
-            <div className="reaction-empty">No buzzes recorded for the current question yet.</div>
-          ) : (
-            <div className="reaction-table-wrap">
-              <table className="reaction-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Team</th>
-                    <th>Best</th>
-                    <th>Last</th>
-                    <th>Avg</th>
-                    <th>Buzzes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reactionRows.map((row, idx) => (
-                    <tr key={row.key}>
-                      <td>{idx + 1}</td>
-                      <td>{row.name}</td>
-                      <td>{row.teamName || '—'}</td>
-                      <td>{formatMs(row.bestMs)}</td>
-                      <td>{formatMs(row.lastMs)}</td>
-                      <td>{formatMs(Math.round(row.totalMs / row.attempts))}</td>
-                      <td>{row.attempts}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <>
-      {buzzWinner?.team && (
-        <div className="buzz-overlay" onClick={handleDismiss}>
-          <div
-            className={`buzz-popup color-${buzzWinner.team.color}`}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="buzz-popup-label">BUZZED IN!</div>
-            <div className="buzz-popup-name">
-              {buzzWinner.memberName
-                ? `${buzzWinner.memberName} just buzzed in for ${buzzWinner.team.name}!`
-                : `${buzzWinner.team.name} buzzed in!`}
-            </div>
-            <div className="buzz-popup-icon">🔔</div>
-            <button className="buzz-dismiss-btn" onClick={handleDismiss}>
-              Reset Buzzers
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showHelp && (
-        <div className="help-overlay" onClick={() => setShowHelp(false)}>
-          <div className="help-popup" onClick={(e) => e.stopPropagation()}>
-            <div className="help-popup-head">
-              <div>
-                <div className="help-popup-tag">Host Guide</div>
-                <h2 className="help-popup-title">How To Run The Game</h2>
-              </div>
-              <button className="help-close-btn" onClick={() => setShowHelp(false)}>✕</button>
-            </div>
-
-            <div className="help-sections">
-              <section className="help-section">
-                <h3>Host Companion</h3>
-                <p>Open Host Companion on a phone/tablet to control timer and sound effects remotely.</p>
-                <a className="help-link" href={hostCompanionUrl} target="_blank" rel="noreferrer">
-                  Open Host Companion
-                </a>
-                <p>Use the same session code and host PIN when prompted.</p>
-              </section>
-
-              <section className="help-section">
-                <h3>Buzzing Flow</h3>
-                <ul>
-                  <li>Press <strong>Arm Buzzers</strong> before answers.</li>
-                  <li>First buzz locks everyone else out.</li>
-                  <li>Press <strong>Reset Buzzers</strong> after scoring to reopen buzzing.</li>
-                  <li>For steals, use <strong>Open Steal</strong> on question screens.</li>
-                </ul>
-              </section>
-
-              <section className="help-section">
-                <h3>Player Join</h3>
-                <ul>
-                  <li>Players scan the QR code or open the join link.</li>
-                  <li>They choose a team and enter their name.</li>
-                  <li>The member list on each team card updates live.</li>
-                </ul>
-              </section>
-
-              <section className="help-section">
-                <h3>Quick Troubleshooting</h3>
-                <ul>
-                  <li>If buzzing seems stuck, press <strong>Reset Buzzers</strong>.</li>
-                  <li>If sound effects do not play, click anywhere once to unlock audio.</li>
-                  <li>If state looks stale, reload the page and re-enter session code + PIN.</li>
-                </ul>
-              </section>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {renderReactionLeaderboardModal()}
-
-      <div className={`home-screen${launching ? ' launching' : ''}`}>
-        <CodesPanel teams={teams} members={members} buzzerUrl={buzzerUrl} />
-
-        <div className="home-actions-bar">
-          <div className="home-actions-secondary">
-            <button className="home-help-btn" onClick={() => setShowHelp(true)}>? Help</button>
-            <button className="home-help-btn" onClick={() => setShowReactionLeaderboard(true)}>⏱ Reaction Times</button>
-            <button className="home-new-game-btn" onClick={handleNewGame}>↺ New Game</button>
-            <button className="home-end-session-btn" onClick={handleEndSession} disabled={endingSession}>
-              {endingSession ? 'Ending…' : '✕ End Session'}
-            </button>
-          </div>
-          <div className="home-actions-primary">
-            <button className="home-start-game-btn" onClick={handleStart}>▶ Start Game</button>
-            <button
-              className={`arm-btn ${armed ? 'armed' : ''}`}
-              onClick={handleArm}
-              disabled={armed || buzzWinner !== null}
-            >
-              {armed ? '🔴 Listening…' : '🎯 Arm Buzzers'}
-            </button>
-            {armed && (
-              <button className="arm-cancel-btn" onClick={handleDismiss}>Cancel</button>
-            )}
-          </div>
-        </div>
-      </div>
+      <HomeBuzzOverlay buzzWinner={buzzWinner} onDismiss={handleDismiss} />
+      <HostHelpModal
+        open={showHelp}
+        onClose={() => setShowHelp(false)}
+        hostCompanionUrl={hostCompanionUrl}
+      />
+      <ReactionLeaderboardModal
+        open={showReactionLeaderboard}
+        rows={reactionRows}
+        onClose={() => setShowReactionLeaderboard(false)}
+      />
+      <HomeLobbyView
+        teams={teams}
+        members={members}
+        buzzerUrl={buzzerUrl}
+        launching={launching}
+        onOpenHelp={() => setShowHelp(true)}
+        onOpenReactionLeaderboard={() => setShowReactionLeaderboard(true)}
+        onNewGame={handleNewGame}
+        onEndSession={handleEndSession}
+        endingSession={endingSession}
+        onStart={handleStart}
+        armed={armed}
+        buzzWinner={buzzWinner}
+        onArm={handleArm}
+        onDismiss={handleDismiss}
+      />
     </>
   )
 }
