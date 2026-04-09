@@ -9,6 +9,17 @@ import { generateSessionCode } from './backend/sessionCode.js'
 import { isHostAuthorized, isHostController, normalizeHostRole } from './backend/hostAuth.js'
 import { registerHostSocketHandlers } from './backend/socket/registerHostSocketHandlers.js'
 import { registerMemberSocketHandlers } from './backend/socket/registerMemberSocketHandlers.js'
+import {
+  initialState,
+  serializeEligibilityState,
+  serializeMemberSyncState,
+  normalizeQuestionCursor,
+  normalizeTeams,
+  normalizeAllowedTeamIndices,
+} from './backend/state/sessionState.js'
+import { createRuntimeStore } from './backend/state/runtimeStore.js'
+import { hostRoom, ctrlRoom, memberTeamRoom } from './backend/socket/rooms.js'
+import { removeFromMembers, leaveTeamRooms, broadcastMembers } from './backend/socket/memberRegistry.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DEBUG_BUZZ = /^(1|true|yes)$/i.test(process.env.DEBUG_BUZZ || '')
@@ -39,69 +50,6 @@ function getAuthMaxAttempts() {
   const raw = Number.parseInt(process.env.HOST_AUTH_MAX_ATTEMPTS || '', 10)
   if (!Number.isInteger(raw) || raw < 1) return 8
   return raw
-}
-
-function initialState() {
-  return {
-    teams: [],
-    armed: false,
-    armedAtMs: null,
-    lastArmAtMs: null,
-    attemptedSocketIds: new Set(),
-    buzzedBy: null,
-    buzzedMemberName: null,
-    allowedTeamIndices: null,
-    members: {},
-    hostQuestionCursor: null,
-  }
-}
-
-function serializeEligibilityState(st) {
-  return { allowedTeamIndices: st.allowedTeamIndices ? [...st.allowedTeamIndices] : null }
-}
-
-function serializeMemberSyncState(st) {
-  return {
-    armed: st.armed,
-    buzzedBy: st.buzzedBy,
-    buzzedMemberName: st.buzzedMemberName,
-    ...serializeEligibilityState(st),
-  }
-}
-
-function normalizeQuestionCursor(rawCursor) {
-  if (rawCursor === null) return null
-  if (!Array.isArray(rawCursor) || rawCursor.length !== 2) return null
-  const [roundIndex, questionIndex] = rawCursor
-  if (!Number.isInteger(roundIndex) || roundIndex < 0) return null
-  if (questionIndex !== null && (!Number.isInteger(questionIndex) || questionIndex < 0)) return null
-  return [roundIndex, questionIndex]
-}
-
-function normalizeTeams(rawTeams) {
-  if (!Array.isArray(rawTeams)) return null
-  if (rawTeams.length < 1 || rawTeams.length > 8) return null
-  const normalized = rawTeams.map((team) => {
-    if (!team || typeof team !== 'object') return null
-    const name = String(team.name || '').trim()
-    const color = String(team.color || '').trim()
-    if (!name || !color) return null
-    return { name, color }
-  })
-  if (normalized.some(t => t === null)) return null
-  return normalized
-}
-
-function normalizeAllowedTeamIndices(rawIndices, teamCount) {
-  if (rawIndices === undefined || rawIndices === null) return null
-  if (!Array.isArray(rawIndices)) return null
-  const next = new Set()
-  for (const value of rawIndices) {
-    if (!Number.isInteger(value)) continue
-    if (value < 0 || value >= teamCount) continue
-    next.add(value)
-  }
-  return next
 }
 
 export function createBuzzServer({ queryFn = query } = {}) {
@@ -145,123 +93,12 @@ export function createBuzzServer({ queryFn = query } = {}) {
     rec.count += 1
   }
 
-  function getState(code) {
-    if (!sessions.has(code)) sessions.set(code, initialState())
-    return sessions.get(code)
-  }
-
-  async function hydrateStateFromDb(code) {
-    const { rows } = await queryFn(
-      `
-        SELECT
-          s.id AS session_id,
-          gs.armed AS gs_armed,
-          gs.host_question_cursor AS gs_host_question_cursor,
-          bs.winner_team_index AS bs_winner_team_index,
-          bs.buzzed_member_name AS bs_buzzed_member_name,
-          bs.allowed_team_indices AS bs_allowed_team_indices,
-          t.idx AS team_idx,
-          t.name AS team_name,
-          t.color AS team_color
-        FROM sessions s
-        LEFT JOIN game_state gs ON gs.session_id = s.id
-        LEFT JOIN buzz_state bs ON bs.session_id = s.id
-        LEFT JOIN teams t ON t.session_id = s.id
-        WHERE s.id = $1 AND s.status = 'active'
-        ORDER BY t.idx ASC
-      `,
-      [code]
-    )
-
-    if (rows.length === 0) return null
-
-    const first = rows[0] || {}
-    const next = initialState()
-    next.teams = rows
-      .filter((r) => Number.isInteger(r.team_idx))
-      .map((r) => ({ name: String(r.team_name || ''), color: String(r.team_color || '') }))
-      .filter((team) => team.name && team.color)
-
-    next.armed = Boolean(first.gs_armed)
-
-    const winnerTeamIndex = Number.parseInt(first.bs_winner_team_index, 10)
-    next.buzzedBy = Number.isInteger(winnerTeamIndex) ? winnerTeamIndex : null
-    next.buzzedMemberName = first.bs_buzzed_member_name ? String(first.bs_buzzed_member_name) : null
-
-    const rawAllowed = first.bs_allowed_team_indices
-    if (Array.isArray(rawAllowed)) {
-      const parsed = normalizeAllowedTeamIndices(rawAllowed, next.teams.length)
-      next.allowedTeamIndices = parsed
-    } else {
-      next.allowedTeamIndices = null
-    }
-
-    let rawCursor = first.gs_host_question_cursor
-    if (typeof rawCursor === 'string') {
-      try { rawCursor = JSON.parse(rawCursor) } catch { rawCursor = null }
-    }
-    next.hostQuestionCursor = normalizeQuestionCursor(rawCursor)
-
-    return next
-  }
-
-  async function ensureState(code) {
-    if (sessions.has(code)) return sessions.get(code)
-    const hydrated = await hydrateStateFromDb(code)
-    if (!hydrated) return null
-    sessions.set(code, hydrated)
-    return hydrated
-  }
-
-  async function persistTeams(code, teams) {
-    await queryFn('DELETE FROM teams WHERE session_id = $1', [code])
-    for (let i = 0; i < teams.length; i++) {
-      const team = teams[i]
-      await queryFn(
-        'INSERT INTO teams (session_id, idx, name, color, score) VALUES ($1, $2, $3, $4, $5)',
-        [code, i, team.name, team.color, 0]
-      )
-    }
-  }
-
-  async function persistRuntimeState(code, st) {
-    const hostQuestionCursor = st.hostQuestionCursor === null ? null : JSON.stringify(st.hostQuestionCursor)
-    const allowedTeamIndices = st.allowedTeamIndices ? [...st.allowedTeamIndices] : null
-    await queryFn(
-      `
-        INSERT INTO game_state (session_id, armed, host_question_cursor)
-        VALUES ($1, $2, $3::jsonb)
-        ON CONFLICT (session_id)
-        DO UPDATE SET
-          armed = EXCLUDED.armed,
-          host_question_cursor = EXCLUDED.host_question_cursor
-      `,
-      [code, st.armed, hostQuestionCursor]
-    )
-    await queryFn(
-      `
-        INSERT INTO buzz_state (session_id, winner_team_index, buzzed_member_name, allowed_team_indices)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (session_id)
-        DO UPDATE SET
-          winner_team_index = EXCLUDED.winner_team_index,
-          buzzed_member_name = EXCLUDED.buzzed_member_name,
-          allowed_team_indices = EXCLUDED.allowed_team_indices
-      `,
-      [code, st.buzzedBy, st.buzzedMemberName, allowedTeamIndices]
-    )
-  }
-
-  function persistRuntimeStateInBackground(code, st) {
-    persistRuntimeState(code, st).catch((err) => {
-      console.error('[persistRuntimeState]', err)
-    })
-  }
-
-  // Scoped Socket.io room names
-  const hostRoom       = (code) => `host:${code}`
-  const ctrlRoom       = (code) => `ctrl:${code}`
-  const memberTeamRoom = (code, i) => `${code}:team-${i}`
+  const { getState, ensureState, persistTeams, persistRuntimeState, persistRuntimeStateInBackground } = createRuntimeStore({
+    queryFn,
+    sessions,
+  })
+  const leaveMemberTeamRooms = (socket, code, teamCount) => leaveTeamRooms(socket, code, teamCount, memberTeamRoom)
+  const broadcastSessionMembers = (code, st) => broadcastMembers(io, hostRoom, code, st)
 
   // ── REST: health check ───────────────────────────────────────────────────
   app.get('/api/health', (_req, res) => res.json({ ok: true }))
@@ -294,28 +131,6 @@ export function createBuzzServer({ queryFn = query } = {}) {
     }
   })
 
-  // ── Socket helpers ──────────────────────────────────────────────────────
-  function removeFromMembers(socketId, st) {
-    let changed = false
-    for (const [teamKey, roster] of Object.entries(st.members)) {
-      if (!roster || typeof roster !== 'object') continue
-      if (!Object.prototype.hasOwnProperty.call(roster, socketId)) continue
-      delete roster[socketId]
-      changed = true
-      if (Object.keys(roster).length === 0) delete st.members[teamKey]
-    }
-    return changed
-  }
-
-  function leaveTeamRooms(socket, code, teamCount) {
-    for (let i = 0; i < teamCount; i++) socket.leave(memberTeamRoom(code, i))
-  }
-
-  function broadcastMembers(code, st) {
-    const memberNames = st.teams.map((_, i) => Object.values(st.members[i] || {}))
-    io.to(hostRoom(code)).emit('host:members', memberNames)
-  }
-
   // ── Socket connection ───────────────────────────────────────────────────
   io.on('connection', (socket) => {
     debugLog(`[connect] socket=${socket.id}`)
@@ -327,7 +142,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
       const st = sessions.get(code)
       if (!st) return
       const changed = removeFromMembers(socket.id, st)
-      if (changed) broadcastMembers(code, st)
+      if (changed) broadcastSessionMembers(code, st)
     })
 
     registerHostSocketHandlers(socket, {
@@ -356,7 +171,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
       ALLOWED_SOUND_KEYS,
       getSoundResultTimeoutMs,
       bcrypt,
-      broadcastMembers,
+      broadcastMembers: broadcastSessionMembers,
     })
 
     registerMemberSocketHandlers(socket, {
@@ -368,8 +183,8 @@ export function createBuzzServer({ queryFn = query } = {}) {
       serializeMemberSyncState,
       serializeEligibilityState,
       removeFromMembers,
-      leaveTeamRooms,
-      broadcastMembers,
+      leaveTeamRooms: leaveMemberTeamRooms,
+      broadcastMembers: broadcastSessionMembers,
       persistRuntimeStateInBackground,
       debugLog,
     })
