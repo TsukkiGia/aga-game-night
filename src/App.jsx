@@ -14,8 +14,28 @@ const pathname = window.location.pathname
 const isBuzzerMode = pathname.startsWith('/buzz')
 const isHostMobileMode = pathname.startsWith('/host-mobile')
 
+function normalizeSavedTeams(raw) {
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 8) return null
+  const normalized = raw.map((team) => {
+    if (!team || typeof team !== 'object') return null
+    const name = String(team.name || '').trim()
+    const color = String(team.color || '').trim()
+    const scoreNum = Number(team.score)
+    const score = Number.isFinite(scoreNum) ? scoreNum : 0
+    if (!name || !color) return null
+    return { name, color, score }
+  })
+  if (normalized.some((team) => team === null)) return null
+  return normalized
+}
+
 function loadTeams() {
-  try { return JSON.parse(localStorage.getItem(TEAMS_KEY)) } catch { return null }
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TEAMS_KEY))
+    return normalizeSavedTeams(parsed)
+  } catch {
+    return null
+  }
 }
 
 export default function App() {
@@ -73,7 +93,7 @@ export default function App() {
           <h1 className="app-title">Sankofa Showdown</h1>
           <div className="adinkra-right">⬡</div>
         </div>
-        <div className="kente-bar" />
+        <div className="kente-bar thin" />
       </header>
 
       <main className="app-main">

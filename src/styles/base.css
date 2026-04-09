@@ -27,9 +27,10 @@
 }
 
 .app-header {
-  background: var(--bg-card);
+  background: rgba(255,255,255,0.92);
   border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  backdrop-filter: blur(8px);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -40,7 +41,7 @@
   align-items: center;
   justify-content: center;
   gap: 20px;
-  padding: 16px 24px;
+  padding: 15px 24px;
 }
 
 .app-title {
@@ -63,8 +64,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 24px 20px;
-  max-width: 1240px;
+  padding: 26px 20px 22px;
+  max-width: 1260px;
   width: 100%;
   margin: 0 auto;
 }
@@ -74,9 +75,9 @@
 }
 .footer-symbols {
   text-align: center;
-  padding: 10px;
-  font-size: 13px;
+  padding: 9px;
+  font-size: 11px;
   letter-spacing: 0.4em;
   color: var(--text-muted);
-  opacity: 0.4;
+  opacity: 0.28;
 }

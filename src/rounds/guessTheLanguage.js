@@ -20,7 +20,7 @@ export default {
   questions: [
     {
       id: 'gtl-yoruba',
-      video: 'https://www.youtube.com/watch?v=Av2Ax3E9aUY&list=PL9fybogIhpBtW3QaWb1pVWJvq990xrVEP',
+      video: 'https://www.youtube.com/watch?v=Av2Ax3E9aUY&list=PL9fybogIhpBtW3QaWb1pVWJvq990xrVEP&start=60',
       answer: 'Yoruba',
       countries: ['Nigeria', 'Benin', 'Togo'],
       explanation: 'Yoruba is one of Nigeria\'s major languages, spoken mainly in southwestern Nigeria and also in parts of Benin and Togo. It has a rich oral literary tradition and a strong diasporic influence in the Americas, especially through religious and cultural traditions like Brazilian Candomblé and Cuban Lucumí.',

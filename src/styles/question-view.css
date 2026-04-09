@@ -525,6 +525,23 @@
   align-items: safe center;
 }
 
+.qv-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 220px;
+  text-align: center;
+  padding: 24px;
+}
+
+.qv-empty-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+}
+
 /* ── Sidebar collapse + groups ── */
 .qv-sidebar.collapsed {
   width: 32px;

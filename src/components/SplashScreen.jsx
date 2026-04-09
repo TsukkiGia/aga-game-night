@@ -7,7 +7,7 @@ export default function SplashScreen({ onDone }) {
   useEffect(() => {
     playTransition()
     const holdTimer  = setTimeout(() => setPhase('out'),  5200)
-    const doneTimer  = setTimeout(() => onDone(),         6000)
+    const doneTimer  = setTimeout(() => onDone(),         5500)
     return () => { clearTimeout(holdTimer); clearTimeout(doneTimer) }
   }, [onDone])
 

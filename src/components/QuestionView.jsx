@@ -15,8 +15,29 @@ export default function QuestionView({
   onHalftime, doublePoints, onToggleDouble, timerControlSignal, onTimerExpired,
 }) {
   const round = rounds[roundIndex]
-  const question = round.questions[questionIndex]
-  const total = round.questions.length
+  const question = round?.questions?.[questionIndex]
+  const total = round?.questions?.length || 0
+  if (!round || !question) {
+    return (
+      <div className="question-view">
+        <div className="qv-nav">
+          <button className="qv-back" onClick={onBack}>← Back</button>
+          <div className="qv-heading">
+            <span className="qv-round-tag">Question</span>
+            <span className="qv-round-name">Unavailable</span>
+          </div>
+          <div />
+        </div>
+        <div className="qv-body">
+          <div className="qv-empty-state">
+            <div className="qv-empty-title">That question no longer exists.</div>
+            <button className="qv-back" onClick={onBack}>Return to Home</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const isCharades = round.type === 'charades'
   const isThesis   = round.type === 'thesis'
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { SESSION_CODE_KEY, HOST_PIN_KEY } from '../storage'
 
 function getStored(key) {
@@ -13,13 +13,7 @@ function clearStored(...keys) {
 
 // 'create' | 'resume'
 export default function SessionGate({ onSession }) {
-  const [mode, setMode] = useState(() => {
-    // If we already have both stored, skip the gate entirely
-    const code = getStored(SESSION_CODE_KEY)
-    const pin  = getStored(HOST_PIN_KEY)
-    if (code && pin) { onSession(code, pin); return 'done' }
-    return 'pick'
-  })
+  const [mode, setMode] = useState('pick')
 
   const [pin, setPin]           = useState('')
   const [resumeCode, setResumeCode] = useState('')
@@ -27,7 +21,13 @@ export default function SessionGate({ onSession }) {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
 
-  if (mode === 'done') return null
+  useEffect(() => {
+    const code = getStored(SESSION_CODE_KEY)
+    const savedPin = getStored(HOST_PIN_KEY)
+    if (!code || !savedPin) return
+    setMode('restoring')
+    onSession(code, savedPin)
+  }, [onSession])
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -72,6 +72,14 @@ export default function SessionGate({ onSession }) {
   return (
     <div className="setup-container">
       <div className="setup-step">
+        {mode === 'restoring' && (
+          <>
+            <div className="setup-icon">🔄</div>
+            <h2 className="setup-heading">Reconnecting…</h2>
+            <p className="setup-sub">Restoring your previous host session</p>
+          </>
+        )}
+
         {mode === 'pick' && (
           <>
             <div className="setup-icon">🎮</div>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import QuestionView from './QuestionView'
 import RoundIntroView from './RoundIntroView'
 import HalftimeScreen from './HalftimeScreen'
@@ -28,9 +28,35 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
   const [suddenDeath, setSuddenDeath] = useState(false)
   const [tiedTeams, setTiedTeams] = useState([])
 
+  const normalizedActiveQuestion = useMemo(() => {
+    if (activeQuestion === null) return null
+    if (!Array.isArray(activeQuestion) || activeQuestion.length !== 2) return null
+    const [rawRoundIndex, rawQuestionIndex] = activeQuestion
+    if (!Number.isInteger(rawRoundIndex) || rawRoundIndex < 0 || rawRoundIndex >= rounds.length) return null
+    const round = rounds[rawRoundIndex]
+    if (rawQuestionIndex === null) return [rawRoundIndex, null]
+    if (!Number.isInteger(rawQuestionIndex) || rawQuestionIndex < 0 || rawQuestionIndex >= round.questions.length) {
+      return [rawRoundIndex, null]
+    }
+    return [rawRoundIndex, rawQuestionIndex]
+  }, [activeQuestion])
+
   useEffect(() => {
-    syncHostQuestion(activeQuestion)
-  }, [activeQuestion, hostReady, syncHostQuestion])
+    if (activeQuestion === null) return
+    if (normalizedActiveQuestion === null) {
+      navigate(null)
+      return
+    }
+    const [aRound, aQuestion] = activeQuestion
+    const [nRound, nQuestion] = normalizedActiveQuestion
+    if (aRound !== nRound || aQuestion !== nQuestion) {
+      navigate(nRound, nQuestion, rounds, true)
+    }
+  }, [activeQuestion, normalizedActiveQuestion, navigate])
+
+  useEffect(() => {
+    syncHostQuestion(normalizedActiveQuestion)
+  }, [normalizedActiveQuestion, hostReady, syncHostQuestion])
 
   function handleTiebreaker(winners) {
     setShowWinner(false)
@@ -60,8 +86,8 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
 
   const buzzerUrl = `${ENDPOINT || window.location.origin}/buzz${sessionCode ? `?s=${sessionCode}` : ''}`
 
-  if (activeQuestion !== null) {
-    const [rIdx, qIdx] = activeQuestion
+  if (normalizedActiveQuestion !== null) {
+    const [rIdx, qIdx] = normalizedActiveQuestion
     function dismissBuzzAndResetMultiplier() {
       clearDoublePoints()
       handleDismiss()
