@@ -305,6 +305,7 @@
   align-items: safe center;
   justify-content: center;
   padding: 40px 48px;
+  min-height: 0;
 }
 
 /* Arm row inside question view */
@@ -320,6 +321,14 @@
   align-items: center;
   gap: 20px;
   width: 100%;
+}
+
+.qv-thesis-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(10px, 1.6vh, 18px);
+  width: min(100%, 1180px);
 }
 
 .charades-active-teams {

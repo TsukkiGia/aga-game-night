@@ -182,7 +182,7 @@ export default function QuestionView({
             </div>
           )}
           {isThesis && (
-            <div className="charades-wrap">
+            <div className="qv-thesis-shell">
               <div className="charades-active-teams">
                 {[...activePair].map(i => (
                   <button

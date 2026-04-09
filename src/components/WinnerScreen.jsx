@@ -24,7 +24,15 @@ export default function WinnerScreen({ teams, onClose, onDismiss, onTiebreaker }
   const [showSuddenDeath, setShowSuddenDeath] = useState(false)
   const [showSdButton, setShowSdButton] = useState(false)
 
-  useEffect(() => { playWinner(); playWinnerMusical(); playApplause() }, [])
+  useEffect(() => {
+    playWinner()
+    playWinnerMusical()
+    playApplause()
+    return () => {
+      stopWinnerSounds()
+      stopSuspense()
+    }
+  }, [])
 
   useEffect(() => {
     if (!isTie || !onTiebreaker) return

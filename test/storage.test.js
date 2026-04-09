@@ -58,6 +58,19 @@ test('host credentials helpers read, write, and clear scoped values', () => {
   }
 })
 
+test('host credentials do not fall back to unscoped legacy pin values', () => {
+  const originalLocalStorage = globalThis.localStorage
+  const storageMock = createLocalStorageMock()
+  globalThis.localStorage = storageMock
+  try {
+    storageMock.setItem(SESSION_CODE_KEY, 'QWERTY')
+    storageMock.setItem(HOST_PIN_KEY, '1234')
+    assert.equal(readHostCredentials(), null)
+  } finally {
+    globalThis.localStorage = originalLocalStorage
+  }
+})
+
 test('buzzer identity helpers persist and clear player identity', () => {
   const originalLocalStorage = globalThis.localStorage
   const storageMock = createLocalStorageMock()

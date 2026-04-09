@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { readHostCredentials, writeHostCredentials, clearHostCredentials } from '../storage'
+import { readHostCredentials, writeHostCredentials, clearHostCredentials, clearAll } from '../storage'
 
 // 'create' | 'resume'
 export default function SessionGate({ onSession }) {
@@ -35,6 +35,7 @@ export default function SessionGate({ onSession }) {
         setError(data.error === 'invalid-pin' ? 'PIN must be 4–8 digits' : 'Could not create session. Try again.')
         return
       }
+      clearAll()
       writeHostCredentials(data.sessionCode, trimmed)
       onSession(data.sessionCode, trimmed)
     } catch {

@@ -41,6 +41,7 @@ function currentSessionCode() {
 }
 
 export function scopedKey(baseKey) {
+  if (baseKey === SESSION_CODE_KEY) return SESSION_CODE_KEY
   const code = currentSessionCode()
   return code ? `${baseKey}:${code}` : baseKey
 }
@@ -48,9 +49,7 @@ export function scopedKey(baseKey) {
 export function getStorageItem(baseKey) {
   try {
     const scoped = scopedKey(baseKey)
-    const scopedVal = localStorage.getItem(scoped)
-    if (scopedVal !== null) return scopedVal
-    return localStorage.getItem(baseKey)
+    return localStorage.getItem(scoped)
   } catch {
     return null
   }
