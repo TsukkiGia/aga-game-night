@@ -25,6 +25,7 @@ export default function BuzzerPage() {
   const [availableTeams, setAvailableTeams] = useState([])
   const [selectedIndex, setSelectedIndex] = useState(null)
   const [name, setName] = useState('')
+  const [joinError, setJoinError] = useState('')
   const [team, setTeam] = useState(null)
   const [teamIndex, setTeamIndex] = useState(null)
   const [status, setStatus] = useState(() => loadBuzzerIdentity() ? 'loading' : 'join')
@@ -55,7 +56,13 @@ export default function BuzzerPage() {
       // Auto-rejoin from saved data on initial connect
       const saved = loadBuzzerIdentity()
       if (saved && teamIndexRef.current === null) {
-        socket.emit('member:join', sessionCode, saved.teamIndex, saved.name, (res) => {
+        const savedName = String(saved.name || '').trim()
+        if (!savedName) {
+          clearBuzzerIdentity()
+          setStatus('join')
+          return
+        }
+        socket.emit('member:join', sessionCode, saved.teamIndex, savedName, (res) => {
           if (res?.error) {
             clearBuzzerIdentity()
             setStatus('join')
@@ -63,8 +70,8 @@ export default function BuzzerPage() {
           }
           setTeam(res.team)
           setTeamIndex(res.teamIndex)
-          setName(saved.name)
-          setStatus(deriveStatusFromSync(res.sync, res.teamIndex, saved.name))
+          setName(savedName)
+          setStatus(deriveStatusFromSync(res.sync, res.teamIndex, savedName))
         })
       }
     }
@@ -115,7 +122,12 @@ export default function BuzzerPage() {
   useEffect(() => {
     if (teamIndex === null) return
     function rejoin() {
-      const memberName = nameRef.current || 'Anonymous'
+      const memberName = String(nameRef.current || '').trim()
+      if (!memberName) {
+        clearBuzzerIdentity()
+        setStatus('join')
+        return
+      }
       socket.emit('member:join', sessionCode, teamIndex, memberName, (res) => {
         if (res?.error) { clearBuzzerIdentity(); setStatus('join'); return }
         if (res?.team) setTeam(res.team)
@@ -130,8 +142,13 @@ export default function BuzzerPage() {
 
   function handleJoin(e) {
     e.preventDefault()
+    const memberName = name.trim()
+    if (!memberName) {
+      setJoinError('Name is required')
+      return
+    }
     if (selectedIndex === null) return
-    const memberName = name.trim() || 'Anonymous'
+    setJoinError('')
     socket.emit('member:join', sessionCode, selectedIndex, memberName, (res) => {
       if (res?.error) return
       saveBuzzerIdentity(res.teamIndex, memberName)
@@ -144,6 +161,13 @@ export default function BuzzerPage() {
   function handleBuzz() {
     if (status !== 'armed' && status !== 'locked-out' && status !== 'team-buzzed') return
     socket.emit('member:buzz')
+  }
+
+  function handleSwitchTeam() {
+    clearBuzzerIdentity()
+    setJoinError('')
+    setSelectedIndex(null)
+    setStatus('join')
   }
 
   // ── Loading screen (auto-rejoin in progress) ─────────────────
@@ -177,7 +201,10 @@ export default function BuzzerPage() {
                     key={i}
                     type="button"
                     className={`buzzer-team-option color-${t.color}${selectedIndex === i ? ' selected' : ''}`}
-                    onClick={() => setSelectedIndex(i)}
+                    onClick={() => {
+                      setJoinError('')
+                      setSelectedIndex(i)
+                    }}
                   >
                     {t.name}
                   </button>
@@ -187,12 +214,16 @@ export default function BuzzerPage() {
             <input
               className="buzzer-name-input"
               value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Your name"
+              onChange={e => {
+                if (joinError) setJoinError('')
+                setName(e.target.value)
+              }}
+              placeholder="Your name (required)"
               maxLength={24}
               autoComplete="off"
             />
-            <button className="buzzer-join-btn" type="submit" disabled={selectedIndex === null}>
+            {joinError && <p className="session-gate-error">{joinError}</p>}
+            <button className="buzzer-join-btn" type="submit" disabled={selectedIndex === null || !name.trim()}>
               Join Team →
             </button>
           </form>
@@ -243,6 +274,13 @@ export default function BuzzerPage() {
         {status === 'i-buzzed'    && '🏆'}
         {status === 'team-buzzed' && '👥'}
         {status === 'locked-out'  && '🔒'}
+      </button>
+      <button
+        className="buzzer-switch-team-btn"
+        type="button"
+        onClick={handleSwitchTeam}
+      >
+        Switch Team
       </button>
     </div>
   )

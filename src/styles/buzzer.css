@@ -352,6 +352,26 @@
 
 .buzzer-btn-locked { opacity: 0.25; }
 
+.buzzer-switch-team-btn {
+  margin-top: 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  letter-spacing: 0.03em;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.buzzer-switch-team-btn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+  transform: translateY(-1px);
+}
+
 /* ── Member names on buzzer join screen ── */
 .buzzer-name-input {
   width: 100%;
