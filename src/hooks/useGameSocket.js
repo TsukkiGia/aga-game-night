@@ -3,7 +3,8 @@ import { socket } from '../socket'
 import { playBuzzIn, playArm, playSoundBiteByKey, unlockAudio } from '../sounds'
 import { HOST_PIN_KEY, SESSION_CODE_KEY } from '../storage'
 
-export function useGameSocket(initialTeams) {
+export function useGameSocket(initialTeams, options = {}) {
+  const onBuzzWinner = typeof options.onBuzzWinner === 'function' ? options.onBuzzWinner : null
   const [armed, setArmed] = useState(false)
   const [buzzWinner, setBuzzWinner] = useState(null)
   const [members, setMembers] = useState([])
@@ -138,7 +139,10 @@ export function useGameSocket(initialTeams) {
     socket.on('buzz:reset',   () => { setArmed(false); setBuzzWinner(null) })
     socket.on('buzz:winner',  (data) => {
       if (!data || typeof data.teamIndex !== 'number' || !data.team?.name || !data.team?.color) return
-      setArmed(false); setBuzzWinner(data); playBuzzIn()
+      setArmed(false)
+      setBuzzWinner(data)
+      playBuzzIn()
+      onBuzzWinner?.(data)
     })
     socket.on('host:members', (data) => setMembers(data))
     socket.on('host:sfx:play', onRemoteSound)
@@ -161,7 +165,7 @@ export function useGameSocket(initialTeams) {
       window.removeEventListener('pointerdown', primeAudio)
       window.removeEventListener('keydown', primeAudio)
     }
-  }, [])
+  }, [initialTeams, onBuzzWinner])
 
   function handleArm(options = {}) {
     const safeOptions = {}

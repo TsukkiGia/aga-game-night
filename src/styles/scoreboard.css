@@ -251,6 +251,65 @@
   color: white;
 }
 
+.reaction-popup {
+  width: min(960px, 100%);
+  max-height: min(82dvh, 760px);
+  overflow: auto;
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow-lg);
+  padding: 26px 26px 24px;
+}
+
+.reaction-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.reaction-empty {
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.reaction-table-wrap {
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.reaction-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.reaction-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #f8f7f4;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.reaction-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #efede7;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.reaction-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 /* ══════════════════════════════════════════
    SCOREBOARD LAYOUT
 ══════════════════════════════════════════ */
@@ -510,6 +569,21 @@
   transition: all 0.2s;
 }
 .halftime-btn:hover { background: var(--amber-light); color: white; }
+
+.qv-reaction-btn {
+  background: var(--teal-bg);
+  color: var(--teal);
+  border: 1.5px solid rgba(0,85,72,0.28);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.qv-reaction-btn:hover { background: var(--teal); color: white; border-color: var(--teal); }
 
 .winner-btn {
   background: var(--teal-bg);

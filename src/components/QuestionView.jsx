@@ -12,7 +12,7 @@ export default function QuestionView({
   onAdjust, onArm, onDismiss,
   stealMode, onWrongAndSteal, onManualBuzz,
   onMarkDone, onNavigate, onBack, onNext, onPrev,
-  onHalftime, doublePoints, onToggleDouble, timerControlSignal, onTimerExpired,
+  onHalftime, onShowReactionLeaderboard, doublePoints, onToggleDouble, timerControlSignal, onTimerExpired,
 }) {
   const round = rounds[roundIndex]
   const question = round?.questions?.[questionIndex]
@@ -75,6 +75,7 @@ export default function QuestionView({
           <span className="qv-counter">Q {questionIndex + 1} / {total}</span>
           <button className="qv-arrow" onClick={onPrev} disabled={questionIndex === 0}>‹</button>
           <button className="qv-arrow" onClick={() => { onMarkDone(); onNext() }}>›</button>
+          <button className="qv-reaction-btn" onClick={onShowReactionLeaderboard}>⏱ Times</button>
           <button className="halftime-btn" onClick={onHalftime}>⏸ Halftime</button>
         </div>
       </div>
