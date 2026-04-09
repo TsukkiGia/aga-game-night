@@ -792,6 +792,47 @@ test('host:new-game clears server state and broadcasts game reset', async () => 
   }
 })
 
+test('host:end-session revokes host auth and keeps the session code dead', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const companion = await harness.connect()
+    const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    await authCompanion(companion, sessionCode, pin)
+    await emitAck(host, 'host:setup', TEAMS)
+    await emitAck(member, 'member:join', sessionCode, 0, 'Alice')
+
+    const memberReset = once(member, 'game:reset')
+    const companionReset = once(companion, 'game:reset')
+    const endResult = await emitAck(host, 'host:end-session')
+    assert.equal(endResult.ok, true)
+    await memberReset
+    await companionReset
+
+    assert.equal(harness.getState(sessionCode), undefined)
+
+    const teamsAfterEnd = await emitAck(member, 'member:get-teams', sessionCode)
+    assert.equal(teamsAfterEnd.error, 'session-not-found')
+
+    const hostNewGame = await emitAck(host, 'host:new-game')
+    assert.equal(hostNewGame.ok, false)
+    assert.equal(hostNewGame.error, 'unauthorized')
+
+    const companionQuestion = await emitAck(companion, 'host:question:get')
+    assert.equal(companionQuestion.ok, false)
+    assert.equal(companionQuestion.error, 'unauthorized')
+
+    const reauth = await emitAck(host, 'host:auth', { sessionCode, pin, role: 'controller' })
+    assert.equal(reauth.ok, false)
+    assert.equal(reauth.error, 'session-not-found')
+  } finally {
+    await harness.close()
+  }
+})
+
 test('companion can trigger timer stop and restart on host controller only', async () => {
   const harness = await createHarness()
   try {

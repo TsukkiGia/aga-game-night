@@ -5,7 +5,6 @@ export function registerHostSocketHandlers(socket, ctx) {
     sessions,
     pendingSoundResults,
     ensureState,
-    getState,
     initialState,
     persistTeams,
     persistRuntimeState,
@@ -27,6 +26,17 @@ export function registerHostSocketHandlers(socket, ctx) {
     bcrypt,
     broadcastMembers,
   } = ctx
+
+  function clearHostAuthorization(targetSocket) {
+    const code = String(targetSocket?.data?.sessionCode || '').trim().toUpperCase()
+    if (code) {
+      targetSocket.leave(hostRoom(code))
+      targetSocket.leave(ctrlRoom(code))
+    }
+    targetSocket.data.isHost = false
+    targetSocket.data.hostRole = null
+    targetSocket.data.sessionCode = undefined
+  }
 
   // ── Host: authenticate ──────────────────────────────────────────────
   socket.on('host:auth', async (payload, callback) => {
@@ -67,6 +77,7 @@ export function registerHostSocketHandlers(socket, ctx) {
         return
       }
 
+      clearHostAuthorization(socket)
       socket.data.isHost = true
       socket.data.hostRole = role
       socket.data.sessionCode = code
@@ -97,8 +108,8 @@ export function registerHostSocketHandlers(socket, ctx) {
     try {
       let st = await ensureState(code)
       if (!st) {
-        st = { ...initialState(), teams: normalizedTeams }
-        sessions.set(code, st)
+        respond({ ok: false, error: 'session-not-found' })
+        return
       }
 
       const isNewGame = JSON.stringify(normalizedTeams.map(t => t.name)) !== JSON.stringify(st.teams.map(t => t.name))
@@ -152,7 +163,11 @@ export function registerHostSocketHandlers(socket, ctx) {
     }
 
     const code = socket.data.sessionCode
-    const st = (await ensureState(code)) || getState(code)
+    const st = await ensureState(code)
+    if (!st) {
+      respond({ ok: false, error: 'session-not-found' })
+      return
+    }
 
     const normalizedTeams = normalizeTeams(payload.teams)
     if (!normalizedTeams || normalizedTeams.length !== st.teams.length) {
@@ -205,7 +220,11 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     const code = socket.data.sessionCode
-    const st = (await ensureState(code)) || getState(code)
+    const st = await ensureState(code)
+    if (!st) {
+      respond({ ok: false, error: 'session-not-found' })
+      return
+    }
     st.hostQuestionCursor = cursor
     try {
       await persistRuntimeState(code, st)
@@ -224,7 +243,11 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     const code = socket.data.sessionCode
-    const st = (await ensureState(code)) || getState(code)
+    const st = await ensureState(code)
+    if (!st) {
+      respond({ ok: false, error: 'session-not-found' })
+      return
+    }
     respond({ ok: true, activeQuestion: st.hostQuestionCursor })
   })
 
@@ -236,10 +259,17 @@ export function registerHostSocketHandlers(socket, ctx) {
     }
     const code = socket.data.sessionCode
     try {
-      await queryFn("UPDATE sessions SET status = 'ended' WHERE id = $1", [code])
+      const result = await queryFn("UPDATE sessions SET status = 'ended' WHERE id = $1 AND status = 'active'", [code])
+      if (result.rowCount === 0) {
+        clearHostAuthorization(socket)
+        respond({ ok: false, error: 'session-not-found' })
+        return
+      }
       sessions.delete(code)
+      const hostSockets = await io.in(hostRoom(code)).fetchSockets()
       io.to(hostRoom(code)).emit('game:reset')
       io.to(`${code}:members`).emit('game:reset')
+      for (const hostSocket of hostSockets) clearHostAuthorization(hostSocket)
       respond({ ok: true })
     } catch (err) {
       console.error('[host:end-session]', err)
@@ -254,8 +284,13 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     const code = socket.data.sessionCode
+    const existing = await ensureState(code)
+    if (!existing) {
+      respond({ ok: false, error: 'session-not-found' })
+      return
+    }
     sessions.set(code, initialState())
-    const st = getState(code)
+    const st = sessions.get(code)
     try {
       await persistTeams(code, st.teams)
       await persistRuntimeState(code, st)
@@ -271,14 +306,18 @@ export function registerHostSocketHandlers(socket, ctx) {
     }
   })
 
-  socket.on('host:streak', (payload, callback) => {
+  socket.on('host:streak', async (payload, callback) => {
     const respond = typeof callback === 'function' ? callback : () => {}
     if (!isHostController(socket)) {
       respond({ ok: false, error: 'unauthorized' })
       return
     }
     const code = socket.data.sessionCode
-    const st = getState(code)
+    const st = await ensureState(code)
+    if (!st) {
+      respond({ ok: false, error: 'session-not-found' })
+      return
+    }
     const teamIndex = Number.parseInt(payload?.teamIndex, 10)
     const streakCount = Number.parseInt(payload?.streakCount, 10)
     if (!Number.isInteger(teamIndex) || teamIndex < 0 || teamIndex >= st.teams.length) {
@@ -357,10 +396,11 @@ export function registerHostSocketHandlers(socket, ctx) {
     respond({ ok: true })
   })
 
-  socket.on('host:timer:expired', () => {
+  socket.on('host:timer:expired', async () => {
     if (!isHostController(socket)) return
     const code = socket.data.sessionCode
-    const st = getState(code)
+    const st = await ensureState(code)
+    if (!st) return
     // Timer expiry should stop countdown flow, but keep current buzz winner
     // visible until the host explicitly scores/resets.
     st.armed = false
@@ -380,7 +420,11 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     const code = socket.data.sessionCode
-    const st = (await ensureState(code)) || getState(code)
+    const st = await ensureState(code)
+    if (!st) {
+      respond({ ok: false, error: 'session-not-found' })
+      return
+    }
     const allowedIndices = normalizeAllowedTeamIndices(options.allowedTeamIndices, st.teams.length)
     debugLog(`[host:arm] armed=${st.armed} buzzedBy=${st.buzzedBy}`)
     if (st.buzzedBy !== null) {
@@ -410,7 +454,11 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     const code = socket.data.sessionCode
-    const st = (await ensureState(code)) || getState(code)
+    const st = await ensureState(code)
+    if (!st) {
+      respond({ ok: false, error: 'session-not-found' })
+      return
+    }
     debugLog('[host:reset]')
     st.armed = false
     st.armedAtMs = null
