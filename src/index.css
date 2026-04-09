@@ -7,6 +7,37 @@
 }
 
 :root {
+  /* ── Typography ── */
+  --font:         'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+  --text-xs:      0.6875rem;
+  --text-sm:      0.8125rem;
+  --text-md:      0.9375rem;
+  --text-lg:      1.125rem;
+  --text-xl:      1.5rem;
+  --text-2xl:     2.125rem;
+  --text-3xl:     2.75rem;
+  --text-4xl:     3rem;
+  --text-5xl:     4rem;
+  --weight-reg:   500;
+  --weight-strong: 700;
+  --weight-heavy: 900;
+
+  /* ── Spacing & shape ── */
+  --space-1:      0.25rem;
+  --space-2:      0.5rem;
+  --space-3:      0.75rem;
+  --space-4:      1rem;
+  --space-5:      1.5rem;
+  --space-6:      2rem;
+  --space-7:      2.5rem;
+  --space-8:      3rem;
+  --space-9:      3.5rem;
+  --radius-sm:    0.625rem;
+  --radius-md:    0.875rem;
+  --radius-lg:    1.25rem;
+  --radius-xl:    1.5rem;
+  --radius-2xl:   1.75rem;
+
   /* ── Brand colors (Kente Modern) ── */
   --terra:        #C94B2C;
   --terra-light:  #EF6B4A;
@@ -71,12 +102,68 @@
   --shadow-md:    0 4px 12px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06);
   --shadow-lg:    0 8px 24px rgba(0,0,0,0.1),  0 20px 48px rgba(0,0,0,0.08);
 
-  font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+  /* ── Team accent defaults (overridden by .color-*) ── */
+  --team-accent:      var(--terra);
+  --team-accent-light: var(--terra-light);
+  --team-accent-bg:   var(--terra-bg);
+  --team-accent-rgb:  201, 75, 44;
+
+  font-family: var(--font);
   font-size: 16px;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Team accent mapping for all color-* components */
+.color-ember {
+  --team-accent: var(--c-ember);
+  --team-accent-light: var(--c-ember-light);
+  --team-accent-bg: var(--c-ember-bg);
+  --team-accent-rgb: 201, 75, 44;
+}
+.color-gold {
+  --team-accent: var(--c-gold);
+  --team-accent-light: var(--c-gold-light);
+  --team-accent-bg: var(--c-gold-bg);
+  --team-accent-rgb: 199, 141, 10;
+}
+.color-forest {
+  --team-accent: var(--c-forest);
+  --team-accent-light: var(--c-forest-light);
+  --team-accent-bg: var(--c-forest-bg);
+  --team-accent-rgb: 0, 85, 72;
+}
+.color-earth {
+  --team-accent: var(--c-earth);
+  --team-accent-light: var(--c-earth-light);
+  --team-accent-bg: var(--c-earth-bg);
+  --team-accent-rgb: 123, 79, 32;
+}
+.color-indigo {
+  --team-accent: var(--c-indigo);
+  --team-accent-light: var(--c-indigo-light);
+  --team-accent-bg: var(--c-indigo-bg);
+  --team-accent-rgb: 61, 79, 171;
+}
+.color-rose {
+  --team-accent: var(--c-rose);
+  --team-accent-light: var(--c-rose-light);
+  --team-accent-bg: var(--c-rose-bg);
+  --team-accent-rgb: 176, 48, 96;
+}
+.color-slate {
+  --team-accent: var(--c-slate);
+  --team-accent-light: var(--c-slate-light);
+  --team-accent-bg: var(--c-slate-bg);
+  --team-accent-rgb: 58, 107, 122;
+}
+.color-sage {
+  --team-accent: var(--c-sage);
+  --team-accent-light: var(--c-sage-light);
+  --team-accent-bg: var(--c-sage-bg);
+  --team-accent-rgb: 74, 124, 89;
 }
 
 body {

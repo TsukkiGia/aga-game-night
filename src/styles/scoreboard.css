@@ -348,8 +348,8 @@
 /* ── Team Card ── */
 .team-card {
   background: var(--bg-card);
-  border-radius: 20px;
-  padding: 24px 22px 20px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) 1.375rem 1.25rem;
   border: 1.5px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -366,27 +366,13 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 4px;
+  background: var(--team-accent);
 }
-.team-card.color-ember::before  { background: var(--terra); }
-.team-card.color-gold::before   { background: var(--amber-light); }
-.team-card.color-forest::before { background: var(--teal); }
-.team-card.color-earth::before  { background: var(--brown); }
-.team-card.color-indigo::before { background: var(--indigo); }
-.team-card.color-rose::before   { background: var(--rose); }
-.team-card.color-slate::before  { background: var(--slate); }
-.team-card.color-sage::before   { background: var(--sage); }
 
 /* Leading */
 .team-card.leading {
-  box-shadow: 0 0 0 2px var(--amber-light), var(--shadow-md);
+  box-shadow: 0 0 0 2px var(--team-accent), var(--shadow-md);
 }
-.team-card.color-ember.leading  { box-shadow: 0 0 0 2px var(--terra), var(--shadow-md); }
-.team-card.color-forest.leading { box-shadow: 0 0 0 2px var(--teal), var(--shadow-md); }
-.team-card.color-earth.leading  { box-shadow: 0 0 0 2px var(--brown), var(--shadow-md); }
-.team-card.color-indigo.leading { box-shadow: 0 0 0 2px var(--indigo), var(--shadow-md); }
-.team-card.color-rose.leading   { box-shadow: 0 0 0 2px var(--rose),   var(--shadow-md); }
-.team-card.color-slate.leading  { box-shadow: 0 0 0 2px var(--slate),  var(--shadow-md); }
-.team-card.color-sage.leading   { box-shadow: 0 0 0 2px var(--sage),   var(--shadow-md); }
 
 /* Flash */
 @keyframes flashUp   { 0%{background:white} 30%{background:var(--teal-bg)} 100%{background:white} }
@@ -419,8 +405,8 @@
 }
 
 .team-name {
-  font-size: 16px;
-  font-weight: 800;
+  font-size: var(--text-md);
+  font-weight: var(--weight-strong);
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -432,20 +418,13 @@
 .score-display { display: flex; align-items: baseline; gap: 5px; }
 
 .score-value {
-  font-size: 68px;
-  font-weight: 900;
+  font-size: clamp(3.5rem, 4.5vw, 4.25rem);
+  font-weight: var(--weight-heavy);
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+  color: var(--team-accent);
 }
-.team-card.color-ember  .score-value { color: var(--terra); }
-.team-card.color-gold   .score-value { color: var(--amber); }
-.team-card.color-forest .score-value { color: var(--teal); }
-.team-card.color-earth  .score-value { color: var(--brown); }
-.team-card.color-indigo .score-value { color: var(--indigo); }
-.team-card.color-rose   .score-value { color: var(--rose); }
-.team-card.color-slate  .score-value { color: var(--slate); }
-.team-card.color-sage   .score-value { color: var(--sage); }
 
 .score-label {
   font-size: 13px;
@@ -468,15 +447,8 @@
   border-radius: 999px;
   transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
   min-width: 2px;
+  background: var(--team-accent);
 }
-.team-card.color-ember  .score-bar-fill { background: var(--terra); }
-.team-card.color-gold   .score-bar-fill { background: var(--amber-light); }
-.team-card.color-forest .score-bar-fill { background: var(--teal); }
-.team-card.color-earth  .score-bar-fill { background: var(--brown); }
-.team-card.color-indigo .score-bar-fill { background: var(--indigo); }
-.team-card.color-rose   .score-bar-fill { background: var(--rose); }
-.team-card.color-slate  .score-bar-fill { background: var(--slate); }
-.team-card.color-sage   .score-bar-fill { background: var(--sage); }
 
 /* Controls */
 .team-controls { display: flex; gap: 6px; }
@@ -666,14 +638,7 @@
   transition: background 0.25s;
   background: transparent;
 }
-.leaderboard-row.top-rank { background: var(--amber-bg); }
-.leaderboard-row.color-ember.top-rank  { background: var(--terra-bg); }
-.leaderboard-row.color-forest.top-rank { background: var(--teal-bg); }
-.leaderboard-row.color-earth.top-rank  { background: var(--brown-bg); }
-.leaderboard-row.color-indigo.top-rank { background: var(--indigo-bg); }
-.leaderboard-row.color-rose.top-rank   { background: var(--rose-bg); }
-.leaderboard-row.color-slate.top-rank  { background: var(--slate-bg); }
-.leaderboard-row.color-sage.top-rank   { background: var(--sage-bg); }
+.leaderboard-row.top-rank { background: var(--team-accent-bg); }
 
 .rank-medal { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
 .rank-dash  { color: var(--text-muted); opacity: 0.3; font-size: 14px; }
@@ -688,15 +653,7 @@
   color: var(--text-muted); opacity: 0.6;
 }
 
-.rank-score { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
-.leaderboard-row.color-ember  .rank-score { color: var(--terra); }
-.leaderboard-row.color-gold   .rank-score { color: var(--amber); }
-.leaderboard-row.color-forest .rank-score { color: var(--teal); }
-.leaderboard-row.color-earth  .rank-score { color: var(--brown); }
-.leaderboard-row.color-indigo .rank-score { color: var(--indigo); }
-.leaderboard-row.color-rose   .rank-score { color: var(--rose); }
-.leaderboard-row.color-slate  .rank-score { color: var(--slate); }
-.leaderboard-row.color-sage   .rank-score { color: var(--sage); }
+.rank-score { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--team-accent); }
 
 .leaderboard-leader-note {
   padding: 10px 14px;
@@ -877,19 +834,13 @@
   min-height: 148px;
   min-width: 0;
   box-shadow: 0 6px 18px rgba(0,0,0,0.05);
+  border-color: var(--team-accent);
+  background: var(--team-accent-bg);
 }
-.code-chip.color-ember  { border-color: var(--terra);        background: var(--terra-bg); }
-.code-chip.color-gold   { border-color: var(--amber-light);   background: var(--amber-bg); }
-.code-chip.color-forest { border-color: var(--teal);          background: var(--teal-bg);  }
-.code-chip.color-earth  { border-color: var(--brown);         background: var(--brown-bg); }
-.code-chip.color-indigo { border-color: var(--indigo);        background: var(--indigo-bg);}
-.code-chip.color-rose   { border-color: var(--rose);          background: var(--rose-bg);  }
-.code-chip.color-slate  { border-color: var(--slate);         background: var(--slate-bg); }
-.code-chip.color-sage   { border-color: var(--sage);          background: var(--sage-bg);  }
 
 .code-team-name {
-  font-size: clamp(22px, 2.1vw, 34px);
-  font-weight: 900;
+  font-size: clamp(1.375rem, 2.1vw, 2.125rem);
+  font-weight: var(--weight-heavy);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -897,32 +848,18 @@
   line-height: 1.15;
   text-align: center;
   letter-spacing: -0.01em;
+  color: var(--team-accent);
 }
-.code-chip.color-ember  .code-team-name { color: var(--terra); }
-.code-chip.color-gold   .code-team-name { color: var(--amber); }
-.code-chip.color-forest .code-team-name { color: var(--teal); }
-.code-chip.color-earth  .code-team-name { color: var(--brown); }
-.code-chip.color-indigo .code-team-name { color: var(--indigo); }
-.code-chip.color-rose   .code-team-name { color: var(--rose); }
-.code-chip.color-slate  .code-team-name { color: var(--slate); }
-.code-chip.color-sage   .code-team-name { color: var(--sage); }
 
 .code-value {
   font-family: monospace;
   font-size: 48px;
-  font-weight: 900;
+  font-weight: var(--weight-heavy);
   letter-spacing: 0.12em;
   white-space: nowrap;
   flex-shrink: 0;
+  color: var(--team-accent);
 }
-.code-chip.color-ember  .code-value { color: var(--terra); }
-.code-chip.color-gold   .code-value { color: var(--amber); }
-.code-chip.color-forest .code-value { color: var(--teal); }
-.code-chip.color-earth  .code-value { color: var(--brown); }
-.code-chip.color-indigo .code-value { color: var(--indigo); }
-.code-chip.color-rose   .code-value { color: var(--rose); }
-.code-chip.color-slate  .code-value { color: var(--slate); }
-.code-chip.color-sage   .code-value { color: var(--sage); }
 
 /* ── Member roster chips ── */
 .member-roster {

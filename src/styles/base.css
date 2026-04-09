@@ -40,13 +40,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  padding: 15px 24px;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-6);
 }
 
 .app-title {
-  font-size: clamp(18px, 3.5vw, 26px);
-  font-weight: 900;
+  font-size: clamp(var(--text-lg), 3.5vw, var(--text-xl));
+  font-weight: var(--weight-heavy);
   letter-spacing: 0.18em;
   color: var(--text);
   margin: 0;
@@ -64,7 +64,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 26px 20px 22px;
+  padding: clamp(var(--space-4), 2vw, var(--space-6)) var(--space-5) var(--space-5);
   max-width: 1260px;
   width: 100%;
   margin: 0 auto;
@@ -75,8 +75,8 @@
 }
 .footer-symbols {
   text-align: center;
-  padding: 9px;
-  font-size: 11px;
+  padding: var(--space-2);
+  font-size: var(--text-xs);
   letter-spacing: 0.4em;
   color: var(--text-muted);
   opacity: 0.28;
