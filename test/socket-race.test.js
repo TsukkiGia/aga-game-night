@@ -13,6 +13,9 @@ process.env.SFX_RESULT_TIMEOUT_MS = '300'
 
 function createFakeQuery() {
   const sessions = new Map()
+  const teamsBySession = new Map()
+  const gameStateBySession = new Map()
+  const buzzStateBySession = new Map()
 
   return async function fakeQuery(text, params = []) {
     if (text.includes('INSERT INTO sessions')) {
@@ -31,6 +34,90 @@ function createFakeQuery() {
       const session = sessions.get(id)
       if (!session || session.status !== 'active') return { rows: [], rowCount: 0 }
       return { rows: [{ pin_hash: session.pin_hash }], rowCount: 1 }
+    }
+
+    if (text.includes('DELETE FROM teams WHERE session_id = $1')) {
+      const [sessionId] = params
+      teamsBySession.set(sessionId, [])
+      return { rows: [], rowCount: 1 }
+    }
+
+    if (text.includes('INSERT INTO teams (session_id, idx, name, color, score) VALUES')) {
+      const [sessionId, idx, name, color, score] = params
+      const current = teamsBySession.get(sessionId) || []
+      current.push({ idx, name, color, score })
+      current.sort((a, b) => a.idx - b.idx)
+      teamsBySession.set(sessionId, current)
+      return { rows: [], rowCount: 1 }
+    }
+
+    if (text.includes('INSERT INTO game_state (session_id, armed, host_question_cursor)')) {
+      const [sessionId, armed, hostQuestionCursorRaw] = params
+      let hostQuestionCursor = hostQuestionCursorRaw
+      if (typeof hostQuestionCursorRaw === 'string') {
+        try { hostQuestionCursor = JSON.parse(hostQuestionCursorRaw) } catch { hostQuestionCursor = null }
+      }
+      gameStateBySession.set(sessionId, {
+        armed: Boolean(armed),
+        host_question_cursor: hostQuestionCursor,
+      })
+      return { rows: [], rowCount: 1 }
+    }
+
+    if (text.includes('INSERT INTO buzz_state (session_id, winner_team_index, buzzed_member_name, allowed_team_indices)')) {
+      const [sessionId, winnerTeamIndex, buzzedMemberName, allowedTeamIndices] = params
+      buzzStateBySession.set(sessionId, {
+        winner_team_index: winnerTeamIndex,
+        buzzed_member_name: buzzedMemberName,
+        allowed_team_indices: Array.isArray(allowedTeamIndices) ? [...allowedTeamIndices] : null,
+      })
+      return { rows: [], rowCount: 1 }
+    }
+
+    if (text.includes('FROM sessions s') && text.includes('LEFT JOIN game_state gs') && text.includes('LEFT JOIN buzz_state bs') && text.includes('LEFT JOIN teams t')) {
+      const [sessionId] = params
+      const session = sessions.get(sessionId)
+      if (!session || session.status !== 'active') return { rows: [], rowCount: 0 }
+
+      const teams = teamsBySession.get(sessionId) || []
+      const gs = gameStateBySession.get(sessionId) || { armed: false, host_question_cursor: null }
+      const bs = buzzStateBySession.get(sessionId) || {
+        winner_team_index: null,
+        buzzed_member_name: null,
+        allowed_team_indices: null,
+      }
+
+      if (teams.length === 0) {
+        return {
+          rows: [{
+            session_id: sessionId,
+            gs_armed: gs.armed,
+            gs_host_question_cursor: gs.host_question_cursor,
+            bs_winner_team_index: bs.winner_team_index,
+            bs_buzzed_member_name: bs.buzzed_member_name,
+            bs_allowed_team_indices: bs.allowed_team_indices,
+            team_idx: null,
+            team_name: null,
+            team_color: null,
+          }],
+          rowCount: 1,
+        }
+      }
+
+      return {
+        rows: teams.map((team) => ({
+          session_id: sessionId,
+          gs_armed: gs.armed,
+          gs_host_question_cursor: gs.host_question_cursor,
+          bs_winner_team_index: bs.winner_team_index,
+          bs_buzzed_member_name: bs.buzzed_member_name,
+          bs_allowed_team_indices: bs.allowed_team_indices,
+          team_idx: team.idx,
+          team_name: team.name,
+          team_color: team.color,
+        })),
+        rowCount: teams.length,
+      }
     }
 
     if (text.includes("UPDATE sessions SET status = 'ended' WHERE id = $1")) {
@@ -142,7 +229,7 @@ async function createHarness() {
     await server.stop()
   }
 
-  return { connect, close, createSession, getState: server.getState }
+  return { connect, close, createSession, getState: server.getState, getSessions: server.getSessions }
 }
 
 test('first buzz wins under near-simultaneous buzzes', async () => {
@@ -284,6 +371,33 @@ test('reconnected host receives authoritative state via state:sync', async () =>
     assert.equal(stateSync.armed, false)
     assert.equal(stateSync.buzzedBy, 0)
     assert.equal(stateSync.buzzedMemberName, 'Alice')
+  } finally {
+    await harness.close()
+  }
+})
+
+test('state hydrates from database after in-memory cache is cleared', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    await emitAck(host, 'host:setup', TEAMS)
+    await emitAck(host, 'host:question:set', [1, 2])
+    await emitAck(host, 'host:arm')
+
+    harness.getSessions().clear()
+
+    const hostAfterClear = await harness.connect()
+    await authHost(hostAfterClear, sessionCode, pin)
+    const stateSyncPromise = once(hostAfterClear, 'state:sync')
+    await emitAck(hostAfterClear, 'host:setup', TEAMS)
+    const stateSync = await stateSyncPromise
+
+    assert.equal(stateSync.armed, true)
+    assert.deepEqual(stateSync.hostQuestionCursor, [1, 2])
+    assert.equal(stateSync.buzzedBy, null)
   } finally {
     await harness.close()
   }
