@@ -1,4 +1,4 @@
-import CodesPanel from '../CodesPanel'
+import CodesPanel from './CodesPanel'
 
 export default function HomeLobbyView({
   teams,
