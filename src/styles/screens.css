@@ -229,7 +229,7 @@
   background: var(--bg-card);
   border-radius: var(--radius-2xl);
   padding: var(--space-8) 52px;
-  max-width: 560px;
+  max-width: 600px;
   width: 90%;
   text-align: center;
   box-shadow: 0 32px 80px rgba(0,0,0,0.5);
@@ -242,14 +242,39 @@
   font-weight: var(--weight-heavy);
   letter-spacing: 0.15em;
   color: var(--amber);
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.winner-heading-wrap {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.winner-teaser {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: -0.01em;
+  animation: fadeInUp 0.5s ease both;
 }
 
 .winner-heading {
-  font-size: 42px;
+  font-size: clamp(36px, 6vw, 56px);
   font-weight: 900;
   letter-spacing: -0.03em;
-  margin-bottom: 4px;
+  margin: 0;
+}
+
+@keyframes winnerPop {
+  0%   { opacity: 0; transform: scale(0.7); }
+  60%  { transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.winner-heading-pop {
+  animation: winnerPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .winner-tied-names {
@@ -257,15 +282,22 @@
   font-weight: var(--weight-strong);
   color: var(--text-muted);
   margin-bottom: 4px;
+  animation: fadeInUp 0.4s ease both;
 }
 
 .winner-score {
   font-size: var(--text-2xl);
   font-weight: var(--weight-heavy);
-  color: var(--amber);
   margin-bottom: 32px;
+  animation: fadeInUp 0.4s ease 0.1s both;
 }
 
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Podium */
 .winner-podium {
   display: flex;
   align-items: flex-end;
@@ -281,6 +313,28 @@
   width: 140px;
 }
 .podium-slot.empty { width: 140px; }
+
+.podium-hidden {
+  opacity: 0;
+  transform: translateY(40px);
+}
+
+@keyframes podiumRise {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes podiumRiseFirst {
+  0%   { opacity: 0; transform: translateY(60px) scale(0.92); }
+  60%  { transform: translateY(-6px) scale(1.03); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.podium-visible {
+  animation: podiumRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.podium-first.podium-visible {
+  animation: podiumRiseFirst 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
 
 .podium-card {
   display: flex;
@@ -298,7 +352,7 @@
 
 .podium-medal { font-size: 28px; line-height: 1; }
 .podium-name  { font-size: 14px; font-weight: 800; text-align: center; }
-.podium-score { font-size: 26px; font-weight: 900; color: var(--team-accent); }
+.podium-score { font-size: 26px; font-weight: 900; }
 
 .podium-block {
   width: 100%;
@@ -324,6 +378,10 @@
   gap: var(--space-3);
   justify-content: center;
   flex-wrap: wrap;
+}
+
+.winner-actions-reveal {
+  animation: fadeInUp 0.4s ease both;
 }
 
 .winner-dismiss-btn,

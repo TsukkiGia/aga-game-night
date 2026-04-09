@@ -12,7 +12,7 @@ export default function QuestionView({
   onAdjust, onArm, onDismiss,
   stealMode, onWrongAndSteal, onManualBuzz,
   onMarkDone, onNavigate, onBack, onNext, onPrev,
-  onHalftime, onShowReactionLeaderboard, doublePoints, onToggleDouble, timerControlSignal, onTimerExpired,
+  onHalftime, onWinner, onShowReactionLeaderboard, doublePoints, onToggleDouble, timerControlSignal, onTimerExpired,
 }) {
   const round = rounds[roundIndex]
   const question = round?.questions?.[questionIndex]
@@ -39,6 +39,7 @@ export default function QuestionView({
   const [stealPickerOpen, setStealPickerOpen] = useState(false)
   const [stealSelected, setStealSelected] = useState(() => defaultStealSelection())
   const [correctGiven, setCorrectGiven] = useState(false)
+  const [confirmFinish, setConfirmFinish] = useState(false)
 
   if (!round || !question) {
     return (
@@ -77,6 +78,13 @@ export default function QuestionView({
           <button className="qv-arrow" onClick={() => { onMarkDone(); onNext() }}>›</button>
           <button className="qv-reaction-btn" onClick={onShowReactionLeaderboard}>⏱ Times</button>
           <button className="halftime-btn" onClick={onHalftime}>⏸ Halftime</button>
+          {confirmFinish
+            ? <>
+                <button className="qv-finish-btn qv-finish-confirm" onClick={() => { setConfirmFinish(false); onWinner() }}>Finish?</button>
+                <button className="qv-finish-btn qv-finish-cancel" onClick={() => setConfirmFinish(false)}>✕</button>
+              </>
+            : <button className="qv-finish-btn" onClick={() => setConfirmFinish(true)}>⏹ Finish</button>
+          }
         </div>
       </div>
 

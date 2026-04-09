@@ -598,6 +598,24 @@
 }
 .halftime-btn:hover { background: var(--amber-light); color: white; }
 
+.qv-finish-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.qv-finish-btn:hover       { border-color: var(--terra); color: var(--terra); }
+.qv-finish-btn.qv-finish-confirm { background: var(--terra); color: white; border-color: var(--terra); }
+.qv-finish-btn.qv-finish-confirm:hover { background: var(--terra-light); }
+.qv-finish-btn.qv-finish-cancel  { padding: 11px 12px; }
+
 .qv-reaction-btn {
   background: var(--teal-bg);
   color: var(--teal);
