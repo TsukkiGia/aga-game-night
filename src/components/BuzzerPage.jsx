@@ -152,7 +152,7 @@ export default function BuzzerPage() {
   }
 
   function handleBuzz() {
-    if (status !== 'armed') return
+    if (status !== 'armed' && status !== 'locked-out' && status !== 'team-buzzed') return
     socket.emit('member:buzz')
   }
 
@@ -246,7 +246,7 @@ export default function BuzzerPage() {
           ${cfg.pulse                ? 'buzzer-pulse'      : ''}
         `}
         onClick={handleBuzz}
-        disabled={status !== 'armed'}
+        disabled={status !== 'armed' && status !== 'locked-out' && status !== 'team-buzzed'}
       >
         {status === 'waiting'     && '⏳'}
         {status === 'armed'       && '🔔'}

@@ -5,6 +5,7 @@ import { HOST_PIN_KEY, SESSION_CODE_KEY } from '../storage'
 
 export function useGameSocket(initialTeams, options = {}) {
   const onBuzzWinner = typeof options.onBuzzWinner === 'function' ? options.onBuzzWinner : null
+  const onBuzzAttempt = typeof options.onBuzzAttempt === 'function' ? options.onBuzzAttempt : null
   const [armed, setArmed] = useState(false)
   const [buzzWinner, setBuzzWinner] = useState(null)
   const [members, setMembers] = useState([])
@@ -144,6 +145,11 @@ export function useGameSocket(initialTeams, options = {}) {
       playBuzzIn()
       onBuzzWinner?.(data)
     })
+    socket.on('buzz:attempt', (data) => {
+      if (!data || typeof data.teamIndex !== 'number' || !data.team?.name || !data.team?.color) return
+      if (!Number.isFinite(data.reactionMs)) return
+      onBuzzAttempt?.(data)
+    })
     socket.on('host:members', (data) => setMembers(data))
     socket.on('host:sfx:play', onRemoteSound)
     socket.on('host:timer:stop', onTimerStop)
@@ -158,6 +164,7 @@ export function useGameSocket(initialTeams, options = {}) {
       socket.off('buzz:armed')
       socket.off('buzz:reset')
       socket.off('buzz:winner')
+      socket.off('buzz:attempt')
       socket.off('host:members')
       socket.off('host:sfx:play', onRemoteSound)
       socket.off('host:timer:stop', onTimerStop)
@@ -165,7 +172,7 @@ export function useGameSocket(initialTeams, options = {}) {
       window.removeEventListener('pointerdown', primeAudio)
       window.removeEventListener('keydown', primeAudio)
     }
-  }, [initialTeams, onBuzzWinner])
+  }, [initialTeams, onBuzzWinner, onBuzzAttempt])
 
   function handleArm(options = {}) {
     const safeOptions = {}

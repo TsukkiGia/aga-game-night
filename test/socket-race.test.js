@@ -316,6 +316,48 @@ test('steal lockout rejects buzzes from the failed team', async () => {
   }
 })
 
+test('host receives reaction attempts from locked-out players', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const memberA = await harness.connect()
+    const memberB = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    await emitAck(host, 'host:setup', TEAMS)
+    await emitAck(memberA, 'member:join', sessionCode, 0, 'Alice')
+    await emitAck(memberB, 'member:join', sessionCode, 1, 'Bob')
+    await emitAck(host, 'host:arm')
+
+    const attempts = []
+    const collectAttempt = (payload) => attempts.push(payload)
+    host.on('buzz:attempt', collectAttempt)
+
+    const winnerPromise = once(host, 'buzz:winner')
+    memberA.emit('member:buzz')
+    await winnerPromise
+
+    memberB.emit('member:buzz')
+    await waitFor(() => attempts.some((a) => a.memberName === 'Bob' && a.accepted === false && a.outcome === 'locked-out'))
+
+    const winnerAttempt = attempts.find((a) => a.memberName === 'Alice')
+    assert.equal(Boolean(winnerAttempt), true)
+    assert.equal(winnerAttempt.accepted, true)
+    assert.equal(winnerAttempt.outcome, 'winner')
+    assert.ok(Number.isFinite(winnerAttempt.reactionMs))
+
+    const lockedAttempt = attempts.find((a) => a.memberName === 'Bob' && a.accepted === false)
+    assert.equal(Boolean(lockedAttempt), true)
+    assert.equal(lockedAttempt.outcome, 'locked-out')
+    assert.ok(Number.isFinite(lockedAttempt.reactionMs))
+
+    host.off('buzz:attempt', collectAttempt)
+  } finally {
+    await harness.close()
+  }
+})
+
 test('late joiners receive the original winner member name', async () => {
   const harness = await createHarness()
   try {

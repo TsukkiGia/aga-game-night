@@ -20,7 +20,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
     socket.emit('host:streak', { teamIndex, streakCount })
   }, [])
   const [reactionStats, setReactionStats] = useState({})
-  const handleBuzzWinnerForLeaderboard = useCallback((data) => {
+  const handleBuzzAttemptForLeaderboard = useCallback((data) => {
     if (!data?.memberName) return
     if (!Number.isFinite(data.reactionMs)) return
     const name = String(data.memberName).trim()
@@ -63,7 +63,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
     })
   }, [])
   const { teams, streaks, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, markDone } = useGameState(initialTeams, { onStreak: emitStreak })
-  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal } = useGameSocket(initialTeams, { onBuzzWinner: handleBuzzWinnerForLeaderboard })
+  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal } = useGameSocket(initialTeams, { onBuzzAttempt: handleBuzzAttemptForLeaderboard })
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
   const [showWinner, setShowWinner] = useState(false)

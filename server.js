@@ -64,6 +64,8 @@ function initialState() {
     teams: [],
     armed: false,
     armedAtMs: null,
+    lastArmAtMs: null,
+    attemptedSocketIds: new Set(),
     buzzedBy: null,
     buzzedMemberName: null,
     allowedTeamIndices: null,
@@ -575,6 +577,8 @@ export function createBuzzServer({ queryFn = query } = {}) {
       // visible until the host explicitly scores/resets.
       st.armed = false
       st.armedAtMs = null
+      st.lastArmAtMs = null
+      st.attemptedSocketIds = new Set()
       io.to(hostRoom(code)).emit('host:timer:expired')
       persistRuntimeStateInBackground(code, st)
     })
@@ -591,6 +595,8 @@ export function createBuzzServer({ queryFn = query } = {}) {
       if (st.buzzedBy !== null) { respond({ ok: false, error: 'buzz-locked' }); return }
       st.armed = true
       st.armedAtMs = Date.now()
+      st.lastArmAtMs = st.armedAtMs
+      st.attemptedSocketIds = new Set()
       st.allowedTeamIndices = allowedIndices
       io.to(hostRoom(code)).emit('buzz:armed', serializeEligibilityState(st))
       io.to(`${code}:members`).emit('buzz:armed', serializeEligibilityState(st))
@@ -611,6 +617,8 @@ export function createBuzzServer({ queryFn = query } = {}) {
       debugLog(`[host:reset]`)
       st.armed = false
       st.armedAtMs = null
+      st.lastArmAtMs = null
+      st.attemptedSocketIds = new Set()
       st.buzzedBy = null
       st.buzzedMemberName = null
       st.allowedTeamIndices = null
@@ -677,25 +685,60 @@ export function createBuzzServer({ queryFn = query } = {}) {
 
     // ── Member: buzz ────────────────────────────────────────────────────
     socket.on('member:buzz', () => {
+      const REACTION_CAPTURE_WINDOW_MS = 15_000
       const code = socket.data.sessionCode
       if (!code) return
       const st = sessions.get(code)
       if (!st) return
       debugLog(`[member:buzz] socket=${socket.id} armed=${st.armed} buzzedBy=${st.buzzedBy} teamIndex=${socket.data.teamIndex}`)
-      if (!st.armed)              return
-      if (st.buzzedBy !== null)   return
+      if (!(st.attemptedSocketIds instanceof Set)) st.attemptedSocketIds = new Set()
+      if (st.attemptedSocketIds.has(socket.id)) return
       const idx = socket.data.teamIndex
       if (idx === undefined || idx === null) return
+      if (!Number.isInteger(idx) || !st.teams[idx]) return
       if (st.allowedTeamIndices !== null && !st.allowedTeamIndices.has(idx)) return
 
-      const reactionMs = Number.isFinite(st.armedAtMs) ? Math.max(0, Date.now() - st.armedAtMs) : null
+      const memberName = socket.data.memberName ? String(socket.data.memberName) : null
+      const reactionStartMs = Number.isFinite(st.armedAtMs)
+        ? st.armedAtMs
+        : (Number.isFinite(st.lastArmAtMs) ? st.lastArmAtMs : null)
+      const reactionMs = Number.isFinite(reactionStartMs)
+        ? Math.max(0, Date.now() - reactionStartMs)
+        : null
+
+      if (!st.armed) {
+        if (st.buzzedBy === null) return
+        if (reactionMs === null || reactionMs > REACTION_CAPTURE_WINDOW_MS) return
+        io.to(hostRoom(code)).emit('buzz:attempt', {
+          teamIndex: idx,
+          team: st.teams[idx],
+          memberName,
+          reactionMs,
+          accepted: false,
+          outcome: 'locked-out',
+          winnerTeamIndex: st.buzzedBy,
+        })
+        st.attemptedSocketIds.add(socket.id)
+        return
+      }
+      if (st.buzzedBy !== null) return
+
       st.armed = false
       st.armedAtMs = null
       st.buzzedBy = idx
-      st.buzzedMemberName = socket.data.memberName
-      debugLog(`[member:buzz] broadcasting buzz:winner for team "${st.teams[idx].name}" member "${socket.data.memberName}"`)
-      io.to(hostRoom(code)).emit('buzz:winner', { teamIndex: idx, team: st.teams[idx], memberName: socket.data.memberName, reactionMs })
-      io.to(`${code}:members`).emit('buzz:winner', { teamIndex: idx, team: st.teams[idx], memberName: socket.data.memberName, reactionMs })
+      st.buzzedMemberName = memberName
+      debugLog(`[member:buzz] broadcasting buzz:winner for team "${st.teams[idx].name}" member "${memberName}"`)
+      io.to(hostRoom(code)).emit('buzz:attempt', {
+        teamIndex: idx,
+        team: st.teams[idx],
+        memberName,
+        reactionMs,
+        accepted: true,
+        outcome: 'winner',
+      })
+      st.attemptedSocketIds.add(socket.id)
+      io.to(hostRoom(code)).emit('buzz:winner', { teamIndex: idx, team: st.teams[idx], memberName, reactionMs })
+      io.to(`${code}:members`).emit('buzz:winner', { teamIndex: idx, team: st.teams[idx], memberName, reactionMs })
       persistRuntimeStateInBackground(code, st)
     })
   })
