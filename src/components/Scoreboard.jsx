@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import QuestionView from './QuestionView'
 import RoundIntroView from './RoundIntroView'
 import HalftimeScreen from './HalftimeScreen'
@@ -65,8 +65,27 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
       }
     })
   }, [])
-  const { teams, streaks, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, markDone } = useGameState(initialTeams, { onStreak: emitStreak })
-  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal } = useGameSocket(initialTeams, { onBuzzAttempt: handleBuzzAttemptForLeaderboard })
+  const runtimeHydratedRef = useRef(false)
+  const {
+    teams,
+    streaks,
+    doneQuestions,
+    doublePoints,
+    setDoublePoints,
+    clearDoublePoints,
+    adjust,
+    resetForNewGame,
+    markDone,
+    hydrateFromServer,
+  } = useGameState(initialTeams, { onStreak: emitStreak })
+  const handleRuntimeSync = useCallback((serverState) => {
+    hydrateFromServer(serverState)
+    runtimeHydratedRef.current = true
+  }, [hydrateFromServer])
+  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal } = useGameSocket(
+    initialTeams,
+    { onBuzzAttempt: handleBuzzAttemptForLeaderboard, onStateSync: handleRuntimeSync }
+  )
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
   const [showWinner, setShowWinner] = useState(false)
@@ -114,6 +133,25 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
   useEffect(() => {
     syncHostQuestion(normalizedActiveQuestion)
   }, [normalizedActiveQuestion, hostReady, syncHostQuestion])
+
+  useEffect(() => {
+    if (!hostReady) runtimeHydratedRef.current = false
+  }, [hostReady])
+
+  useEffect(() => {
+    if (!hostReady || !runtimeHydratedRef.current) return
+    const payload = {
+      teams: teams.map((team) => ({
+        name: String(team.name || '').trim(),
+        color: String(team.color || '').trim(),
+        score: Number.isFinite(Number(team.score)) ? Number(team.score) : 0,
+      })),
+      doneQuestions: [...doneQuestions],
+      streaks: [...streaks],
+      doublePoints: Boolean(doublePoints),
+    }
+    socket.emit('host:runtime:update', payload)
+  }, [hostReady, teams, doneQuestions, streaks, doublePoints])
 
   function handleTiebreaker(winners) {
     setShowWinner(false)

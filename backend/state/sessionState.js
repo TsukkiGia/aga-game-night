@@ -10,6 +10,9 @@ export function initialState() {
     allowedTeamIndices: null,
     members: {},
     hostQuestionCursor: null,
+    streaks: [],
+    doneQuestions: [],
+    doublePoints: false,
   }
 }
 
@@ -42,8 +45,10 @@ export function normalizeTeams(rawTeams) {
     if (!team || typeof team !== 'object') return null
     const name = String(team.name || '').trim()
     const color = String(team.color || '').trim()
+    const scoreNum = Number(team.score)
+    const score = Number.isFinite(scoreNum) ? Math.round(scoreNum) : 0
     if (!name || !color) return null
-    return { name, color }
+    return { name, color, score }
   })
   if (normalized.some(t => t === null)) return null
   return normalized

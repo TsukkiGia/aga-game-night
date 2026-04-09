@@ -36,6 +36,16 @@ function createFakeQuery() {
       return { rows: [{ pin_hash: session.pin_hash }], rowCount: 1 }
     }
 
+    if (text.includes('DELETE FROM teams WHERE session_id = $1 AND idx >= $2')) {
+      const [sessionId, minIdx] = params
+      const current = teamsBySession.get(sessionId) || []
+      teamsBySession.set(
+        sessionId,
+        current.filter((team) => team.idx < Number(minIdx))
+      )
+      return { rows: [], rowCount: 1 }
+    }
+
     if (text.includes('DELETE FROM teams WHERE session_id = $1')) {
       const [sessionId] = params
       teamsBySession.set(sessionId, [])
@@ -56,15 +66,20 @@ function createFakeQuery() {
       return { rows: [], rowCount: 1 }
     }
 
-    if (text.includes('INSERT INTO game_state (session_id, armed, host_question_cursor)')) {
-      const [sessionId, armed, hostQuestionCursorRaw] = params
+    if (text.includes('INSERT INTO game_state')) {
+      const [sessionId, roundIndex, questionIndex, armed, streaksRaw, doneQuestionsRaw, hostQuestionCursorRaw, doublePoints] = params
       let hostQuestionCursor = hostQuestionCursorRaw
       if (typeof hostQuestionCursorRaw === 'string') {
         try { hostQuestionCursor = JSON.parse(hostQuestionCursorRaw) } catch { hostQuestionCursor = null }
       }
       gameStateBySession.set(sessionId, {
+        round_index: Number.parseInt(roundIndex, 10) || 0,
+        question_index: questionIndex === null ? null : Number.parseInt(questionIndex, 10),
         armed: Boolean(armed),
+        streaks: Array.isArray(streaksRaw) ? [...streaksRaw] : [],
+        done_questions: Array.isArray(doneQuestionsRaw) ? [...doneQuestionsRaw] : [],
         host_question_cursor: hostQuestionCursor,
+        double_points: Boolean(doublePoints),
       })
       return { rows: [], rowCount: 1 }
     }
@@ -85,7 +100,15 @@ function createFakeQuery() {
       if (!session || session.status !== 'active') return { rows: [], rowCount: 0 }
 
       const teams = teamsBySession.get(sessionId) || []
-      const gs = gameStateBySession.get(sessionId) || { armed: false, host_question_cursor: null }
+      const gs = gameStateBySession.get(sessionId) || {
+        round_index: 0,
+        question_index: null,
+        armed: false,
+        streaks: [],
+        done_questions: [],
+        host_question_cursor: null,
+        double_points: false,
+      }
       const bs = buzzStateBySession.get(sessionId) || {
         winner_team_index: null,
         buzzed_member_name: null,
@@ -97,6 +120,11 @@ function createFakeQuery() {
           rows: [{
             session_id: sessionId,
             gs_armed: gs.armed,
+            gs_round_index: gs.round_index,
+            gs_question_index: gs.question_index,
+            gs_streaks: gs.streaks,
+            gs_done_questions: gs.done_questions,
+            gs_double_points: gs.double_points,
             gs_host_question_cursor: gs.host_question_cursor,
             bs_winner_team_index: bs.winner_team_index,
             bs_buzzed_member_name: bs.buzzed_member_name,
@@ -104,6 +132,7 @@ function createFakeQuery() {
             team_idx: null,
             team_name: null,
             team_color: null,
+            team_score: null,
           }],
           rowCount: 1,
         }
@@ -113,6 +142,11 @@ function createFakeQuery() {
         rows: teams.map((team) => ({
           session_id: sessionId,
           gs_armed: gs.armed,
+          gs_round_index: gs.round_index,
+          gs_question_index: gs.question_index,
+          gs_streaks: gs.streaks,
+          gs_done_questions: gs.done_questions,
+          gs_double_points: gs.double_points,
           gs_host_question_cursor: gs.host_question_cursor,
           bs_winner_team_index: bs.winner_team_index,
           bs_buzzed_member_name: bs.buzzed_member_name,
@@ -120,6 +154,7 @@ function createFakeQuery() {
           team_idx: team.idx,
           team_name: team.name,
           team_color: team.color,
+          team_score: team.score,
         })),
         rowCount: teams.length,
       }
@@ -445,6 +480,45 @@ test('state hydrates from database after in-memory cache is cleared', async () =
     assert.equal(stateSync.armed, true)
     assert.deepEqual(stateSync.hostQuestionCursor, [1, 2])
     assert.equal(stateSync.buzzedBy, null)
+  } finally {
+    await harness.close()
+  }
+})
+
+test('runtime scoreboard state persists and rehydrates after reconnect', async () => {
+  const harness = await createHarness()
+  try {
+    const host1 = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host1, sessionCode, pin)
+    await emitAck(host1, 'host:setup', TEAMS)
+
+    const runtimeUpdate = await emitAck(host1, 'host:runtime:update', {
+      teams: [
+        { name: 'Team A', color: 'ember', score: 15 },
+        { name: 'Team B', color: 'gold', score: 7 },
+      ],
+      doneQuestions: ['0-0', '0-1'],
+      streaks: [2, 1],
+      doublePoints: true,
+    })
+    assert.equal(runtimeUpdate.ok, true)
+
+    harness.getSessions().delete(sessionCode)
+
+    const host2 = await harness.connect()
+    await authHost(host2, sessionCode, pin)
+    const syncPromise = once(host2, 'state:sync')
+    const setup = await emitAck(host2, 'host:setup', TEAMS)
+    assert.equal(setup.ok, true)
+    const sync = await syncPromise
+
+    assert.equal(sync.teams[0].score, 15)
+    assert.equal(sync.teams[1].score, 7)
+    assert.deepEqual(sync.doneQuestions, ['0-0', '0-1'])
+    assert.deepEqual(sync.streaks, [2, 1])
+    assert.equal(sync.doublePoints, true)
   } finally {
     await harness.close()
   }

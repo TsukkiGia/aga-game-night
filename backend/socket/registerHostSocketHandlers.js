@@ -103,12 +103,27 @@ export function registerHostSocketHandlers(socket, ctx) {
 
       const isNewGame = JSON.stringify(normalizedTeams.map(t => t.name)) !== JSON.stringify(st.teams.map(t => t.name))
       if (isNewGame) {
-        st = { ...initialState(), teams: normalizedTeams }
+        st = {
+          ...initialState(),
+          teams: normalizedTeams.map((team) => ({ ...team, score: Number.isFinite(team.score) ? team.score : 0 })),
+          streaks: normalizedTeams.map(() => 0),
+          doneQuestions: [],
+          doublePoints: false,
+        }
         sessions.set(code, st)
         io.to(hostRoom(code)).except(socket.id).emit('game:reset')
         io.to(`${code}:members`).emit('game:reset')
       } else {
-        st.teams = normalizedTeams
+        st.teams = normalizedTeams.map((team, index) => ({
+          ...team,
+          score: Number.isFinite(st.teams[index]?.score) ? st.teams[index].score : (Number.isFinite(team.score) ? team.score : 0),
+        }))
+        st.streaks = st.teams.map((_, index) => {
+          const parsed = Number.parseInt(st.streaks?.[index], 10)
+          return Number.isInteger(parsed) && parsed > 0 ? parsed : 0
+        })
+        if (!Array.isArray(st.doneQuestions)) st.doneQuestions = []
+        st.doublePoints = Boolean(st.doublePoints)
       }
 
       await persistTeams(code, st.teams)
@@ -121,6 +136,58 @@ export function registerHostSocketHandlers(socket, ctx) {
       respond({ ok: true })
     } catch (err) {
       console.error('[host:setup]', err)
+      respond({ ok: false, error: 'server-error' })
+    }
+  })
+
+  socket.on('host:runtime:update', async (payload, callback) => {
+    const respond = typeof callback === 'function' ? callback : () => {}
+    if (!isHostController(socket)) {
+      respond({ ok: false, error: 'unauthorized' })
+      return
+    }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      respond({ ok: false, error: 'invalid-payload' })
+      return
+    }
+
+    const code = socket.data.sessionCode
+    const st = (await ensureState(code)) || getState(code)
+
+    const normalizedTeams = normalizeTeams(payload.teams)
+    if (!normalizedTeams || normalizedTeams.length !== st.teams.length) {
+      respond({ ok: false, error: 'invalid-teams' })
+      return
+    }
+
+    const normalizedDoneQuestions = Array.isArray(payload.doneQuestions)
+      ? payload.doneQuestions
+          .map((value) => String(value || '').trim())
+          .filter(Boolean)
+          .slice(0, 500)
+      : []
+
+    const normalizedStreaks = Array.isArray(payload.streaks)
+      ? st.teams.map((_, index) => {
+          const parsed = Number.parseInt(payload.streaks[index], 10)
+          return Number.isInteger(parsed) && parsed > 0 ? parsed : 0
+        })
+      : st.teams.map(() => 0)
+
+    st.teams = normalizedTeams.map((team, index) => ({
+      ...team,
+      score: Number.isFinite(team.score) ? team.score : (Number.isFinite(st.teams[index]?.score) ? st.teams[index].score : 0),
+    }))
+    st.doneQuestions = normalizedDoneQuestions
+    st.streaks = normalizedStreaks
+    st.doublePoints = Boolean(payload.doublePoints)
+
+    try {
+      await persistTeams(code, st.teams)
+      await persistRuntimeState(code, st)
+      respond({ ok: true })
+    } catch (err) {
+      console.error('[host:runtime:update]', err)
       respond({ ok: false, error: 'server-error' })
     }
   })

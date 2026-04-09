@@ -7,6 +7,7 @@ import { clearHostCredentials, readHostCredentials, writeHostCredentials } from 
 export function useGameSocket(initialTeams, options = {}) {
   const onBuzzWinner = typeof options.onBuzzWinner === 'function' ? options.onBuzzWinner : null
   const onBuzzAttempt = typeof options.onBuzzAttempt === 'function' ? options.onBuzzAttempt : null
+  const onStateSync = typeof options.onStateSync === 'function' ? options.onStateSync : null
   const [armed, setArmed] = useState(false)
   const [buzzWinner, setBuzzWinner] = useState(null)
   const [members, setMembers] = useState([])
@@ -119,6 +120,7 @@ export function useGameSocket(initialTeams, options = {}) {
               memberName: state.buzzedMemberName,
             }
       )
+      onStateSync?.(state)
     }
 
     function onDisconnect() {
@@ -213,7 +215,7 @@ export function useGameSocket(initialTeams, options = {}) {
       window.removeEventListener('pointerdown', primeAudio)
       window.removeEventListener('keydown', primeAudio)
     }
-  }, [onBuzzWinner, onBuzzAttempt, submitAuth])
+  }, [onBuzzWinner, onBuzzAttempt, onStateSync, submitAuth])
 
   function handleArm(options = {}) {
     const safeOptions = {}

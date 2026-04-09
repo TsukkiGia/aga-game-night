@@ -12,6 +12,40 @@ export function useGameState(initialTeams, options = {}) {
   const [doublePoints, setDoublePoints] = useState(false)
   const [streaks, setStreaks] = useState(() => initialTeams.map(() => 0))
 
+  function hydrateFromServer(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return
+    if (Array.isArray(snapshot.teams) && snapshot.teams.length === initialTeams.length) {
+      setTeams(snapshot.teams.map((team, index) => {
+        const fallback = initialTeams[index] || {}
+        const scoreNum = Number(team?.score)
+        const score = Number.isFinite(scoreNum) ? scoreNum : Number(fallback.score) || 0
+        return {
+          name: String(team?.name || fallback.name || `Team ${index + 1}`),
+          color: String(team?.color || fallback.color || ''),
+          score,
+        }
+      }))
+    }
+    if (Array.isArray(snapshot.doneQuestions)) {
+      const nextDone = new Set(
+        snapshot.doneQuestions
+          .map((value) => String(value || '').trim())
+          .filter(Boolean)
+      )
+      setDoneQuestions(nextDone)
+    }
+    if (Array.isArray(snapshot.streaks)) {
+      const nextStreaks = initialTeams.map((_, index) => {
+        const parsed = Number.parseInt(snapshot.streaks[index], 10)
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : 0
+      })
+      setStreaks(nextStreaks)
+    }
+    if (typeof snapshot.doublePoints === 'boolean') {
+      setDoublePoints(snapshot.doublePoints)
+    }
+  }
+
   function clearDoublePoints() {
     setDoublePoints(false)
   }
@@ -79,5 +113,19 @@ export function useGameState(initialTeams, options = {}) {
     })
   }
 
-  return { teams, streaks, doneQuestions, flashing, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetScores, resetForNewGame, toggleDone, markDone }
+  return {
+    teams,
+    streaks,
+    doneQuestions,
+    flashing,
+    doublePoints,
+    setDoublePoints,
+    clearDoublePoints,
+    adjust,
+    resetScores,
+    resetForNewGame,
+    toggleDone,
+    markDone,
+    hydrateFromServer,
+  }
 }
