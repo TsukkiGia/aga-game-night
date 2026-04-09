@@ -100,25 +100,29 @@ export function clearHostCredentials() {
   removeStorageItem(SESSION_CODE_KEY)
 }
 
-export function loadBuzzerIdentity() {
+function buzzerKey(sessionCode) {
+  return sessionCode ? `${BUZZER_PLAYER_KEY}:${sessionCode}` : BUZZER_PLAYER_KEY
+}
+
+export function loadBuzzerIdentity(sessionCode) {
   try {
-    return JSON.parse(localStorage.getItem(BUZZER_PLAYER_KEY))
+    return JSON.parse(localStorage.getItem(buzzerKey(sessionCode)))
   } catch {
     return null
   }
 }
 
-export function saveBuzzerIdentity(teamIndex, name) {
+export function saveBuzzerIdentity(teamIndex, name, sessionCode) {
   try {
-    localStorage.setItem(BUZZER_PLAYER_KEY, JSON.stringify({ teamIndex, name }))
+    localStorage.setItem(buzzerKey(sessionCode), JSON.stringify({ teamIndex, name }))
   } catch {
     // Ignore storage failures.
   }
 }
 
-export function clearBuzzerIdentity() {
+export function clearBuzzerIdentity(sessionCode) {
   try {
-    localStorage.removeItem(BUZZER_PLAYER_KEY)
+    localStorage.removeItem(buzzerKey(sessionCode))
   } catch {
     // Ignore storage failures.
   }

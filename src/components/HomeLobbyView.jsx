@@ -8,6 +8,8 @@ export default function HomeLobbyView({
   onOpenHelp,
   onOpenReactionLeaderboard,
   onNewGame,
+  newGamePending,
+  newGameError,
   onEndSession,
   endingSession,
   onStart,
@@ -24,11 +26,14 @@ export default function HomeLobbyView({
         <div className="home-actions-secondary">
           <button className="home-help-btn" onClick={onOpenHelp}>? Help</button>
           <button className="home-help-btn" onClick={onOpenReactionLeaderboard}>⏱ Reaction Times</button>
-          <button className="home-new-game-btn" onClick={onNewGame}>↺ New Game</button>
+          <button className="home-new-game-btn" onClick={onNewGame} disabled={newGamePending || endingSession}>
+            {newGamePending ? 'Resetting…' : '↺ New Game'}
+          </button>
           <button className="home-end-session-btn" onClick={onEndSession} disabled={endingSession}>
             {endingSession ? 'Ending…' : '✕ End Session'}
           </button>
         </div>
+        {newGameError && <div className="host-auth-error">{newGameError}</div>}
         <div className="home-actions-primary">
           <button className="home-start-game-btn" onClick={onStart}>▶ Start Game</button>
           <button

@@ -40,11 +40,15 @@ export function registerMemberSocketHandlers(socket, ctx) {
     const respond = typeof callback === 'function' ? callback : () => {}
     const code = String(sessionCode || '').trim().toUpperCase()
     const idx = parseInt(teamIndex, 10)
-    const name = (memberName || '').trim() || 'Anonymous'
+    const name = String(memberName || '').trim()
     debugLog(`[member:join] socket=${socket.id} session=${code} teamIndex=${idx} name="${name}"`)
 
     if (!code) {
       respond({ error: 'session-code-required' })
+      return
+    }
+    if (!name) {
+      respond({ error: 'name-required' })
       return
     }
     const st = (await ensureState(code)) || sessions.get(code)

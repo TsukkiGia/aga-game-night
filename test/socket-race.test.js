@@ -611,6 +611,29 @@ test('member:join ack includes authoritative sync state', async () => {
   }
 })
 
+test('member:join requires a non-empty name', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    await emitAck(host, 'host:setup', TEAMS)
+
+    const emptyName = await emitAck(member, 'member:join', sessionCode, 0, '')
+    assert.equal(emptyName.error, 'name-required')
+
+    const whitespaceName = await emitAck(member, 'member:join', sessionCode, 0, '   ')
+    assert.equal(whitespaceName.error, 'name-required')
+
+    const state = harness.getState(sessionCode)
+    assert.deepEqual(state.members, {})
+  } finally {
+    await harness.close()
+  }
+})
+
 test('late join sync carries eligibility metadata', async () => {
   const harness = await createHarness()
   try {

@@ -101,6 +101,8 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
   const [endingSession, setEndingSession] = useState(false)
   const [showEndSessionConfirm, setShowEndSessionConfirm] = useState(false)
   const [endSessionError, setEndSessionError] = useState('')
+  const [startingNewGame, setStartingNewGame] = useState(false)
+  const [newGameError, setNewGameError] = useState('')
   const [authForm, setAuthForm] = useState({ sessionCode: '', pin: '' })
 
   const reactionRows = useMemo(() => {
@@ -352,12 +354,37 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
   }
 
   function handleNewGame() {
-    clearDoublePoints()
-    handleDismiss()
-    setReactionStats({})
-    socket.emit('host:new-game')
-    clearAll()
-    onReset()
+    if (startingNewGame || endingSession) return
+    if (!socket.connected) {
+      setNewGameError('Not connected to server. Reconnect and try again.')
+      return
+    }
+    setNewGameError('')
+    setStartingNewGame(true)
+    socket.timeout(4000).emit('host:new-game', (err, result) => {
+      setStartingNewGame(false)
+      if (err) {
+        setNewGameError('Timed out starting a new game. Check your connection and try again.')
+        return
+      }
+      if (!result?.ok) {
+        if (result?.error === 'unauthorized') {
+          invalidateAuth('Host authorization expired. Sign in again.')
+          return
+        }
+        if (result?.error === 'session-not-found') {
+          invalidateAuth('Session is no longer active. Sign in again.')
+          return
+        }
+        setNewGameError('Could not start a new game. Please try again.')
+        return
+      }
+      clearDoublePoints()
+      handleDismiss()
+      setReactionStats({})
+      clearAll()
+      onReset()
+    })
   }
 
   function handleEndSession() {
@@ -491,6 +518,8 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
         onOpenHelp={() => setShowHelp(true)}
         onOpenReactionLeaderboard={() => setShowReactionLeaderboard(true)}
         onNewGame={handleNewGame}
+        newGamePending={startingNewGame}
+        newGameError={newGameError}
         onEndSession={handleEndSession}
         endingSession={endingSession}
         onStart={handleStart}
