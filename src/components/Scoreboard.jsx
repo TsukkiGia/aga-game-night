@@ -28,6 +28,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
   const [suddenDeath, setSuddenDeath] = useState(false)
   const [tiedTeams, setTiedTeams] = useState([])
   const [showHelp, setShowHelp] = useState(false)
+  const [endingSession, setEndingSession] = useState(false)
 
   const normalizedActiveQuestion = useMemo(() => {
     if (activeQuestion === null) return null
@@ -192,8 +193,30 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
   }
 
   function handleEndSession() {
+    if (endingSession) return
     if (!window.confirm('End this session? The session code will stop working and players will be disconnected.')) return
-    socket.emit('host:end-session', () => {
+    if (!socket.connected) {
+      window.alert('Not connected to server. Reconnect and try again.')
+      return
+    }
+
+    setEndingSession(true)
+    socket.timeout(4000).emit('host:end-session', (err, result) => {
+      if (err) {
+        setEndingSession(false)
+        window.alert('Timed out ending session. Check your connection and try again.')
+        return
+      }
+      if (!result?.ok) {
+        setEndingSession(false)
+        if (result?.error === 'unauthorized') {
+          window.alert('Host authorization expired. Refresh and sign in again.')
+        } else {
+          window.alert('Could not end session. Please try again.')
+        }
+        return
+      }
+
       clearAll()
       try { sessionStorage.clear() } catch { /* ignore */ }
       onEndSession?.()
@@ -282,7 +305,9 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
           <div className="home-actions-secondary">
             <button className="home-help-btn" onClick={() => setShowHelp(true)}>? Help</button>
             <button className="home-new-game-btn" onClick={handleNewGame}>↺ New Game</button>
-            <button className="home-end-session-btn" onClick={handleEndSession}>✕ End Session</button>
+            <button className="home-end-session-btn" onClick={handleEndSession} disabled={endingSession}>
+              {endingSession ? 'Ending…' : '✕ End Session'}
+            </button>
           </div>
           <div className="home-actions-primary">
             <button className="home-start-game-btn" onClick={handleStart}>▶ Start Game</button>
