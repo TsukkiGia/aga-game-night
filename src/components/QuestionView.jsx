@@ -5,6 +5,16 @@ import VideoBody from './VideoBody'
 import SlangBody from './SlangBody'
 import CharadesBody from './CharadesBody'
 import ThesisBody from './ThesisBody'
+import roundsData from '../rounds'
+import { buildPlanCatalog, questionItemIdFor } from '../gamePlan'
+
+const PLAN_CATALOG = buildPlanCatalog(roundsData)
+
+function isQuestionDone(doneQuestions, roundIndex, questionIndex) {
+  if (doneQuestions?.has(`${roundIndex}-${questionIndex}`)) return true
+  const itemId = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+  return Boolean(itemId && doneQuestions?.has(itemId))
+}
 
 export default function QuestionView({
   rounds, roundIndex, questionIndex, doneQuestions,
@@ -13,10 +23,16 @@ export default function QuestionView({
   stealMode, onWrongAndSteal, onManualBuzz,
   onMarkDone, onNavigate, onBack, onNext, onPrev,
   onHalftime, onWinner, onShowReactionLeaderboard, doublePoints, onToggleDouble, timerControlSignal, onTimerExpired,
+  isRoundIncluded = () => true,
+  isQuestionIncluded = () => true,
+  getRoundDisplayLabel = (ri) => `Round ${ri + 1}`,
+  getQuestionDisplayNumber = (_ri, qi) => qi + 1,
+  getQuestionTotal = (ri) => rounds[ri]?.questions?.length || 0,
 }) {
   const round = rounds[roundIndex]
   const question = round?.questions?.[questionIndex]
-  const total = round?.questions?.length || 0
+  const total = getQuestionTotal(roundIndex)
+  const displayQuestionNumber = getQuestionDisplayNumber(roundIndex, questionIndex)
   const isCharades = round?.type === 'charades'
   const isThesis   = round?.type === 'thesis'
 
@@ -69,11 +85,11 @@ export default function QuestionView({
       <div className="qv-nav">
         <button className="qv-back" onClick={onBack}>← Back</button>
         <div className="qv-heading">
-          <span className="qv-round-tag">{round.label}</span>
+          <span className="qv-round-tag">{getRoundDisplayLabel(roundIndex)}</span>
           <span className="qv-round-name">{round.name}</span>
         </div>
         <div className="qv-pagination">
-          <span className="qv-counter">Q {questionIndex + 1} / {total}</span>
+          <span className="qv-counter">Q {displayQuestionNumber} / {total}</span>
           <button className="qv-arrow" onClick={onPrev} disabled={questionIndex === 0}>‹</button>
           <button className="qv-arrow" onClick={() => { onMarkDone(); onNext() }}>›</button>
           <button className="qv-reaction-btn" onClick={onShowReactionLeaderboard}>⏱ Times</button>
@@ -137,6 +153,7 @@ export default function QuestionView({
             {sidebarOpen ? '‹' : '›'}
           </button>
           {sidebarOpen && rounds.map((r, ri) => {
+            if (!isRoundIncluded(ri)) return null
             const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis' }
             return (
               <div key={ri} className="qv-sidebar-group">
@@ -144,18 +161,20 @@ export default function QuestionView({
                   className={`qv-sidebar-round-label clickable${ri === roundIndex && questionIndex === null ? ' active-round' : ''}`}
                   onClick={() => onNavigate(ri, null)}
                 >
-                  {r.label}
+                  {getRoundDisplayLabel(ri)}
                 </button>
                 {r.questions.map((_q, qi) => {
-                  const done = doneQuestions?.has(`${ri}-${qi}`)
+                  if (!isQuestionIncluded(ri, qi)) return null
+                  const done = isQuestionDone(doneQuestions, ri, qi)
                   const active = ri === roundIndex && qi === questionIndex
+                  const displayNumber = getQuestionDisplayNumber(ri, qi)
                   return (
                     <button
                       key={qi}
                       className={`qv-sidebar-item${active ? ' active' : ''}${done ? ' done' : ''}`}
                       onClick={() => onNavigate(ri, qi)}
                     >
-                      {done ? '✓ ' : ''}{typeLabel[r.type]} {qi + 1}
+                      {done ? '✓ ' : ''}{typeLabel[r.type]} {displayNumber}
                     </button>
                   )
                 })}

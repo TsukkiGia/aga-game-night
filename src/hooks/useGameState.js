@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react'
 import { SCORES_KEY, DONE_KEY, loadScores, loadDone, clearAll, setStorageItem } from '../storage'
 import { playCorrect, playWrong } from '../sounds'
+import rounds from '../rounds'
+import { buildPlanCatalog, normalizeDoneQuestionIds, questionItemIdFor } from '../gamePlan'
 
 const STREAK_THRESHOLD = 3
+const PLAN_CATALOG = buildPlanCatalog(rounds)
+
+function resolveDoneQuestionId(valueOrRoundIndex, maybeQuestionIndex) {
+  if (Number.isInteger(valueOrRoundIndex) && Number.isInteger(maybeQuestionIndex)) {
+    return questionItemIdFor(valueOrRoundIndex, maybeQuestionIndex, PLAN_CATALOG)
+  }
+  const candidate = String(valueOrRoundIndex || '').trim()
+  if (!candidate) return null
+  if (PLAN_CATALOG.byId.get(candidate)?.type === 'question') return candidate
+  return null
+}
 
 export function useGameState(initialTeams, options = {}) {
   const onStreak = typeof options.onStreak === 'function' ? options.onStreak : null
   const [teams, setTeams] = useState(() => loadScores(initialTeams))
-  const [doneQuestions, setDoneQuestions] = useState(() => loadDone())
+  const [doneQuestions, setDoneQuestions] = useState(() => {
+    const saved = loadDone()
+    return new Set(normalizeDoneQuestionIds([...saved], PLAN_CATALOG))
+  })
   const [flashing, setFlashing] = useState(null)
   const [doublePoints, setDoublePoints] = useState(false)
   const [streaks, setStreaks] = useState(() => initialTeams.map(() => 0))
@@ -27,11 +43,7 @@ export function useGameState(initialTeams, options = {}) {
       }))
     }
     if (Array.isArray(snapshot.doneQuestions)) {
-      const nextDone = new Set(
-        snapshot.doneQuestions
-          .map((value) => String(value || '').trim())
-          .filter(Boolean)
-      )
+      const nextDone = new Set(normalizeDoneQuestionIds(snapshot.doneQuestions, PLAN_CATALOG))
       setDoneQuestions(nextDone)
     }
     if (Array.isArray(snapshot.streaks)) {
@@ -95,8 +107,9 @@ export function useGameState(initialTeams, options = {}) {
     clearDoublePoints()
   }
 
-  function toggleDone(rIdx, qIdx) {
-    const key = `${rIdx}-${qIdx}`
+  function toggleDone(valueOrRoundIndex, maybeQuestionIndex = null) {
+    const key = resolveDoneQuestionId(valueOrRoundIndex, maybeQuestionIndex)
+    if (!key) return
     setDoneQuestions(prev => {
       const next = new Set(prev)
       next.has(key) ? next.delete(key) : next.add(key)
@@ -104,8 +117,9 @@ export function useGameState(initialTeams, options = {}) {
     })
   }
 
-  function markDone(rIdx, qIdx) {
-    const key = `${rIdx}-${qIdx}`
+  function markDone(valueOrRoundIndex, maybeQuestionIndex = null) {
+    const key = resolveDoneQuestionId(valueOrRoundIndex, maybeQuestionIndex)
+    if (!key) return
     setDoneQuestions(prev => {
       const next = new Set(prev)
       next.add(key)

@@ -4,11 +4,20 @@ export const DONE_KEY            = 'scorekeeping_done'
 export const HOST_PIN_KEY        = 'scorekeeping_host_pin'
 export const SESSION_CODE_KEY    = 'scorekeeping_session_code'
 export const ACTIVE_QUESTION_KEY = 'scorekeeping_active_question'
+export const GAME_PLAN_KEY       = 'scorekeeping_game_plan'
 export const BUZZER_PLAYER_KEY   = 'sankofa_player'
 
-// Validates and normalizes a [roundIndex, questionIndex|null] cursor from storage or socket.
+// Validates and normalizes a cursor from storage or socket.
 export function normalizeQuestionCursor(rawCursor) {
   if (rawCursor === null) return null
+  if (typeof rawCursor === 'string') {
+    const normalized = rawCursor.trim()
+    return normalized || null
+  }
+  if (rawCursor && typeof rawCursor === 'object' && !Array.isArray(rawCursor)) {
+    const normalized = String(rawCursor.itemId || '').trim()
+    return normalized || null
+  }
   if (!Array.isArray(rawCursor) || rawCursor.length !== 2) return null
   const [roundIndex, questionIndex] = rawCursor
   if (!Number.isInteger(roundIndex) || roundIndex < 0) return null
@@ -149,5 +158,6 @@ export function clearAll() {
   removeStorageItem(TEAMS_KEY)
   removeStorageItem(SCORES_KEY)
   removeStorageItem(DONE_KEY)
+  removeStorageItem(GAME_PLAN_KEY)
   removeStorageItem(ACTIVE_QUESTION_KEY)
 }

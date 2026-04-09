@@ -14,6 +14,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     normalizeTeams,
     normalizeQuestionCursor,
     normalizeAllowedTeamIndices,
+    normalizeGamePlan,
     serializeEligibilityState,
     isHostAuthorized,
     isHostController,
@@ -120,6 +121,7 @@ export function registerHostSocketHandlers(socket, ctx) {
           streaks: normalizedTeams.map(() => 0),
           doneQuestions: [],
           doublePoints: false,
+          gamePlan: normalizeGamePlan(st?.gamePlan),
         }
         sessions.set(code, st)
         io.to(hostRoom(code)).except(socket.id).emit('game:reset')
@@ -135,6 +137,7 @@ export function registerHostSocketHandlers(socket, ctx) {
         })
         if (!Array.isArray(st.doneQuestions)) st.doneQuestions = []
         st.doublePoints = Boolean(st.doublePoints)
+        st.gamePlan = normalizeGamePlan(st.gamePlan)
       }
 
       await persistTeams(code, st.teams)
@@ -188,6 +191,9 @@ export function registerHostSocketHandlers(socket, ctx) {
           return Number.isInteger(parsed) && parsed > 0 ? parsed : 0
         })
       : st.teams.map(() => 0)
+    const normalizedGamePlan = Array.isArray(payload.gamePlan)
+      ? normalizeGamePlan(payload.gamePlan)
+      : normalizeGamePlan(st.gamePlan)
 
     st.teams = normalizedTeams.map((team, index) => ({
       ...team,
@@ -196,6 +202,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     st.doneQuestions = normalizedDoneQuestions
     st.streaks = normalizedStreaks
     st.doublePoints = Boolean(payload.doublePoints)
+    st.gamePlan = normalizedGamePlan
 
     try {
       await persistTeams(code, st.teams)

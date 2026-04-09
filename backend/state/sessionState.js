@@ -13,6 +13,7 @@ export function initialState() {
     streaks: [],
     doneQuestions: [],
     doublePoints: false,
+    gamePlan: [],
   }
 }
 
@@ -31,11 +32,29 @@ export function serializeMemberSyncState(st) {
 
 export function normalizeQuestionCursor(rawCursor) {
   if (rawCursor === null) return null
+  if (typeof rawCursor === 'string') {
+    const normalized = rawCursor.trim()
+    return normalized || null
+  }
   if (!Array.isArray(rawCursor) || rawCursor.length !== 2) return null
   const [roundIndex, questionIndex] = rawCursor
   if (!Number.isInteger(roundIndex) || roundIndex < 0) return null
   if (questionIndex !== null && (!Number.isInteger(questionIndex) || questionIndex < 0)) return null
   return [roundIndex, questionIndex]
+}
+
+export function normalizeGamePlan(rawPlan) {
+  if (!Array.isArray(rawPlan)) return []
+  const normalized = []
+  const seen = new Set()
+  for (const value of rawPlan) {
+    const id = String(value || '').trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    normalized.push(id)
+    if (normalized.length >= 500) break
+  }
+  return normalized
 }
 
 export function normalizeTeams(rawTeams) {

@@ -5,14 +5,18 @@ import BuzzerPage from './components/BuzzerPage'
 import HostMobilePage from './components/HostMobilePage'
 import SessionGate from './components/SessionGate'
 import SplashScreen from './components/SplashScreen'
-import { TEAMS_KEY, normalizeSavedTeams, getStorageItem, setStorageItem } from './storage'
+import GameConfig from './components/GameConfig'
+import { TEAMS_KEY, GAME_PLAN_KEY, ACTIVE_QUESTION_KEY, normalizeSavedTeams, getStorageItem, setStorageItem } from './storage'
 import { useWakeLock } from './hooks/useWakeLock'
 import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong, playHelloGetDown, playOhNoNo, playDontProvokeMe, playWhyAreYouRunning } from './sounds'
+import rounds from './rounds'
+import { buildPlanCatalog, normalizePlanIdsWithRoundIntros } from './gamePlan'
 import './App.css'
 
 const pathname = window.location.pathname
 const isBuzzerMode = pathname.startsWith('/buzz')
 const isHostMobileMode = pathname.startsWith('/host-mobile')
+const PLAN_CATALOG = buildPlanCatalog(rounds)
 
 
 function loadTeams() {
@@ -24,10 +28,21 @@ function loadTeams() {
   }
 }
 
+function loadGamePlan() {
+  try {
+    const parsed = JSON.parse(getStorageItem(GAME_PLAN_KEY) || 'null')
+    return normalizePlanIdsWithRoundIntros(parsed, PLAN_CATALOG, { fallbackToDefault: true })
+  } catch {
+    return normalizePlanIdsWithRoundIntros(null, PLAN_CATALOG, { fallbackToDefault: true })
+  }
+}
+
 export default function App() {
   const [splashDone, setSplashDone] = useState(false)
   const [session, setSession] = useState(null) // { code, pin } | null
   const [teams, setTeams] = useState(() => loadTeams())
+  const [gamePlanIds, setGamePlanIds] = useState(() => loadGamePlan())
+  const [needsPlanConfig, setNeedsPlanConfig] = useState(false)
   useWakeLock(true)
 
   useEffect(() => {
@@ -64,11 +79,23 @@ export default function App() {
   function handleStart(newTeams) {
     setStorageItem(TEAMS_KEY, JSON.stringify(newTeams))
     setTeams(newTeams)
+    setGamePlanIds(loadGamePlan())
+    setNeedsPlanConfig(true)
+  }
+
+  function handlePlanConfirm(nextPlanIds) {
+    setStorageItem(GAME_PLAN_KEY, JSON.stringify(nextPlanIds))
+    // Fresh game config should always start from home, never reuse a stale cursor.
+    setStorageItem(ACTIVE_QUESTION_KEY, JSON.stringify(null))
+    setGamePlanIds(nextPlanIds)
+    setNeedsPlanConfig(false)
   }
 
   function handleSession(code, pin) {
     setSession({ code, pin })
     setTeams(loadTeams())
+    setGamePlanIds(loadGamePlan())
+    setNeedsPlanConfig(false)
   }
 
   if (isBuzzerMode) return <BuzzerPage />
@@ -92,8 +119,29 @@ export default function App() {
           <SessionGate onSession={handleSession} />
         ) : !teams ? (
           <Setup onStart={handleStart} />
+        ) : needsPlanConfig ? (
+          <GameConfig
+            initialPlanIds={gamePlanIds}
+            onConfirm={handlePlanConfirm}
+            onBack={() => {
+              setNeedsPlanConfig(false)
+              setTeams(null)
+            }}
+          />
         ) : (
-          <Scoreboard teams={teams} onReset={() => setTeams(null)} onEndSession={() => { setTeams(null); setSession(null) }} />
+          <Scoreboard
+            teams={teams}
+            initialPlanIds={gamePlanIds}
+            onReset={() => {
+              setTeams(null)
+              setGamePlanIds(loadGamePlan())
+            }}
+            onEndSession={() => {
+              setTeams(null)
+              setSession(null)
+              setGamePlanIds(loadGamePlan())
+            }}
+          />
         )}
       </main>
 

@@ -1,4 +1,4 @@
-import { initialState, normalizeAllowedTeamIndices, normalizeQuestionCursor } from './sessionState.js'
+import { initialState, normalizeAllowedTeamIndices, normalizeQuestionCursor, normalizeGamePlan } from './sessionState.js'
 
 export function createRuntimeStore({ queryFn, sessions }) {
   function getState(code) {
@@ -17,6 +17,7 @@ export function createRuntimeStore({ queryFn, sessions }) {
           gs.streaks AS gs_streaks,
           gs.done_questions AS gs_done_questions,
           gs.double_points AS gs_double_points,
+          gs.game_plan AS gs_game_plan,
           gs.host_question_cursor AS gs_host_question_cursor,
           bs.winner_team_index AS bs_winner_team_index,
           bs.buzzed_member_name AS bs_buzzed_member_name,
@@ -59,6 +60,7 @@ export function createRuntimeStore({ queryFn, sessions }) {
     })
 
     next.doublePoints = Boolean(first.gs_double_points)
+    next.gamePlan = normalizeGamePlan(first.gs_game_plan)
 
     next.armed = Boolean(first.gs_armed)
 
@@ -83,7 +85,12 @@ export function createRuntimeStore({ queryFn, sessions }) {
       }
     }
     if (typeof rawCursor === 'string') {
-      try { rawCursor = JSON.parse(rawCursor) } catch { rawCursor = null }
+      const trimmed = rawCursor.trim()
+      if (trimmed.startsWith('[') || trimmed.startsWith('{') || trimmed.startsWith('"')) {
+        try { rawCursor = JSON.parse(trimmed) } catch { rawCursor = trimmed }
+      } else {
+        rawCursor = trimmed
+      }
     }
     next.hostQuestionCursor = normalizeQuestionCursor(rawCursor)
 
@@ -129,6 +136,7 @@ export function createRuntimeStore({ queryFn, sessions }) {
     const doneQuestions = Array.isArray(st.doneQuestions)
       ? st.doneQuestions.map((k) => String(k || '').trim()).filter(Boolean)
       : []
+    const gamePlan = normalizeGamePlan(st.gamePlan)
     await queryFn(
       `
         INSERT INTO game_state (
@@ -139,9 +147,10 @@ export function createRuntimeStore({ queryFn, sessions }) {
           streaks,
           done_questions,
           host_question_cursor,
-          double_points
+          double_points,
+          game_plan
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)
         ON CONFLICT (session_id)
         DO UPDATE SET
           round_index = EXCLUDED.round_index,
@@ -150,9 +159,10 @@ export function createRuntimeStore({ queryFn, sessions }) {
           streaks = EXCLUDED.streaks,
           done_questions = EXCLUDED.done_questions,
           host_question_cursor = EXCLUDED.host_question_cursor,
-          double_points = EXCLUDED.double_points
+          double_points = EXCLUDED.double_points,
+          game_plan = EXCLUDED.game_plan
       `,
-      [code, roundIndex, questionIndex, st.armed, streaks, doneQuestions, hostQuestionCursor, Boolean(st.doublePoints)]
+      [code, roundIndex, questionIndex, st.armed, streaks, doneQuestions, hostQuestionCursor, Boolean(st.doublePoints), gamePlan]
     )
     await queryFn(
       `

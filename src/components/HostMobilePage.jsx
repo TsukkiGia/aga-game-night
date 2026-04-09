@@ -3,6 +3,7 @@ import rounds from '../rounds'
 import { socket } from '../socket'
 import { mapHostAuthError } from '../auth'
 import { normalizeQuestionCursor, readHostCredentials, writeHostCredentials, clearHostCredentials } from '../storage'
+import { buildPlanCatalog, defaultPlanIds, normalizeCursorId } from '../gamePlan'
 
 const SOUND_BUTTONS = [
   { label: 'Crickets', key: 'crickets' },
@@ -31,11 +32,17 @@ const SHOW_SOUND_STATUS = (() => {
   return /^(1|true|yes)$/i.test(queryDebug.trim())
 })()
 
-const normalizeCursor = normalizeQuestionCursor
+const PLAN_CATALOG = buildPlanCatalog(rounds)
+const DEFAULT_PLAN_IDS = defaultPlanIds(PLAN_CATALOG)
+
+function normalizeCursor(rawCursor) {
+  const normalized = normalizeQuestionCursor(rawCursor)
+  return normalizeCursorId(normalized, DEFAULT_PLAN_IDS, PLAN_CATALOG)
+}
 
 function extractAnswerView(activeQuestion) {
-  const cursor = normalizeCursor(activeQuestion)
-  if (cursor === null) {
+  const cursorId = normalizeCursor(activeQuestion)
+  if (cursorId === null) {
     return {
       status: 'waiting',
       heading: 'Waiting for question',
@@ -44,7 +51,18 @@ function extractAnswerView(activeQuestion) {
     }
   }
 
-  const [roundIndex, questionIndex] = cursor
+  const item = PLAN_CATALOG.byId.get(cursorId)
+  if (!item) {
+    return {
+      status: 'invalid',
+      heading: 'Invalid cursor',
+      roundLabel: '',
+      rows: [],
+    }
+  }
+
+  const roundIndex = item.roundIndex
+  const questionIndex = item.questionIndex
   const round = rounds[roundIndex]
   if (!round) {
     return {
@@ -55,7 +73,7 @@ function extractAnswerView(activeQuestion) {
     }
   }
 
-  if (questionIndex === null) {
+  if (item.type === 'round-intro') {
     return {
       status: 'intro',
       heading: `${round.label} — ${round.name}`,

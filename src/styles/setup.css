@@ -207,3 +207,216 @@
   font-weight: 700;
   margin: 0;
 }
+
+/* Game config */
+.game-config-step {
+  max-width: 920px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #faf8f4 100%);
+}
+
+.game-config-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 auto 16px;
+  max-width: 620px;
+}
+
+.game-config-metric {
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  box-shadow: var(--shadow-sm);
+}
+
+.game-config-metric-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 800;
+}
+
+.game-config-metric-value {
+  margin-top: 4px;
+  font-size: var(--text-lg);
+  font-weight: 900;
+  color: var(--text);
+}
+
+.game-config-metric-muted .game-config-metric-value {
+  color: var(--teal);
+}
+
+.game-config-rounds {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.game-config-round-card {
+  --gc-accent: var(--terra);
+  --gc-accent-bg: var(--terra-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: white;
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.game-config-round-card.off {
+  opacity: 0.78;
+}
+
+.game-config-round-card.type-video {
+  --gc-accent: var(--indigo);
+  --gc-accent-bg: var(--indigo-bg);
+}
+
+.game-config-round-card.type-charades {
+  --gc-accent: var(--terra);
+  --gc-accent-bg: var(--terra-bg);
+}
+
+.game-config-round-card.type-slang {
+  --gc-accent: var(--teal);
+  --gc-accent-bg: var(--teal-bg);
+}
+
+.game-config-round-card.type-thesis {
+  --gc-accent: var(--amber);
+  --gc-accent-bg: var(--amber-bg);
+}
+
+.game-config-round-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.game-config-round-title-wrap {
+  min-width: 0;
+}
+
+.game-config-round-pill {
+  display: inline-block;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 900;
+  color: var(--gc-accent);
+  background: var(--gc-accent-bg);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 999px;
+  padding: 3px 8px;
+  margin-bottom: 6px;
+}
+
+.game-config-round-title {
+  font-size: var(--text-lg);
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.game-config-round-meta {
+  margin-top: 3px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.game-config-round-action {
+  border: 1px solid var(--gc-accent);
+  background: var(--gc-accent-bg);
+  color: var(--gc-accent);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: var(--text-sm);
+  font-weight: 800;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.game-config-round-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.game-config-question-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.game-config-question-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px 6px 8px;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  background: #fcfbf9;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.game-config-question-item:hover {
+  border-color: var(--gc-accent);
+  color: var(--text);
+}
+
+.game-config-question-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 900;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: white;
+}
+
+.game-config-question-item.selected {
+  border-color: var(--gc-accent);
+  background: var(--gc-accent-bg);
+  color: var(--text);
+}
+
+.game-config-question-item.selected .game-config-question-check {
+  border-color: var(--gc-accent);
+  background: var(--gc-accent);
+  color: white;
+}
+
+@media (max-width: 820px) {
+  .game-config-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .game-config-round-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .game-config-round-action {
+    width: 100%;
+  }
+}

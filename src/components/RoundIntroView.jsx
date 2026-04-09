@@ -1,11 +1,25 @@
 import { useState } from 'react'
 import QRImg from './QRImg'
 import MemberRoster from './MemberRoster'
+import roundsData from '../rounds'
+import { buildPlanCatalog, questionItemIdFor } from '../gamePlan'
+
+const PLAN_CATALOG = buildPlanCatalog(roundsData)
+
+function isQuestionDone(doneQuestions, roundIndex, questionIndex) {
+  if (doneQuestions?.has(`${roundIndex}-${questionIndex}`)) return true
+  const itemId = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+  return Boolean(itemId && doneQuestions?.has(itemId))
+}
 
 export default function RoundIntroView({
   rounds, roundIndex, doneQuestions,
   teams, members, buzzerUrl,
   onNavigate, onBack,
+  isRoundIncluded = () => true,
+  isQuestionIncluded = () => true,
+  getRoundDisplayLabel = (ri) => `Round ${ri + 1}`,
+  getQuestionDisplayNumber = (_ri, qi) => qi + 1,
 }) {
   const round = rounds[roundIndex]
   const [qrOpen, setQrOpen] = useState(false)
@@ -17,7 +31,7 @@ export default function RoundIntroView({
       <div className="qv-nav">
         <button className="qv-back" onClick={onBack}>← Back</button>
         <div className="qv-heading">
-          <span className="qv-round-tag">{round.label}</span>
+          <span className="qv-round-tag">{getRoundDisplayLabel(roundIndex)}</span>
           <span className="qv-round-name">{round.name}</span>
         </div>
         <div />
@@ -27,12 +41,22 @@ export default function RoundIntroView({
       <div className="qv-main">
 
         {/* Left sidebar */}
-        <Sidebar rounds={rounds} roundIndex={roundIndex} activeQIdx={null} doneQuestions={doneQuestions} onNavigate={onNavigate} />
+        <Sidebar
+          rounds={rounds}
+          roundIndex={roundIndex}
+          activeQIdx={null}
+          doneQuestions={doneQuestions}
+          onNavigate={onNavigate}
+          isRoundIncluded={isRoundIncluded}
+          isQuestionIncluded={isQuestionIncluded}
+          getRoundDisplayLabel={getRoundDisplayLabel}
+          getQuestionDisplayNumber={getQuestionDisplayNumber}
+        />
 
         {/* Intro content */}
         <div className="qv-body">
           <div className="round-intro">
-            <div className="round-intro-tag">{round.label}</div>
+            <div className="round-intro-tag">{getRoundDisplayLabel(roundIndex)}</div>
             <h2 className="round-intro-name">{round.name}</h2>
             <p className="round-intro-blurb">{round.intro}</p>
 
@@ -95,10 +119,21 @@ export default function RoundIntroView({
   )
 }
 
-function Sidebar({ rounds, roundIndex, activeQIdx, doneQuestions, onNavigate }) {
+function Sidebar({
+  rounds,
+  roundIndex,
+  activeQIdx,
+  doneQuestions,
+  onNavigate,
+  isRoundIncluded,
+  isQuestionIncluded,
+  getRoundDisplayLabel,
+  getQuestionDisplayNumber,
+}) {
   return (
     <div className="qv-sidebar">
       {rounds.map((r, ri) => {
+        if (!isRoundIncluded(ri)) return null
         const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis' }
         return (
           <div key={ri} className="qv-sidebar-group">
@@ -106,18 +141,20 @@ function Sidebar({ rounds, roundIndex, activeQIdx, doneQuestions, onNavigate }) 
               className={`qv-sidebar-round-label clickable${ri === roundIndex && activeQIdx === null ? ' active-round' : ''}`}
               onClick={() => onNavigate(ri, null)}
             >
-              {r.label}
+              {getRoundDisplayLabel(ri)}
             </button>
             {r.questions.map((_q, qi) => {
-              const done = doneQuestions?.has(`${ri}-${qi}`)
+              if (!isQuestionIncluded(ri, qi)) return null
+              const done = isQuestionDone(doneQuestions, ri, qi)
               const active = ri === roundIndex && qi === activeQIdx
+              const displayNumber = getQuestionDisplayNumber(ri, qi)
               return (
                 <button
                   key={qi}
                   className={`qv-sidebar-item${active ? ' active' : ''}${done ? ' done' : ''}`}
                   onClick={() => onNavigate(ri, qi)}
                 >
-                  {done ? '✓ ' : ''}{typeLabel[r.type]} {qi + 1}
+                  {done ? '✓ ' : ''}{typeLabel[r.type]} {displayNumber}
                 </button>
               )
             })}

@@ -13,6 +13,7 @@ export default function HomeLobbyView({
   onEndSession,
   endingSession,
   onStart,
+  startDisabled,
   armed,
   buzzWinner,
   onArm,
@@ -35,7 +36,7 @@ export default function HomeLobbyView({
         </div>
         {newGameError && <div className="host-auth-error">{newGameError}</div>}
         <div className="home-actions-primary">
-          <button className="home-start-game-btn" onClick={onStart}>▶ Start Game</button>
+          <button className="home-start-game-btn" onClick={onStart} disabled={startDisabled}>▶ Start Game</button>
           <button
             className={`arm-btn ${armed ? 'armed' : ''}`}
             onClick={onArm}

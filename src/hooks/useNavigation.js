@@ -11,7 +11,7 @@ function loadActiveQuestion() {
 }
 
 export function useNavigation() {
-  const [activeQuestion, setActiveQuestion] = useState(() => loadActiveQuestion())  // [rIdx, qIdx|null] | null
+  const [activeQuestion, setActiveQuestion] = useState(() => loadActiveQuestion())  // cursor id | null
   const [questionsOpen, setQuestionsOpen] = useState(false)
   const [transition, setTransition] = useState(null)  // round object | null
 
@@ -19,21 +19,14 @@ export function useNavigation() {
     setStorageItem(ACTIVE_QUESTION_KEY, JSON.stringify(activeQuestion))
   }, [activeQuestion])
 
-  // navigate(null)        → back to main scoreboard
-  // navigate(rIdx, null)  → round intro (with transition)
-  // navigate(rIdx, qIdx)  → specific question
-  function navigate(rIdx, qIdx = null, rounds = null, silent = false) {
+  // navigate(null) -> back to main scoreboard
+  // navigate(itemId, { transitionRound, silent })
+  function navigate(nextCursor, options = {}) {
+    const { transitionRound = null, silent = false } = options
     setQuestionsOpen(false)
-    if (rIdx === null) {
-      setActiveQuestion(null)
-    } else if (qIdx === null && rounds) {
-      if (!silent) playTransition()
-      setTransition(rounds[rIdx])
-      setActiveQuestion([rIdx, null])
-    } else {
-      if (!silent) playTransition()
-      setActiveQuestion([rIdx, qIdx])
-    }
+    if (!silent && nextCursor !== null) playTransition()
+    if (transitionRound) setTransition(transitionRound)
+    setActiveQuestion(nextCursor)
   }
 
   function dismissTransition() { setTransition(null) }

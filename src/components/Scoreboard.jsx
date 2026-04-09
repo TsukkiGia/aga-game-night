@@ -17,12 +17,22 @@ import { useGameSocket } from '../hooks/useGameSocket'
 import { useNavigation } from '../hooks/useNavigation'
 import { clearAll, clearHostCredentials } from '../storage'
 import { playGameStart } from '../sounds'
+import {
+  buildPlanCatalog,
+  normalizePlanIdsWithRoundIntros,
+  normalizeCursorId,
+  normalizeDoneQuestionIds,
+  resolveEffectivePlanForSync,
+  firstQuestionIdInRound,
+  questionItemIdFor,
+} from '../gamePlan'
 
 const RUNTIME_PERSIST_TIMEOUT_MS = 3000
 const RUNTIME_PERSIST_RETRY_BASE_MS = 600
 const RUNTIME_PERSIST_RETRY_MAX_MS = 5000
+const PLAN_CATALOG = buildPlanCatalog(rounds)
 
-export default function Scoreboard({ teams: initialTeams, onReset, onEndSession }) {
+export default function Scoreboard({ teams: initialTeams, initialPlanIds, onReset, onEndSession }) {
   const emitStreak = useCallback(({ teamIndex, streakCount }) => {
     socket.emit('host:streak', { teamIndex, streakCount })
   }, [])
@@ -82,14 +92,6 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
     markDone,
     hydrateFromServer,
   } = useGameState(initialTeams, { onStreak: emitStreak })
-  const handleRuntimeSync = useCallback((serverState) => {
-    hydrateFromServer(serverState)
-    runtimeHydratedRef.current = true
-  }, [hydrateFromServer])
-  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal, invalidateAuth } = useGameSocket(
-    initialTeams,
-    { onBuzzAttempt: handleBuzzAttemptForLeaderboard, onStateSync: handleRuntimeSync }
-  )
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
   const [showWinner, setShowWinner] = useState(false)
@@ -104,41 +106,120 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
   const [startingNewGame, setStartingNewGame] = useState(false)
   const [newGameError, setNewGameError] = useState('')
   const [authForm, setAuthForm] = useState({ sessionCode: '', pin: '' })
+  const [gamePlanIds, setGamePlanIds] = useState(() =>
+    normalizePlanIdsWithRoundIntros(initialPlanIds, PLAN_CATALOG, { fallbackToDefault: true })
+  )
 
   const reactionRows = useMemo(() => {
     return Object.values(reactionStats)
       .sort((a, b) => a.bestMs - b.bestMs)
   }, [reactionStats])
 
-  const normalizedActiveQuestion = useMemo(() => {
-    if (activeQuestion === null) return null
-    if (!Array.isArray(activeQuestion) || activeQuestion.length !== 2) return null
-    const [rawRoundIndex, rawQuestionIndex] = activeQuestion
-    if (!Number.isInteger(rawRoundIndex) || rawRoundIndex < 0 || rawRoundIndex >= rounds.length) return null
-    const round = rounds[rawRoundIndex]
-    if (rawQuestionIndex === null) return [rawRoundIndex, null]
-    if (!Number.isInteger(rawQuestionIndex) || rawQuestionIndex < 0 || rawQuestionIndex >= round.questions.length) {
-      return [rawRoundIndex, null]
+  const normalizedPlanIds = useMemo(
+    () => normalizePlanIdsWithRoundIntros(gamePlanIds, PLAN_CATALOG, { fallbackToDefault: true }),
+    [gamePlanIds]
+  )
+  const planIdSet = useMemo(() => new Set(normalizedPlanIds), [normalizedPlanIds])
+  const plannedItems = useMemo(
+    () => normalizedPlanIds.map((id) => PLAN_CATALOG.byId.get(id)).filter(Boolean),
+    [normalizedPlanIds]
+  )
+  const activeQuestionId = useMemo(
+    () => normalizeCursorId(activeQuestion, normalizedPlanIds, PLAN_CATALOG),
+    [activeQuestion, normalizedPlanIds]
+  )
+  const activeItem = useMemo(
+    () => (activeQuestionId ? PLAN_CATALOG.byId.get(activeQuestionId) || null : null),
+    [activeQuestionId]
+  )
+  const activePlanIndex = useMemo(
+    () => (activeQuestionId ? normalizedPlanIds.indexOf(activeQuestionId) : -1),
+    [activeQuestionId, normalizedPlanIds]
+  )
+  const activeLegacyPair = useMemo(
+    () => (activeItem ? [activeItem.roundIndex, activeItem.questionIndex] : null),
+    [activeItem]
+  )
+  const [activeRoundIndex, activeQuestionIndex] = activeLegacyPair || [null, null]
+  const plannedRoundIndexSet = useMemo(() => {
+    const set = new Set()
+    plannedItems.forEach((item) => set.add(item.roundIndex))
+    return set
+  }, [plannedItems])
+  const hasPlannedQuestions = plannedItems.some((item) => item.type === 'question')
+  const planDisplay = useMemo(() => {
+    const roundDisplayNumberByIndex = new Map()
+    const questionDisplayNumberByItemId = new Map()
+    const questionTotalByRound = new Map()
+    let roundCounter = 0
+    for (const item of plannedItems) {
+      if (!roundDisplayNumberByIndex.has(item.roundIndex)) {
+        roundCounter += 1
+        roundDisplayNumberByIndex.set(item.roundIndex, roundCounter)
+      }
+      if (item.type !== 'question') continue
+      const nextNumber = (questionTotalByRound.get(item.roundIndex) || 0) + 1
+      questionTotalByRound.set(item.roundIndex, nextNumber)
+      questionDisplayNumberByItemId.set(item.id, nextNumber)
     }
-    return [rawRoundIndex, rawQuestionIndex]
-  }, [activeQuestion])
+    return {
+      roundDisplayNumberByIndex,
+      questionDisplayNumberByItemId,
+      questionTotalByRound,
+    }
+  }, [plannedItems])
+  const getRoundDisplayLabel = useCallback((roundIndex) => {
+    const displayNumber = planDisplay.roundDisplayNumberByIndex.get(roundIndex) || (roundIndex + 1)
+    return `Round ${displayNumber}`
+  }, [planDisplay])
+  const getQuestionDisplayNumber = useCallback((roundIndex, questionIndex) => {
+    const id = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+    if (!id) return questionIndex + 1
+    return planDisplay.questionDisplayNumberByItemId.get(id) || (questionIndex + 1)
+  }, [planDisplay])
+  const getQuestionTotal = useCallback((roundIndex) => {
+    return planDisplay.questionTotalByRound.get(roundIndex) || (rounds[roundIndex]?.questions?.length || 0)
+  }, [planDisplay])
+  const transitionRoundLabel = useMemo(() => {
+    if (!transition) return null
+    const idx = rounds.findIndex((round) => round?.id === transition?.id)
+    if (idx < 0) return transition.label
+    return getRoundDisplayLabel(idx)
+  }, [transition, getRoundDisplayLabel])
+
+  const handleRuntimeSync = useCallback((serverState) => {
+    const effectivePlan = resolveEffectivePlanForSync(serverState?.gamePlan, normalizedPlanIds, PLAN_CATALOG)
+
+    // On brand-new "New Game" flows, server state can temporarily have an empty
+    // plan before the client's selected plan is persisted. Keep local plan in
+    // that window to avoid remapping UI back to default ordering.
+    setGamePlanIds(effectivePlan)
+    const normalizedDone = normalizeDoneQuestionIds(serverState?.doneQuestions, PLAN_CATALOG)
+    hydrateFromServer({ ...serverState, doneQuestions: normalizedDone })
+    const nextCursor = normalizeCursorId(serverState?.hostQuestionCursor, effectivePlan, PLAN_CATALOG)
+    navigate(nextCursor, { silent: true })
+    runtimeHydratedRef.current = true
+  }, [hydrateFromServer, navigate, normalizedPlanIds])
+
+  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal, invalidateAuth } = useGameSocket(
+    initialTeams,
+    { onBuzzAttempt: handleBuzzAttemptForLeaderboard, onStateSync: handleRuntimeSync }
+  )
 
   useEffect(() => {
     if (activeQuestion === null) return
-    if (normalizedActiveQuestion === null) {
-      navigate(null)
+    if (activeQuestionId === null) {
+      navigate(null, { silent: true })
       return
     }
-    const [aRound, aQuestion] = activeQuestion
-    const [nRound, nQuestion] = normalizedActiveQuestion
-    if (aRound !== nRound || aQuestion !== nQuestion) {
-      navigate(nRound, nQuestion, rounds, true)
+    if (activeQuestion !== activeQuestionId) {
+      navigate(activeQuestionId, { silent: true })
     }
-  }, [activeQuestion, normalizedActiveQuestion, navigate])
+  }, [activeQuestion, activeQuestionId, navigate])
 
   useEffect(() => {
-    syncHostQuestion(normalizedActiveQuestion)
-  }, [normalizedActiveQuestion, hostReady, syncHostQuestion])
+    syncHostQuestion(activeQuestionId)
+  }, [activeQuestionId, hostReady, syncHostQuestion])
 
   useEffect(() => {
     if (!hostReady) runtimeHydratedRef.current = false
@@ -155,6 +236,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
       doneQuestions: [...doneQuestions],
       streaks: [...streaks],
       doublePoints: Boolean(doublePoints),
+      gamePlan: normalizedPlanIds,
     }
 
     let cancelled = false
@@ -190,7 +272,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
       cancelled = true
       if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [hostReady, teams, doneQuestions, streaks, doublePoints, invalidateAuth])
+  }, [hostReady, teams, doneQuestions, streaks, doublePoints, normalizedPlanIds, invalidateAuth])
 
   function handleTiebreaker(winners) {
     setShowWinner(false)
@@ -252,29 +334,51 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  if (normalizedActiveQuestion !== null) {
-    const [rIdx, qIdx] = normalizedActiveQuestion
-    function dismissBuzzAndResetMultiplier() {
-      clearDoublePoints()
-      handleDismiss()
-    }
-    function navigateWithReset(ri, qi = null) {
-      const currentQuestionKey = Number.isInteger(qIdx) ? `${rIdx}-${qIdx}` : null
-      const nextQuestionKey = Number.isInteger(qi) ? `${ri}-${qi}` : null
-      if (nextQuestionKey && nextQuestionKey !== currentQuestionKey) {
-        setReactionStats({})
-      }
-      clearDoublePoints()
-      handleDismiss()
-      navigate(ri, qi, rounds)
-    }
-    function goBack() {
-      dismissBuzzAndResetMultiplier()
-      setLaunching(false)
-      navigate(null)
-    }
+  function dismissBuzzAndResetMultiplier() {
+    clearDoublePoints()
+    handleDismiss()
+  }
 
-    if (qIdx === null) {
+  function navigateToCursor(nextCursorId, options = {}) {
+    const { clearBuzz = true, transitionRound = null, silent = false } = options
+    const currentQuestionId = activeItem?.type === 'question' ? activeItem.id : null
+    const nextItem = nextCursorId ? PLAN_CATALOG.byId.get(nextCursorId) : null
+    if (nextItem?.type === 'question' && nextItem.id !== currentQuestionId) {
+      setReactionStats({})
+    }
+    if (clearBuzz) {
+      clearDoublePoints()
+      handleDismiss()
+    }
+    navigate(nextCursorId, { transitionRound, silent })
+  }
+
+  function navigateWithReset(roundIndex, questionIndex = null) {
+    if (questionIndex === null) {
+      const introId = PLAN_CATALOG.introIdByRoundIndex.get(roundIndex)
+      if (!introId || !planIdSet.has(introId)) return
+      navigateToCursor(introId, { transitionRound: rounds[roundIndex] })
+      return
+    }
+    const directId = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+    if (directId && planIdSet.has(directId)) {
+      navigateToCursor(directId)
+      return
+    }
+    const fallback = firstQuestionIdInRound(roundIndex, normalizedPlanIds, PLAN_CATALOG)
+    if (fallback) navigateToCursor(fallback)
+  }
+
+  function goBack() {
+    dismissBuzzAndResetMultiplier()
+    setLaunching(false)
+    navigate(null, { silent: true })
+  }
+
+  if (activeItem !== null) {
+    const rIdx = activeRoundIndex
+    const qIdx = activeQuestionIndex
+    if (activeItem.type === 'round-intro') {
       return (
         <>
           <RoundIntroView
@@ -286,8 +390,15 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
             buzzerUrl={buzzerUrl}
             onNavigate={navigateWithReset}
             onBack={goBack}
+            isRoundIncluded={(roundIndex) => plannedRoundIndexSet.has(roundIndex)}
+            isQuestionIncluded={(roundIndex, questionIndex) => {
+              const id = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+              return Boolean(id && planIdSet.has(id))
+            }}
+            getRoundDisplayLabel={getRoundDisplayLabel}
+            getQuestionDisplayNumber={getQuestionDisplayNumber}
           />
-          {transition && <RoundTransitionScreen round={transition} onDone={dismissTransition} />}
+          {transition && <RoundTransitionScreen round={transition} roundLabel={transitionRoundLabel} onDone={dismissTransition} />}
           <ReactionLeaderboardModal
             open={showReactionLeaderboard}
             rows={reactionRows}
@@ -300,7 +411,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
     return (
       <>
         <QuestionView
-          key={`${rIdx}-${qIdx}`}
+          key={activeItem.id}
           rounds={rounds}
           roundIndex={rIdx}
           questionIndex={qIdx}
@@ -317,22 +428,39 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
           stealMode={stealMode}
           onWrongAndSteal={(allowedTeamIndices) => handleWrongAndSteal(allowedTeamIndices)}
           onManualBuzz={(i) => handleManualBuzz(i, teams)}
-          onMarkDone={() => { clearDoublePoints(); markDone(rIdx, qIdx) }}
+          onMarkDone={() => { clearDoublePoints(); markDone(activeItem.id) }}
           onNavigate={navigateWithReset}
           onBack={goBack}
           onNext={() => {
-            const isLastQuestion = qIdx === rounds[rIdx].questions.length - 1
-            const isLastRound = rIdx === rounds.length - 1
-            if (isLastQuestion && isLastRound) setShowWinner(true)
-            else if (isLastQuestion) navigateWithReset(rIdx + 1, null)
-            else navigateWithReset(rIdx, qIdx + 1)
+            const next = plannedItems[activePlanIndex + 1] || null
+            if (!next) {
+              setShowWinner(true)
+              return
+            }
+            navigateToCursor(next.id, {
+              transitionRound: next.type === 'round-intro' ? rounds[next.roundIndex] : null,
+            })
           }}
-          onPrev={() => navigateWithReset(rIdx, qIdx - 1)}
+          onPrev={() => {
+            const prev = plannedItems[activePlanIndex - 1] || null
+            if (!prev) return
+            navigateToCursor(prev.id, {
+              transitionRound: prev.type === 'round-intro' ? rounds[prev.roundIndex] : null,
+            })
+          }}
           onHalftime={() => setShowHalftime(true)}
           onWinner={() => setShowWinner(true)}
           onShowReactionLeaderboard={() => setShowReactionLeaderboard(true)}
           doublePoints={doublePoints}
           onToggleDouble={() => setDoublePoints(d => !d)}
+          isRoundIncluded={(roundIndex) => plannedRoundIndexSet.has(roundIndex)}
+          isQuestionIncluded={(roundIndex, questionIndex) => {
+            const id = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+            return Boolean(id && planIdSet.has(id))
+          }}
+          getRoundDisplayLabel={getRoundDisplayLabel}
+          getQuestionDisplayNumber={getQuestionDisplayNumber}
+          getQuestionTotal={getQuestionTotal}
         />
         {showHalftime && <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />}
         {showWinner   && <WinnerScreen   teams={teams} onDismiss={() => setShowWinner(false)} onClose={() => { setShowWinner(false); clearAll(); onReset() }} onTiebreaker={handleTiebreaker} />}
@@ -347,10 +475,21 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
   }
 
   function handleStart() {
+    if (!hasPlannedQuestions) {
+      setNewGameError('No questions are selected in this game plan.')
+      return
+    }
     resetForNewGame()
     setLaunching(true)
     playGameStart()
-    setTimeout(() => navigate(0, null, rounds, true), 600)
+    const firstItem = plannedItems[0] || null
+    setTimeout(() => {
+      if (!firstItem) return
+      navigate(firstItem.id, {
+        transitionRound: firstItem.type === 'round-intro' ? rounds[firstItem.roundIndex] : null,
+        silent: true,
+      })
+    }, 600)
   }
 
   function handleNewGame() {
@@ -523,6 +662,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
         onEndSession={handleEndSession}
         endingSession={endingSession}
         onStart={handleStart}
+        startDisabled={!hasPlannedQuestions}
         armed={armed}
         buzzWinner={buzzWinner}
         onArm={handleArm}
