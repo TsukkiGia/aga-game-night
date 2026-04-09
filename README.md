@@ -45,7 +45,7 @@ Built with **React + Vite** on the frontend and **Express + Socket.io** on the b
 
 ## Getting Started
 
-Prerequisite: Node 18+.
+Prerequisite: Node 20.19+ (or Node 22.12+).
 
 ### Install dependencies
 

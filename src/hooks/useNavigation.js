@@ -1,18 +1,10 @@
 import { useEffect, useState } from 'react'
 import { playTransition } from '../sounds'
-
-const ACTIVE_QUESTION_KEY = 'scorekeeping_active_question'
+import { ACTIVE_QUESTION_KEY, normalizeQuestionCursor, getStorageItem, setStorageItem } from '../storage'
 
 function loadActiveQuestion() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(ACTIVE_QUESTION_KEY) || 'null')
-    if (parsed === null) return null
-    if (!Array.isArray(parsed) || parsed.length !== 2) return null
-
-    const [roundIndex, questionIndex] = parsed
-    const validRound = Number.isInteger(roundIndex) && roundIndex >= 0
-    const validQuestion = questionIndex === null || (Number.isInteger(questionIndex) && questionIndex >= 0)
-    return validRound && validQuestion ? [roundIndex, questionIndex] : null
+    return normalizeQuestionCursor(JSON.parse(getStorageItem(ACTIVE_QUESTION_KEY) || 'null'))
   } catch {
     return null
   }
@@ -24,11 +16,7 @@ export function useNavigation() {
   const [transition, setTransition] = useState(null)  // round object | null
 
   useEffect(() => {
-    try {
-      localStorage.setItem(ACTIVE_QUESTION_KEY, JSON.stringify(activeQuestion))
-    } catch {
-      // Ignore storage failures; navigation still works in-memory.
-    }
+    setStorageItem(ACTIVE_QUESTION_KEY, JSON.stringify(activeQuestion))
   }, [activeQuestion])
 
   // navigate(null)        → back to main scoreboard

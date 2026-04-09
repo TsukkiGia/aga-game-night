@@ -82,6 +82,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
   function handleSuddenDeathCancel() {
     handleDismiss()
     setSuddenDeath(false)
+    setTiedTeams([])
     setShowWinner(true)
   }
 
@@ -135,6 +136,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
     return (
       <>
         <QuestionView
+          key={`${rIdx}-${qIdx}`}
           rounds={rounds}
           roundIndex={rIdx}
           questionIndex={qIdx}
@@ -151,7 +153,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
           stealMode={stealMode}
           onWrongAndSteal={(allowedTeamIndices) => handleWrongAndSteal(allowedTeamIndices)}
           onManualBuzz={(i) => handleManualBuzz(i, teams)}
-          onMarkDone={() => markDone(rIdx, qIdx)}
+          onMarkDone={() => { clearDoublePoints(); markDone(rIdx, qIdx) }}
           onNavigate={navigateWithReset}
           onBack={goBack}
           onNext={() => {

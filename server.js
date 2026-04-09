@@ -30,7 +30,9 @@ function isHostController(socket) {
 }
 
 function normalizeHostRole(rawRole) {
-  return rawRole === 'companion' ? 'companion' : 'controller'
+  if (rawRole === 'companion') return 'companion'
+  if (rawRole === 'controller') return 'controller'
+  return null
 }
 
 const ALLOWED_SOUND_KEYS = new Set([
@@ -42,6 +44,18 @@ const ALLOWED_SOUND_KEYS = new Set([
 function getSoundResultTimeoutMs() {
   const raw = Number.parseInt(process.env.SFX_RESULT_TIMEOUT_MS || '', 10)
   if (!Number.isInteger(raw) || raw < 250) return 4000
+  return raw
+}
+
+function getAuthWindowMs() {
+  const raw = Number.parseInt(process.env.HOST_AUTH_WINDOW_MS || '', 10)
+  if (!Number.isInteger(raw) || raw < 1000) return 60_000
+  return raw
+}
+
+function getAuthMaxAttempts() {
+  const raw = Number.parseInt(process.env.HOST_AUTH_MAX_ATTEMPTS || '', 10)
+  if (!Number.isInteger(raw) || raw < 1) return 8
   return raw
 }
 
@@ -114,6 +128,37 @@ export function createBuzzServer({ queryFn = query } = {}) {
   // Per-session in-memory state — keyed by sessionCode
   const sessions = new Map()
   const pendingSoundResults = new Map()
+  const authAttempts = new Map()
+
+  function authAttemptKey(socket) {
+    return String(socket.handshake.address || socket.id || 'unknown')
+  }
+
+  function isAuthRateLimited(socket) {
+    const key = authAttemptKey(socket)
+    const rec = authAttempts.get(key)
+    if (!rec) return false
+    if ((Date.now() - rec.windowStart) > getAuthWindowMs()) {
+      authAttempts.delete(key)
+      return false
+    }
+    return rec.count >= getAuthMaxAttempts()
+  }
+
+  function noteAuthAttempt(socket, ok) {
+    const key = authAttemptKey(socket)
+    if (ok) {
+      authAttempts.delete(key)
+      return
+    }
+    const now = Date.now()
+    const rec = authAttempts.get(key)
+    if (!rec || (now - rec.windowStart) > getAuthWindowMs()) {
+      authAttempts.set(key, { windowStart: now, count: 1 })
+      return
+    }
+    rec.count += 1
+  }
 
   function getState(code) {
     if (!sessions.has(code)) sessions.set(code, initialState())
@@ -199,8 +244,19 @@ export function createBuzzServer({ queryFn = query } = {}) {
       const pin  = String(payload?.pin || '').trim()
       const role = normalizeHostRole(payload?.role)
 
+      if (isAuthRateLimited(socket)) {
+        respond({ ok: false, error: 'rate-limited' })
+        return
+      }
+
       if (!code || !pin) {
+        noteAuthAttempt(socket, false)
         respond({ ok: false, error: 'missing-credentials' })
+        return
+      }
+      if (!role) {
+        noteAuthAttempt(socket, false)
+        respond({ ok: false, error: 'invalid-role' })
         return
       }
       try {
@@ -208,9 +264,17 @@ export function createBuzzServer({ queryFn = query } = {}) {
           "SELECT pin_hash FROM sessions WHERE id = $1 AND status = 'active'",
           [code]
         )
-        if (rows.length === 0) { respond({ ok: false, error: 'session-not-found' }); return }
+        if (rows.length === 0) {
+          noteAuthAttempt(socket, false)
+          respond({ ok: false, error: 'session-not-found' })
+          return
+        }
         const valid = await bcrypt.compare(pin, rows[0].pin_hash)
-        if (!valid) { respond({ ok: false, error: 'unauthorized' }); return }
+        if (!valid) {
+          noteAuthAttempt(socket, false)
+          respond({ ok: false, error: 'unauthorized' })
+          return
+        }
 
         socket.data.isHost = true
         socket.data.hostRole = role
@@ -218,6 +282,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
         socket.join(hostRoom(code))
         socket.leave(ctrlRoom(code))
         if (role === 'controller') socket.join(ctrlRoom(code))
+        noteAuthAttempt(socket, true)
         respond({ ok: true })
       } catch (err) {
         console.error('[host:auth]', err)
@@ -228,7 +293,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
     // ── Host: register teams ────────────────────────────────────────────
     socket.on('host:setup', (teams, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
-      if (!isHostAuthorized(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
+      if (!isHostController(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
       const code = socket.data.sessionCode
       const normalizedTeams = normalizeTeams(teams)
       if (!normalizedTeams) { respond({ ok: false, error: 'invalid-teams' }); return }
@@ -253,7 +318,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
     // ── Host: question cursor ───────────────────────────────────────────
     socket.on('host:question:set', (rawCursor, callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
-      if (!isHostAuthorized(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
+      if (!isHostController(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
       const cursor = normalizeQuestionCursor(rawCursor)
       if (cursor === null && rawCursor !== null) { respond({ ok: false, error: 'invalid-cursor' }); return }
       const st = getState(socket.data.sessionCode)
@@ -270,7 +335,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
 
     socket.on('host:end-session', async (callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
-      if (!isHostAuthorized(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
+      if (!isHostController(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
       const code = socket.data.sessionCode
       try {
         await queryFn("UPDATE sessions SET status = 'ended' WHERE id = $1", [code])
@@ -286,7 +351,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
 
     socket.on('host:new-game', (callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
-      if (!isHostAuthorized(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
+      if (!isHostController(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
       const code = socket.data.sessionCode
       sessions.set(code, initialState())
       const st = getState(code)
@@ -366,14 +431,23 @@ export function createBuzzServer({ queryFn = query } = {}) {
 
     socket.on('host:timer:expired', () => {
       if (!isHostController(socket)) return
-      io.to(hostRoom(socket.data.sessionCode)).emit('host:timer:expired')
+      const code = socket.data.sessionCode
+      const st = getState(code)
+      // Auto-reset buzzers so the next question can receive buzzes
+      st.armed = false
+      st.buzzedBy = null
+      st.buzzedMemberName = null
+      st.allowedTeamIndices = null
+      io.to(hostRoom(code)).emit('host:timer:expired')
+      io.to(hostRoom(code)).emit('buzz:reset')
+      io.to(`${code}:members`).emit('buzz:reset')
     })
 
     // ── Buzzers ─────────────────────────────────────────────────────────
     socket.on('host:arm', (arg1, arg2) => {
       const options = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}
       const respond = typeof arg1 === 'function' ? arg1 : (typeof arg2 === 'function' ? arg2 : () => {})
-      if (!isHostAuthorized(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
+      if (!isHostController(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
       const code = socket.data.sessionCode
       const st = getState(code)
       const allowedIndices = normalizeAllowedTeamIndices(options.allowedTeamIndices, st.teams.length)
@@ -388,7 +462,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
 
     socket.on('host:reset', (callback) => {
       const respond = typeof callback === 'function' ? callback : () => {}
-      if (!isHostAuthorized(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
+      if (!isHostController(socket)) { respond({ ok: false, error: 'unauthorized' }); return }
       const code = socket.data.sessionCode
       const st = getState(code)
       debugLog(`[host:reset]`)

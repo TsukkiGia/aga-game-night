@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import rounds from '../rounds'
 import { socket } from '../socket'
-import { HOST_PIN_KEY, SESSION_CODE_KEY } from '../storage'
+import { HOST_PIN_KEY, SESSION_CODE_KEY, normalizeQuestionCursor } from '../storage'
 
 const SOUND_BUTTONS = [
   { label: 'Crickets', key: 'crickets' },
@@ -30,15 +30,7 @@ const SHOW_SOUND_STATUS = (() => {
   return /^(1|true|yes)$/i.test(queryDebug.trim())
 })()
 
-// Mirrors normalizeQuestionCursor() in server.js — keep in sync.
-function normalizeCursor(rawCursor) {
-  if (rawCursor === null) return null
-  if (!Array.isArray(rawCursor) || rawCursor.length !== 2) return null
-  const [roundIndex, questionIndex] = rawCursor
-  if (!Number.isInteger(roundIndex) || roundIndex < 0) return null
-  if (questionIndex !== null && (!Number.isInteger(questionIndex) || questionIndex < 0)) return null
-  return [roundIndex, questionIndex]
-}
+const normalizeCursor = normalizeQuestionCursor
 
 function getStored(key) {
   try { return sessionStorage.getItem(key) || '' } catch { return '' }
@@ -216,6 +208,8 @@ export default function HostMobilePage() {
           if (!canPrompt) { setErrorMsg('Invalid session code or PIN'); return }
           if (result?.error === 'session-not-found') {
             setErrorMsg('Session not found. Check the session code.')
+          } else if (result?.error === 'rate-limited') {
+            setErrorMsg('Too many PIN attempts. Wait a minute and try again.')
           } else {
             setErrorMsg('Incorrect PIN.')
           }

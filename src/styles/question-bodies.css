@@ -10,6 +10,17 @@
   max-width: 820px;
 }
 
+.qv-video-error {
+  width: min(100%, 960px);
+  border: 1.5px solid #f2c5bc;
+  background: #fff5f2;
+  color: #9d2f17;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .qv-video {
   width: auto;
   max-width: 100%;

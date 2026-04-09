@@ -5,7 +5,7 @@ import BuzzerPage from './components/BuzzerPage'
 import HostMobilePage from './components/HostMobilePage'
 import SessionGate from './components/SessionGate'
 import SplashScreen from './components/SplashScreen'
-import { TEAMS_KEY } from './storage'
+import { TEAMS_KEY, normalizeSavedTeams, getStorageItem, setStorageItem } from './storage'
 import { useWakeLock } from './hooks/useWakeLock'
 import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong, playHelloGetDown, playOhNoNo, playDontProvokeMe, playWhyAreYouRunning } from './sounds'
 import './App.css'
@@ -14,24 +14,10 @@ const pathname = window.location.pathname
 const isBuzzerMode = pathname.startsWith('/buzz')
 const isHostMobileMode = pathname.startsWith('/host-mobile')
 
-function normalizeSavedTeams(raw) {
-  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 8) return null
-  const normalized = raw.map((team) => {
-    if (!team || typeof team !== 'object') return null
-    const name = String(team.name || '').trim()
-    const color = String(team.color || '').trim()
-    const scoreNum = Number(team.score)
-    const score = Number.isFinite(scoreNum) ? scoreNum : 0
-    if (!name || !color) return null
-    return { name, color, score }
-  })
-  if (normalized.some((team) => team === null)) return null
-  return normalized
-}
 
 function loadTeams() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(TEAMS_KEY))
+    const parsed = JSON.parse(getStorageItem(TEAMS_KEY) || 'null')
     return normalizeSavedTeams(parsed)
   } catch {
     return null
@@ -76,8 +62,13 @@ export default function App() {
   }, [])
 
   function handleStart(newTeams) {
-    localStorage.setItem(TEAMS_KEY, JSON.stringify(newTeams))
+    setStorageItem(TEAMS_KEY, JSON.stringify(newTeams))
     setTeams(newTeams)
+  }
+
+  function handleSession(code, pin) {
+    setSession({ code, pin })
+    setTeams(loadTeams())
   }
 
   if (isBuzzerMode) return <BuzzerPage />
@@ -98,7 +89,7 @@ export default function App() {
 
       <main className="app-main">
         {!session ? (
-          <SessionGate onSession={(code, pin) => setSession({ code, pin })} />
+          <SessionGate onSession={handleSession} />
         ) : !teams ? (
           <Setup onStart={handleStart} />
         ) : (

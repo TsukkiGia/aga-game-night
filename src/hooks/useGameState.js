@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { SCORES_KEY, DONE_KEY, loadScores, loadDone, clearAll } from '../storage'
+import { SCORES_KEY, DONE_KEY, loadScores, loadDone, clearAll, setStorageItem } from '../storage'
 import { playCorrect, playWrong } from '../sounds'
 
 const STREAK_THRESHOLD = 3
@@ -19,11 +19,11 @@ export function useGameState(initialTeams, options = {}) {
   useEffect(() => {
     const s = {}
     teams.forEach((t, i) => { s[i] = t.score })
-    localStorage.setItem(SCORES_KEY, JSON.stringify(s))
+    setStorageItem(SCORES_KEY, JSON.stringify(s))
   }, [teams])
 
   useEffect(() => {
-    localStorage.setItem(DONE_KEY, JSON.stringify([...doneQuestions]))
+    setStorageItem(DONE_KEY, JSON.stringify([...doneQuestions]))
   }, [doneQuestions])
 
   function adjust(index, delta) {

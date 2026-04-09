@@ -202,7 +202,7 @@ export default function BuzzerPage() {
               maxLength={24}
               autoComplete="off"
             />
-            <button className="buzzer-join-btn" type="submit" disabled={selectedIndex === null || !name.trim()}>
+            <button className="buzzer-join-btn" type="submit" disabled={selectedIndex === null}>
               Join Team →
             </button>
           </form>

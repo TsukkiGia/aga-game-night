@@ -66,6 +66,7 @@ export default function VideoBody({ question, paused }) {
   const videoRef = useRef(null)
   const iframeRef = useRef(null)
   const [revealed, setRevealed] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const videoPath = String(question.video || '').trim().replace(/^\/+/, '')
   const youtubeEmbedUrl = toYouTubeEmbedUrl(videoPath)
   const isYouTube = Boolean(youtubeEmbedUrl)
@@ -90,6 +91,11 @@ export default function VideoBody({ question, paused }) {
 
   return (
     <div className="qv-video-wrap">
+      {loadError && (
+        <div className="qv-video-error">
+          {loadError}
+        </div>
+      )}
       {isYouTube ? (
         <div className="qv-video-yt-mask">
           <iframe
@@ -100,10 +106,17 @@ export default function VideoBody({ question, paused }) {
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             referrerPolicy="strict-origin-when-cross-origin"
             allowFullScreen
+            onError={() => setLoadError('Could not load this YouTube video. Check the URL or choose another clip.')}
           />
         </div>
       ) : (
-        <video ref={videoRef} className="qv-video" src={videoSrc} controls />
+        <video
+          ref={videoRef}
+          className="qv-video"
+          src={videoSrc}
+          controls
+          onError={() => setLoadError(`Could not load local video "${videoPath}". Add it to /public/videos or switch to a YouTube link.`)}
+        />
       )}
       {!revealed ? (
         <button className="qv-reveal-btn" onClick={() => { playTransition(); setRevealed(true) }}>Reveal Answer ▼</button>

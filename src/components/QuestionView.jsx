@@ -17,6 +17,29 @@ export default function QuestionView({
   const round = rounds[roundIndex]
   const question = round?.questions?.[questionIndex]
   const total = round?.questions?.length || 0
+  const isCharades = round?.type === 'charades'
+  const isThesis   = round?.type === 'thesis'
+
+  const activePair = isCharades
+    ? new Set([(questionIndex * 2) % teams.length, (questionIndex * 2 + 1) % teams.length])
+    : isThesis
+    ? new Set([questionIndex % teams.length])
+    : null
+
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  function defaultStealSelection() {
+    const allTeams = new Set(teams.map((_, i) => i))
+    if (!isCharades) return allTeams
+    const firstActive = (questionIndex * 2) % teams.length
+    const secondActive = (questionIndex * 2 + 1) % teams.length
+    allTeams.delete(firstActive)
+    allTeams.delete(secondActive)
+    return allTeams
+  }
+  const [stealPickerOpen, setStealPickerOpen] = useState(false)
+  const [stealSelected, setStealSelected] = useState(() => defaultStealSelection())
+  const [correctGiven, setCorrectGiven] = useState(false)
+
   if (!round || !question) {
     return (
       <div className="question-view">
@@ -36,37 +59,6 @@ export default function QuestionView({
         </div>
       </div>
     )
-  }
-
-  const isCharades = round.type === 'charades'
-  const isThesis   = round.type === 'thesis'
-
-  const activePair = isCharades
-    ? new Set([(questionIndex * 2) % teams.length, (questionIndex * 2 + 1) % teams.length])
-    : isThesis
-    ? new Set([questionIndex % teams.length])
-    : null
-
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  function defaultStealSelection() {
-    const allTeams = new Set(teams.map((_, i) => i))
-    if (!isCharades) return allTeams
-    const firstActive = (questionIndex * 2) % teams.length
-    const secondActive = (questionIndex * 2 + 1) % teams.length
-    allTeams.delete(firstActive)
-    allTeams.delete(secondActive)
-    return allTeams
-  }
-  const questionKey = `${roundIndex}-${questionIndex}`
-  const [lastKey, setLastKey] = useState(questionKey)
-  const [stealPickerOpen, setStealPickerOpen] = useState(false)
-  const [stealSelected, setStealSelected] = useState(() => defaultStealSelection())
-  const [correctGiven, setCorrectGiven] = useState(false)
-  if (lastKey !== questionKey) {
-    setLastKey(questionKey)
-    setStealPickerOpen(false)
-    setStealSelected(defaultStealSelection())
-    setCorrectGiven(false)
   }
 
   return (

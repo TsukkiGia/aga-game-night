@@ -42,6 +42,8 @@ export function useGameSocket(initialTeams) {
           if (!canPrompt) return
           if (authResult?.error === 'session-not-found') {
             window.alert('Session not found. Check the session code.')
+          } else if (authResult?.error === 'rate-limited') {
+            window.alert('Too many PIN attempts. Wait a minute and try again.')
           } else {
             window.alert('Incorrect PIN.')
           }
@@ -134,7 +136,10 @@ export function useGameSocket(initialTeams) {
     socket.on('state:sync',   syncState)
     socket.on('buzz:armed',   () => setArmed(true))
     socket.on('buzz:reset',   () => { setArmed(false); setBuzzWinner(null) })
-    socket.on('buzz:winner',  (data) => { setArmed(false); setBuzzWinner(data); playBuzzIn() })
+    socket.on('buzz:winner',  (data) => {
+      if (!data || typeof data.teamIndex !== 'number' || !data.team?.name || !data.team?.color) return
+      setArmed(false); setBuzzWinner(data); playBuzzIn()
+    })
     socket.on('host:members', (data) => setMembers(data))
     socket.on('host:sfx:play', onRemoteSound)
     socket.on('host:timer:stop', onTimerStop)

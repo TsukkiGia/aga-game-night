@@ -460,6 +460,45 @@ test('host question cursor sync requires auth and broadcasts updates', async () 
   }
 })
 
+test('companion cannot run controller-only gameplay mutations', async () => {
+  const harness = await createHarness()
+  try {
+    const controller = await harness.connect()
+    const companion = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(controller, sessionCode, pin)
+    await authCompanion(companion, sessionCode, pin)
+    await emitAck(controller, 'host:setup', TEAMS)
+
+    const setup = await emitAck(companion, 'host:setup', TEAMS)
+    assert.equal(setup.ok, false)
+    assert.equal(setup.error, 'unauthorized')
+
+    const setQuestion = await emitAck(companion, 'host:question:set', [0, 0])
+    assert.equal(setQuestion.ok, false)
+    assert.equal(setQuestion.error, 'unauthorized')
+
+    const arm = await emitAck(companion, 'host:arm')
+    assert.equal(arm.ok, false)
+    assert.equal(arm.error, 'unauthorized')
+
+    const reset = await emitAck(companion, 'host:reset')
+    assert.equal(reset.ok, false)
+    assert.equal(reset.error, 'unauthorized')
+
+    const newGame = await emitAck(companion, 'host:new-game')
+    assert.equal(newGame.ok, false)
+    assert.equal(newGame.error, 'unauthorized')
+
+    const endSession = await emitAck(companion, 'host:end-session')
+    assert.equal(endSession.ok, false)
+    assert.equal(endSession.error, 'unauthorized')
+  } finally {
+    await harness.close()
+  }
+})
+
 test('controller can broadcast streak status to host companions', async () => {
   const harness = await createHarness()
   try {
