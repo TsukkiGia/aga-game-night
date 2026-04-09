@@ -45,13 +45,21 @@ export default function BuzzerPage() {
   useEffect(() => {
     socket.connect()
 
+    function refreshAvailableTeams() {
+      socket.emit('member:get-teams', sessionCode, (res) => {
+        if (Array.isArray(res?.teams)) {
+          setAvailableTeams(res.teams)
+          return
+        }
+        setAvailableTeams([])
+      })
+    }
+
     function onConnect() {
       setConnected(true)
 
       // Always fetch teams for the join screen
-      socket.emit('member:get-teams', sessionCode, (res) => {
-        if (res?.teams) setAvailableTeams(res.teams)
-      })
+      refreshAvailableTeams()
 
       // Auto-rejoin from saved data on initial connect
       const saved = loadBuzzerIdentity()
@@ -66,6 +74,7 @@ export default function BuzzerPage() {
           if (res?.error) {
             clearBuzzerIdentity()
             setStatus('join')
+            refreshAvailableTeams()
             return
           }
           setTeam(res.team)
@@ -83,7 +92,9 @@ export default function BuzzerPage() {
       setTeam(null)
       setTeamIndex(null)
       setSelectedIndex(null)
+      setAvailableTeams([])
       setStatus('join')
+      refreshAvailableTeams()
     })
     socket.on('buzz:armed', (payload) => {
       const sync = (payload && typeof payload === 'object')
@@ -150,7 +161,10 @@ export default function BuzzerPage() {
     if (selectedIndex === null) return
     setJoinError('')
     socket.emit('member:join', sessionCode, selectedIndex, memberName, (res) => {
-      if (res?.error) return
+      if (res?.error) {
+        if (res?.error === 'session-not-found') setAvailableTeams([])
+        return
+      }
       saveBuzzerIdentity(res.teamIndex, memberName)
       setTeam(res.team)
       setTeamIndex(res.teamIndex)

@@ -82,7 +82,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
     hydrateFromServer(serverState)
     runtimeHydratedRef.current = true
   }, [hydrateFromServer])
-  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal } = useGameSocket(
+  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal, invalidateAuth } = useGameSocket(
     initialTeams,
     { onBuzzAttempt: handleBuzzAttemptForLeaderboard, onStateSync: handleRuntimeSync }
   )
@@ -346,7 +346,9 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
       if (!result?.ok) {
         setEndingSession(false)
         if (result?.error === 'unauthorized') {
-          setEndSessionError('Host authorization expired. Sign in again.')
+          setShowEndSessionConfirm(false)
+          setEndSessionError('')
+          invalidateAuth('Host authorization expired. Sign in again.')
         } else {
           setEndSessionError('Could not end session. Please try again.')
         }

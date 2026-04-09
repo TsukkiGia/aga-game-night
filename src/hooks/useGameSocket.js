@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { socket } from '../socket'
 import { playBuzzIn, playArm, playSoundBiteByKey, unlockAudio } from '../sounds'
 import { mapHostAuthError } from '../auth'
@@ -8,6 +8,15 @@ export function useGameSocket(initialTeams, options = {}) {
   const onBuzzWinner = typeof options.onBuzzWinner === 'function' ? options.onBuzzWinner : null
   const onBuzzAttempt = typeof options.onBuzzAttempt === 'function' ? options.onBuzzAttempt : null
   const onStateSync = typeof options.onStateSync === 'function' ? options.onStateSync : null
+  const onBuzzWinnerRef = useRef(onBuzzWinner)
+  const onBuzzAttemptRef = useRef(onBuzzAttempt)
+  const onStateSyncRef = useRef(onStateSync)
+
+  useEffect(() => {
+    onBuzzWinnerRef.current = onBuzzWinner
+    onBuzzAttemptRef.current = onBuzzAttempt
+    onStateSyncRef.current = onStateSync
+  }, [onBuzzWinner, onBuzzAttempt, onStateSync])
   const [armed, setArmed] = useState(false)
   const [buzzWinner, setBuzzWinner] = useState(null)
   const [members, setMembers] = useState([])
@@ -120,7 +129,7 @@ export function useGameSocket(initialTeams, options = {}) {
               memberName: state.buzzedMemberName,
             }
       )
-      onStateSync?.(state)
+      onStateSyncRef.current?.(state)
     }
 
     function onDisconnect() {
@@ -186,12 +195,12 @@ export function useGameSocket(initialTeams, options = {}) {
       setArmed(false)
       setBuzzWinner(data)
       playBuzzIn()
-      onBuzzWinner?.(data)
+      onBuzzWinnerRef.current?.(data)
     })
     socket.on('buzz:attempt', (data) => {
       if (!data || typeof data.teamIndex !== 'number' || !data.team?.name || !data.team?.color) return
       if (!Number.isFinite(data.reactionMs)) return
-      onBuzzAttempt?.(data)
+      onBuzzAttemptRef.current?.(data)
     })
     socket.on('host:members', (data) => setMembers(data))
     socket.on('host:sfx:play', onRemoteSound)
@@ -215,7 +224,7 @@ export function useGameSocket(initialTeams, options = {}) {
       window.removeEventListener('pointerdown', primeAudio)
       window.removeEventListener('keydown', primeAudio)
     }
-  }, [onBuzzWinner, onBuzzAttempt, onStateSync, submitAuth])
+  }, [submitAuth])
 
   function handleArm(options = {}) {
     const safeOptions = {}
@@ -274,6 +283,16 @@ export function useGameSocket(initialTeams, options = {}) {
     socket.emit('host:question:set', activeQuestion)
   }, [hostReady])
 
+  const invalidateAuth = useCallback((message = 'Host authorization expired. Sign in again.') => {
+    setHostReady(false)
+    setAuthState((prev) => ({
+      required: true,
+      error: message,
+      sessionCode: prev.sessionCode || sessionCode || '',
+      authenticating: false,
+    }))
+  }, [sessionCode])
+
   return {
     armed,
     buzzWinner,
@@ -290,5 +309,6 @@ export function useGameSocket(initialTeams, options = {}) {
     handleRearm,
     syncHostQuestion,
     timerControlSignal,
+    invalidateAuth,
   }
 }
