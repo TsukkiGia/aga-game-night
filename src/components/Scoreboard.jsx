@@ -18,6 +18,10 @@ import { useNavigation } from '../hooks/useNavigation'
 import { clearAll, clearHostCredentials } from '../storage'
 import { playGameStart } from '../sounds'
 
+const RUNTIME_PERSIST_TIMEOUT_MS = 3000
+const RUNTIME_PERSIST_RETRY_BASE_MS = 600
+const RUNTIME_PERSIST_RETRY_MAX_MS = 5000
+
 export default function Scoreboard({ teams: initialTeams, onReset, onEndSession }) {
   const emitStreak = useCallback(({ teamIndex, streakCount }) => {
     socket.emit('host:streak', { teamIndex, streakCount })
@@ -150,8 +154,41 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
       streaks: [...streaks],
       doublePoints: Boolean(doublePoints),
     }
-    socket.emit('host:runtime:update', payload)
-  }, [hostReady, teams, doneQuestions, streaks, doublePoints])
+
+    let cancelled = false
+    let retryCount = 0
+    let retryTimer = null
+
+    function scheduleRetry() {
+      if (cancelled) return
+      const delay = Math.min(
+        RUNTIME_PERSIST_RETRY_MAX_MS,
+        RUNTIME_PERSIST_RETRY_BASE_MS * (2 ** Math.min(retryCount, 4))
+      )
+      retryCount += 1
+      retryTimer = setTimeout(send, delay)
+    }
+
+    function send() {
+      if (cancelled) return
+      socket.timeout(RUNTIME_PERSIST_TIMEOUT_MS).emit('host:runtime:update', payload, (err, result) => {
+        if (cancelled) return
+        if (!err && result?.ok) return
+        if (result?.error === 'unauthorized') {
+          invalidateAuth('Host authorization expired while saving game state. Sign in again.')
+          return
+        }
+        scheduleRetry()
+      })
+    }
+
+    send()
+
+    return () => {
+      cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+    }
+  }, [hostReady, teams, doneQuestions, streaks, doublePoints, invalidateAuth])
 
   function handleTiebreaker(winners) {
     setShowWinner(false)
