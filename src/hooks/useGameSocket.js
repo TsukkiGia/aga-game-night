@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { socket } from '../socket'
 import { playBuzzIn, playArm, playSoundBiteByKey, unlockAudio } from '../sounds'
-import { HOST_PIN_KEY, SESSION_CODE_KEY } from '../storage'
+import { mapHostAuthError } from '../auth'
+import { clearHostCredentials, readHostCredentials, writeHostCredentials } from '../storage'
 
 export function useGameSocket(initialTeams, options = {}) {
   const onBuzzWinner = typeof options.onBuzzWinner === 'function' ? options.onBuzzWinner : null
@@ -12,60 +13,99 @@ export function useGameSocket(initialTeams, options = {}) {
   const [stealMode, setStealMode] = useState(false)
   const [hostReady, setHostReady] = useState(false)
   const [timerControlSignal, setTimerControlSignal] = useState({ sequence: 0, action: null })
-
-  useEffect(() => {
-    function getStored(key) {
-      try { return localStorage.getItem(key) || '' } catch { return '' }
+  const [sessionCode, setSessionCode] = useState(() => readHostCredentials()?.sessionCode || '')
+  const [authState, setAuthState] = useState(() => {
+    const saved = readHostCredentials()
+    return {
+      required: !saved,
+      error: saved ? '' : 'Enter session code and host PIN.',
+      sessionCode: saved?.sessionCode || '',
+      authenticating: false,
     }
-    function setStored(key, val) {
-      try { localStorage.setItem(key, val) } catch { /* ignore */ }
+  })
+
+  const submitAuth = useCallback((sessionCodeInput, pinInput, options = {}) => {
+    const showAuthUi = options?.showAuthUi !== false
+    const normalizedSessionCode = String(sessionCodeInput || '').trim().toUpperCase()
+    const normalizedPin = String(pinInput || '').trim()
+    if (!normalizedSessionCode || !normalizedPin) {
+      setHostReady(false)
+      setSessionCode('')
+      setAuthState({
+        required: true,
+        error: 'Session code and host PIN are required.',
+        sessionCode: normalizedSessionCode,
+        authenticating: false,
+      })
+      return Promise.resolve({ ok: false, error: 'missing-credentials' })
     }
-    function clearStored(...keys) {
-      try { keys.forEach(k => localStorage.removeItem(k)) } catch { /* ignore */ }
-    }
 
-    function authenticateAndSetup() {
-      const sessionCode = getStored(SESSION_CODE_KEY)
-      const pin = getStored(HOST_PIN_KEY)
+    setAuthState((prev) => ({
+      required: showAuthUi ? true : prev.required,
+      error: '',
+      sessionCode: normalizedSessionCode,
+      authenticating: true,
+    }))
 
-      if (sessionCode && pin) {
-        tryAuth(sessionCode, pin, /* canPrompt */ true)
-        return
-      }
-
-      promptAndAuth()
-    }
-
-    function tryAuth(sessionCode, pin, canPrompt) {
-      socket.emit('host:auth', { sessionCode, pin, role: 'controller' }, (authResult) => {
+    return new Promise((resolve) => {
+      socket.emit('host:auth', { sessionCode: normalizedSessionCode, pin: normalizedPin, role: 'controller' }, (authResult) => {
         if (!authResult?.ok) {
           setHostReady(false)
-          clearStored(SESSION_CODE_KEY, HOST_PIN_KEY)
-          if (!canPrompt) return
-          if (authResult?.error === 'session-not-found') {
-            window.alert('Session not found. Check the session code.')
-          } else if (authResult?.error === 'rate-limited') {
-            window.alert('Too many PIN attempts. Wait a minute and try again.')
-          } else {
-            window.alert('Incorrect PIN.')
-          }
-          promptAndAuth()
+          setSessionCode('')
+          clearHostCredentials()
+          setAuthState({
+            required: true,
+            error: mapHostAuthError(authResult?.error),
+            sessionCode: normalizedSessionCode,
+            authenticating: false,
+          })
+          resolve({ ok: false, error: authResult?.error || 'unauthorized' })
           return
         }
-        setStored(SESSION_CODE_KEY, sessionCode)
-        setStored(HOST_PIN_KEY, pin)
+
+        writeHostCredentials(normalizedSessionCode, normalizedPin)
+        setSessionCode(normalizedSessionCode)
         socket.emit('host:setup', initialTeams, (setupResult) => {
-          setHostReady(Boolean(setupResult?.ok))
+          if (!setupResult?.ok) {
+            setHostReady(false)
+            setAuthState({
+              required: true,
+              error: 'Could not initialize host session. Try again.',
+              sessionCode: normalizedSessionCode,
+              authenticating: false,
+            })
+            resolve({ ok: false, error: 'setup-failed' })
+            return
+          }
+
+          setHostReady(true)
+          setAuthState({
+            required: false,
+            error: '',
+            sessionCode: normalizedSessionCode,
+            authenticating: false,
+          })
+          resolve({ ok: true })
         })
       })
-    }
+    })
+  }, [initialTeams])
 
-    function promptAndAuth() {
-      const sessionCode = (window.prompt('Enter session code') || '').trim().toUpperCase()
-      if (!sessionCode) return
-      const pin = (window.prompt('Enter host PIN') || '').trim()
-      if (!pin) return
-      tryAuth(sessionCode, pin, /* canPrompt */ false)
+  useEffect(() => {
+    function authenticateAndSetup() {
+      const creds = readHostCredentials()
+      if (!creds) {
+        setHostReady(false)
+        setSessionCode('')
+        setAuthState({
+          required: true,
+          error: 'Enter session code and host PIN.',
+          sessionCode: '',
+          authenticating: false,
+        })
+        return
+      }
+      void submitAuth(creds.sessionCode, creds.pin, { showAuthUi: false })
     }
 
     function syncState(state) {
@@ -83,6 +123,7 @@ export function useGameSocket(initialTeams, options = {}) {
 
     function onDisconnect() {
       setHostReady(false)
+      setAuthState((prev) => ({ ...prev, authenticating: false }))
     }
 
     function onRemoteSound(payload) {
@@ -172,7 +213,7 @@ export function useGameSocket(initialTeams, options = {}) {
       window.removeEventListener('pointerdown', primeAudio)
       window.removeEventListener('keydown', primeAudio)
     }
-  }, [initialTeams, onBuzzWinner, onBuzzAttempt])
+  }, [onBuzzWinner, onBuzzAttempt, submitAuth])
 
   function handleArm(options = {}) {
     const safeOptions = {}
@@ -237,7 +278,9 @@ export function useGameSocket(initialTeams, options = {}) {
     members,
     stealMode,
     hostReady,
-    sessionCode: (() => { try { return localStorage.getItem(SESSION_CODE_KEY) || '' } catch { return '' } })(),
+    sessionCode,
+    authState,
+    submitAuth,
     handleArm,
     handleDismiss,
     handleWrongAndSteal,

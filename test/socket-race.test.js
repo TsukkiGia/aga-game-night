@@ -42,10 +42,15 @@ function createFakeQuery() {
       return { rows: [], rowCount: 1 }
     }
 
-    if (text.includes('INSERT INTO teams (session_id, idx, name, color, score) VALUES')) {
+    if (text.includes('INSERT INTO teams (session_id, idx, name, color, score)')) {
       const [sessionId, idx, name, color, score] = params
       const current = teamsBySession.get(sessionId) || []
-      current.push({ idx, name, color, score })
+      const existingIndex = current.findIndex((team) => team.idx === idx)
+      if (existingIndex >= 0) {
+        current[existingIndex] = { idx, name, color, score }
+      } else {
+        current.push({ idx, name, color, score })
+      }
       current.sort((a, b) => a.idx - b.idx)
       teamsBySession.set(sessionId, current)
       return { rows: [], rowCount: 1 }

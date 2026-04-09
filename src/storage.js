@@ -4,6 +4,7 @@ export const DONE_KEY            = 'scorekeeping_done'
 export const HOST_PIN_KEY        = 'scorekeeping_host_pin'
 export const SESSION_CODE_KEY    = 'scorekeeping_session_code'
 export const ACTIVE_QUESTION_KEY = 'scorekeeping_active_question'
+export const BUZZER_PLAYER_KEY   = 'sankofa_player'
 
 // Validates and normalizes a [roundIndex, questionIndex|null] cursor from storage or socket.
 export function normalizeQuestionCursor(rawCursor) {
@@ -67,6 +68,58 @@ export function removeStorageItem(baseKey) {
   try {
     localStorage.removeItem(scopedKey(baseKey))
     localStorage.removeItem(baseKey) // legacy key cleanup
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+export function readHostCredentials() {
+  const sessionCode = (getStorageItem(SESSION_CODE_KEY) || '').trim().toUpperCase()
+  const pin = (getStorageItem(HOST_PIN_KEY) || '').trim()
+  if (!sessionCode || !pin) return null
+  return { sessionCode, pin }
+}
+
+export function writeHostCredentials(sessionCode, pin) {
+  const normalizedCode = String(sessionCode || '').trim().toUpperCase()
+  const normalizedPin = String(pin || '').trim()
+  if (!normalizedCode || !normalizedPin) return
+  setStorageItem(SESSION_CODE_KEY, normalizedCode)
+  setStorageItem(HOST_PIN_KEY, normalizedPin)
+}
+
+export function clearHostCredentials() {
+  const existingCode = (readHostCredentials()?.sessionCode || '').trim().toUpperCase()
+  if (existingCode) {
+    try {
+      localStorage.removeItem(`${HOST_PIN_KEY}:${existingCode}`)
+    } catch {
+      // Ignore storage failures.
+    }
+  }
+  removeStorageItem(HOST_PIN_KEY)
+  removeStorageItem(SESSION_CODE_KEY)
+}
+
+export function loadBuzzerIdentity() {
+  try {
+    return JSON.parse(localStorage.getItem(BUZZER_PLAYER_KEY))
+  } catch {
+    return null
+  }
+}
+
+export function saveBuzzerIdentity(teamIndex, name) {
+  try {
+    localStorage.setItem(BUZZER_PLAYER_KEY, JSON.stringify({ teamIndex, name }))
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+export function clearBuzzerIdentity() {
+  try {
+    localStorage.removeItem(BUZZER_PLAYER_KEY)
   } catch {
     // Ignore storage failures.
   }

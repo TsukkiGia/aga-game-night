@@ -310,6 +310,62 @@
   border-bottom: none;
 }
 
+.host-auth-modal,
+.end-session-modal {
+  width: min(440px, 100%);
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+  padding: 20px;
+}
+
+.host-auth-title,
+.end-session-title {
+  margin: 6px 0;
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.host-auth-sub,
+.end-session-copy {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.host-auth-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.host-auth-submit-btn {
+  width: 100%;
+}
+
+.host-auth-error {
+  border-radius: 10px;
+  background: #ffe5df;
+  color: #8e2a14;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  margin-top: 10px;
+}
+
+.end-session-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.end-session-confirm-btn {
+  border-color: rgba(201,75,44,0.45);
+  color: var(--terra);
+}
+
 /* ══════════════════════════════════════════
    SCOREBOARD LAYOUT
 ══════════════════════════════════════════ */

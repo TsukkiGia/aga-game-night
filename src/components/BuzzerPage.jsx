@@ -1,20 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { socket } from '../socket'
+import { loadBuzzerIdentity, saveBuzzerIdentity, clearBuzzerIdentity } from '../storage'
 
 // status: 'loading' | 'join' | 'waiting' | 'armed' | 'i-buzzed' | 'team-buzzed' | 'locked-out'
 
-const STORAGE_KEY = 'sankofa_player'
 const sessionCode = new URLSearchParams(window.location.search).get('s')?.trim().toUpperCase() || ''
-
-function loadSaved() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null }
-}
-function savePlayer(teamIndex, name) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ teamIndex, name }))
-}
-function clearPlayer() {
-  localStorage.removeItem(STORAGE_KEY)
-}
 
 function isEligibleDuringArmedState(sync, teamIndex) {
   if (!Number.isInteger(teamIndex)) return false
@@ -37,7 +27,7 @@ export default function BuzzerPage() {
   const [name, setName] = useState('')
   const [team, setTeam] = useState(null)
   const [teamIndex, setTeamIndex] = useState(null)
-  const [status, setStatus] = useState(() => loadSaved() ? 'loading' : 'join')
+  const [status, setStatus] = useState(() => loadBuzzerIdentity() ? 'loading' : 'join')
   const [connected, setConnected] = useState(true)
   const teamIndexRef = useRef(teamIndex)
   const nameRef = useRef(name)
@@ -63,11 +53,11 @@ export default function BuzzerPage() {
       })
 
       // Auto-rejoin from saved data on initial connect
-      const saved = loadSaved()
+      const saved = loadBuzzerIdentity()
       if (saved && teamIndexRef.current === null) {
         socket.emit('member:join', sessionCode, saved.teamIndex, saved.name, (res) => {
           if (res?.error) {
-            clearPlayer()
+            clearBuzzerIdentity()
             setStatus('join')
             return
           }
@@ -82,7 +72,7 @@ export default function BuzzerPage() {
     socket.on('connect', onConnect)
     socket.on('disconnect', () => setConnected(false))
     socket.on('game:reset', () => {
-      clearPlayer()
+      clearBuzzerIdentity()
       setTeam(null)
       setTeamIndex(null)
       setSelectedIndex(null)
@@ -127,7 +117,7 @@ export default function BuzzerPage() {
     function rejoin() {
       const memberName = nameRef.current || 'Anonymous'
       socket.emit('member:join', sessionCode, teamIndex, memberName, (res) => {
-        if (res?.error) { clearPlayer(); setStatus('join'); return }
+        if (res?.error) { clearBuzzerIdentity(); setStatus('join'); return }
         if (res?.team) setTeam(res.team)
         if (res?.teamIndex !== undefined) {
           setStatus(deriveStatusFromSync(res.sync, res.teamIndex, memberName))
@@ -144,7 +134,7 @@ export default function BuzzerPage() {
     const memberName = name.trim() || 'Anonymous'
     socket.emit('member:join', sessionCode, selectedIndex, memberName, (res) => {
       if (res?.error) return
-      savePlayer(res.teamIndex, memberName)
+      saveBuzzerIdentity(res.teamIndex, memberName)
       setTeam(res.team)
       setTeamIndex(res.teamIndex)
       setStatus(deriveStatusFromSync(res.sync, res.teamIndex, memberName))

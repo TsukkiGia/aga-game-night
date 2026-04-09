@@ -15,7 +15,7 @@ import rounds from '../rounds'
 import { useGameState } from '../hooks/useGameState'
 import { useGameSocket } from '../hooks/useGameSocket'
 import { useNavigation } from '../hooks/useNavigation'
-import { clearAll, SESSION_CODE_KEY, HOST_PIN_KEY } from '../storage'
+import { clearAll, clearHostCredentials } from '../storage'
 import { playGameStart } from '../sounds'
 
 export default function Scoreboard({ teams: initialTeams, onReset, onEndSession }) {
@@ -66,7 +66,7 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
     })
   }, [])
   const { teams, streaks, doneQuestions, doublePoints, setDoublePoints, clearDoublePoints, adjust, resetForNewGame, markDone } = useGameState(initialTeams, { onStreak: emitStreak })
-  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal } = useGameSocket(initialTeams, { onBuzzAttempt: handleBuzzAttemptForLeaderboard })
+  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal } = useGameSocket(initialTeams, { onBuzzAttempt: handleBuzzAttemptForLeaderboard })
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
   const [showWinner, setShowWinner] = useState(false)
@@ -76,6 +76,9 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
   const [showHelp, setShowHelp] = useState(false)
   const [showReactionLeaderboard, setShowReactionLeaderboard] = useState(false)
   const [endingSession, setEndingSession] = useState(false)
+  const [showEndSessionConfirm, setShowEndSessionConfirm] = useState(false)
+  const [endSessionError, setEndSessionError] = useState('')
+  const [authForm, setAuthForm] = useState({ sessionCode: '', pin: '' })
 
   const reactionRows = useMemo(() => {
     return Object.values(reactionStats)
@@ -284,9 +287,14 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
 
   function handleEndSession() {
     if (endingSession) return
-    if (!window.confirm('End this session? The session code will stop working and players will be disconnected.')) return
+    setEndSessionError('')
+    setShowEndSessionConfirm(true)
+  }
+
+  function confirmEndSession() {
+    if (endingSession) return
     if (!socket.connected) {
-      window.alert('Not connected to server. Reconnect and try again.')
+      setEndSessionError('Not connected to server. Reconnect and try again.')
       return
     }
 
@@ -294,25 +302,24 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
     socket.timeout(4000).emit('host:end-session', (err, result) => {
       if (err) {
         setEndingSession(false)
-        window.alert('Timed out ending session. Check your connection and try again.')
+        setEndSessionError('Timed out ending session. Check your connection and try again.')
         return
       }
       if (!result?.ok) {
         setEndingSession(false)
         if (result?.error === 'unauthorized') {
-          window.alert('Host authorization expired. Refresh and sign in again.')
+          setEndSessionError('Host authorization expired. Sign in again.')
         } else {
-          window.alert('Could not end session. Please try again.')
+          setEndSessionError('Could not end session. Please try again.')
         }
         return
       }
 
       clearAll()
-      try {
-        localStorage.removeItem(SESSION_CODE_KEY)
-        localStorage.removeItem(HOST_PIN_KEY)
-      } catch { /* ignore */ }
+      clearHostCredentials()
       setReactionStats({})
+      setShowEndSessionConfirm(false)
+      setEndSessionError('')
       onEndSession?.()
     })
   }
@@ -325,11 +332,80 @@ export default function Scoreboard({ teams: initialTeams, onReset, onEndSession 
         onClose={() => setShowHelp(false)}
         hostCompanionUrl={hostCompanionUrl}
       />
+      {authState.required && (
+        <div className="help-overlay" role="dialog" aria-modal="true">
+          <div className="host-auth-modal">
+            <div className="help-popup-tag">Host Sign In</div>
+            <h2 className="host-auth-title">Reconnect Host Controller</h2>
+            <p className="host-auth-sub">Enter session code and host PIN to control this game.</p>
+            {authState.error && <div className="host-auth-error">{authState.error}</div>}
+            <form
+              className="host-auth-form"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void submitAuth(authForm.sessionCode || authState.sessionCode, authForm.pin)
+              }}
+            >
+              <input
+                className="team-name-input session-gate-input"
+                type="text"
+                value={authForm.sessionCode || authState.sessionCode}
+                onChange={(e) => setAuthForm((prev) => ({ ...prev, sessionCode: e.target.value.toUpperCase() }))}
+                placeholder="Session code"
+                maxLength={6}
+                autoComplete="off"
+                disabled={authState.authenticating}
+              />
+              <input
+                className="team-name-input session-gate-input"
+                type="password"
+                inputMode="numeric"
+                value={authForm.pin}
+                onChange={(e) => setAuthForm((prev) => ({ ...prev, pin: e.target.value }))}
+                placeholder="Host PIN"
+                maxLength={8}
+                disabled={authState.authenticating}
+              />
+              <button className="start-btn host-auth-submit-btn" type="submit" disabled={authState.authenticating}>
+                {authState.authenticating ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
       <ReactionLeaderboardModal
         open={showReactionLeaderboard}
         rows={reactionRows}
         onClose={() => setShowReactionLeaderboard(false)}
       />
+      {showEndSessionConfirm && (
+        <div className="help-overlay" onClick={() => !endingSession && setShowEndSessionConfirm(false)}>
+          <div className="end-session-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="help-popup-tag">Confirm Action</div>
+            <h2 className="end-session-title">End this session?</h2>
+            <p className="end-session-copy">The session code will stop working and all players will disconnect.</p>
+            {endSessionError && <div className="host-auth-error">{endSessionError}</div>}
+            <div className="end-session-actions">
+              <button
+                className="back-btn"
+                type="button"
+                onClick={() => setShowEndSessionConfirm(false)}
+                disabled={endingSession}
+              >
+                Cancel
+              </button>
+              <button
+                className="home-end-session-btn end-session-confirm-btn"
+                type="button"
+                onClick={confirmEndSession}
+                disabled={endingSession}
+              >
+                {endingSession ? 'Ending…' : 'End Session'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <HomeLobbyView
         teams={teams}
         members={members}

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import rounds from '../rounds'
 import { socket } from '../socket'
-import { HOST_PIN_KEY, SESSION_CODE_KEY, normalizeQuestionCursor } from '../storage'
+import { mapHostAuthError } from '../auth'
+import { normalizeQuestionCursor, readHostCredentials, writeHostCredentials, clearHostCredentials } from '../storage'
 
 const SOUND_BUTTONS = [
   { label: 'Crickets', key: 'crickets' },
@@ -31,16 +32,6 @@ const SHOW_SOUND_STATUS = (() => {
 })()
 
 const normalizeCursor = normalizeQuestionCursor
-
-function getStored(key) {
-  try { return localStorage.getItem(key) || '' } catch { return '' }
-}
-function setStored(key, val) {
-  try { localStorage.setItem(key, val) } catch { /* ignore */ }
-}
-function clearStored(...keys) {
-  try { keys.forEach(k => localStorage.removeItem(k)) } catch { /* ignore */ }
-}
 
 function extractAnswerView(activeQuestion) {
   const cursor = normalizeCursor(activeQuestion)
@@ -138,12 +129,18 @@ function extractAnswerView(activeQuestion) {
 }
 
 export default function HostMobilePage() {
+  const savedHostCredentials = readHostCredentials()
   const [connected, setConnected] = useState(false)
   const [authorized, setAuthorized] = useState(false)
   const [activeQuestion, setActiveQuestion] = useState(null)
   const [buzzActive, setBuzzActive] = useState(false)
   const [timerRunning, setTimerRunning] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+  const [authForm, setAuthForm] = useState({
+    sessionCode: savedHostCredentials?.sessionCode || '',
+    pin: savedHostCredentials?.pin || '',
+  })
   const [soundStatus, setSoundStatus] = useState('')
   const [streakStatus, setStreakStatus] = useState('')
   const pendingSoundRequestIdRef = useRef('')
@@ -151,28 +148,28 @@ export default function HostMobilePage() {
   const soundStatusTimeoutRef = useRef(null)
   const streakStatusTimeoutRef = useRef(null)
 
-  function clearPendingSoundTimeout() {
+  const clearPendingSoundTimeout = useCallback(() => {
     if (pendingSoundTimeoutRef.current) {
       clearTimeout(pendingSoundTimeoutRef.current)
       pendingSoundTimeoutRef.current = null
     }
-  }
+  }, [])
 
-  function clearSoundStatusTimeout() {
+  const clearSoundStatusTimeout = useCallback(() => {
     if (soundStatusTimeoutRef.current) {
       clearTimeout(soundStatusTimeoutRef.current)
       soundStatusTimeoutRef.current = null
     }
-  }
+  }, [])
 
-  function clearStreakStatusTimeout() {
+  const clearStreakStatusTimeout = useCallback(() => {
     if (streakStatusTimeoutRef.current) {
       clearTimeout(streakStatusTimeoutRef.current)
       streakStatusTimeoutRef.current = null
     }
-  }
+  }, [])
 
-  function setTransientSoundStatus(message) {
+  const setTransientSoundStatus = useCallback((message) => {
     if (!SHOW_SOUND_STATUS) return
     setSoundStatus(message)
     clearSoundStatusTimeout()
@@ -180,67 +177,68 @@ export default function HostMobilePage() {
       setSoundStatus('')
       soundStatusTimeoutRef.current = null
     }, SOUND_STATUS_AUTO_CLEAR_MS)
-  }
+  }, [clearSoundStatusTimeout])
 
-  function setTransientStreakStatus(message) {
+  const setTransientStreakStatus = useCallback((message) => {
     setStreakStatus(message)
     clearStreakStatusTimeout()
     streakStatusTimeoutRef.current = setTimeout(() => {
       setStreakStatus('')
       streakStatusTimeoutRef.current = null
     }, STREAK_STATUS_AUTO_CLEAR_MS)
-  }
+  }, [clearStreakStatusTimeout])
 
-  useEffect(() => {
-    function afterAuth() {
-      setAuthorized(true)
-      setErrorMsg('')
-      socket.emit('host:question:get', (result) => {
-        if (result?.ok) setActiveQuestion(normalizeCursor(result.activeQuestion))
-      })
+  const submitAuth = useCallback((sessionCodeInput, pinInput) => {
+    const code = String(sessionCodeInput || '').trim().toUpperCase()
+    const pin = String(pinInput || '').trim()
+    if (!code || !pin) {
+      setErrorMsg('Session code and host PIN are required.')
+      setAuthorized(false)
+      return Promise.resolve({ ok: false, error: 'missing-credentials' })
     }
 
-    function tryAuth(code, pin, canPrompt) {
+    setAuthLoading(true)
+    setErrorMsg('')
+    return new Promise((resolve) => {
       socket.emit('host:auth', { sessionCode: code, pin, role: 'companion' }, (result) => {
         if (!result?.ok) {
-          clearStored(SESSION_CODE_KEY, HOST_PIN_KEY)
+          clearHostCredentials()
           setAuthorized(false)
-          if (!canPrompt) { setErrorMsg('Invalid session code or PIN'); return }
-          if (result?.error === 'session-not-found') {
-            setErrorMsg('Session not found. Check the session code.')
-          } else if (result?.error === 'rate-limited') {
-            setErrorMsg('Too many PIN attempts. Wait a minute and try again.')
-          } else {
-            setErrorMsg('Incorrect PIN.')
-          }
-          promptAndAuth()
+          setErrorMsg(mapHostAuthError(result?.error))
+          setAuthLoading(false)
+          resolve({ ok: false, error: result?.error || 'unauthorized' })
           return
         }
-        setStored(SESSION_CODE_KEY, code)
-        setStored(HOST_PIN_KEY, pin)
-        afterAuth()
+        writeHostCredentials(code, pin)
+        setAuthForm({ sessionCode: code, pin })
+        setAuthorized(true)
+        setErrorMsg('')
+        socket.emit('host:question:get', (questionResult) => {
+          if (questionResult?.ok) setActiveQuestion(normalizeCursor(questionResult.activeQuestion))
+          setAuthLoading(false)
+          resolve({ ok: true })
+        })
       })
-    }
+    })
+  }, [])
 
-    function promptAndAuth() {
-      const code = (window.prompt('Enter session code') || '').trim().toUpperCase()
-      if (!code) { setErrorMsg('Session code is required'); return }
-      const pin = (window.prompt('Enter host PIN') || '').trim()
-      if (!pin) { setErrorMsg('Host PIN is required'); return }
-      tryAuth(code, pin, false)
-    }
-
+  useEffect(() => {
     function onConnect() {
       setConnected(true)
-      const code = getStored(SESSION_CODE_KEY)
-      const pin  = getStored(HOST_PIN_KEY)
-      if (code && pin) { tryAuth(code, pin, true); return }
-      promptAndAuth()
+      const creds = readHostCredentials()
+      if (!creds) {
+        setAuthorized(false)
+        setErrorMsg('Enter session code and host PIN.')
+        return
+      }
+      setAuthForm({ sessionCode: creds.sessionCode, pin: creds.pin })
+      void submitAuth(creds.sessionCode, creds.pin)
     }
 
     function onDisconnect() {
       setConnected(false)
       setAuthorized(false)
+      setAuthLoading(false)
     }
 
     function onHostQuestion(cursor) {
@@ -294,7 +292,7 @@ export default function HostMobilePage() {
       socket.off('buzz:reset')
       socket.off('host:timer:expired')
     }
-  }, [])
+  }, [clearPendingSoundTimeout, clearSoundStatusTimeout, clearStreakStatusTimeout, setTransientSoundStatus, setTransientStreakStatus, submitAuth])
 
   const answerView = useMemo(() => extractAnswerView(activeQuestion), [activeQuestion])
 
@@ -340,7 +338,40 @@ export default function HostMobilePage() {
         {errorMsg && <div className="host-mobile-error">{errorMsg}</div>}
         {streakStatus && <div className="host-mobile-streak-status">{streakStatus} 🔥</div>}
         {!authorized ? (
-          <div className="host-mobile-wait">Waiting for host authorization…</div>
+          <form
+            className="host-mobile-auth-form"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void submitAuth(authForm.sessionCode, authForm.pin)
+            }}
+          >
+            <p className="host-mobile-wait">
+              {connected ? 'Sign in to control this session.' : 'Reconnecting…'}
+            </p>
+            <input
+              className="host-mobile-auth-input"
+              type="text"
+              value={authForm.sessionCode}
+              onChange={(e) => setAuthForm((prev) => ({ ...prev, sessionCode: e.target.value.toUpperCase() }))}
+              placeholder="Session code"
+              maxLength={6}
+              autoComplete="off"
+              disabled={authLoading}
+            />
+            <input
+              className="host-mobile-auth-input"
+              type="password"
+              inputMode="numeric"
+              value={authForm.pin}
+              onChange={(e) => setAuthForm((prev) => ({ ...prev, pin: e.target.value }))}
+              placeholder="Host PIN"
+              maxLength={8}
+              disabled={authLoading}
+            />
+            <button className="host-mobile-auth-btn" type="submit" disabled={!connected || authLoading}>
+              {authLoading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
         ) : (
           <>
             <div className="host-mobile-heading">{answerView.heading}</div>

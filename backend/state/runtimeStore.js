@@ -74,7 +74,15 @@ export function createRuntimeStore({ queryFn, sessions }) {
     for (let i = 0; i < teams.length; i++) {
       const team = teams[i]
       await queryFn(
-        'INSERT INTO teams (session_id, idx, name, color, score) VALUES ($1, $2, $3, $4, $5)',
+        `
+          INSERT INTO teams (session_id, idx, name, color, score)
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (session_id, idx)
+          DO UPDATE SET
+            name = EXCLUDED.name,
+            color = EXCLUDED.color,
+            score = EXCLUDED.score
+        `,
         [code, i, team.name, team.color, 0]
       )
     }

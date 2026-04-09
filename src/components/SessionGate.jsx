@@ -1,15 +1,5 @@
 import { useEffect, useState } from 'react'
-import { SESSION_CODE_KEY, HOST_PIN_KEY } from '../storage'
-
-function getStored(key) {
-  try { return localStorage.getItem(key) || '' } catch { return '' }
-}
-function setStored(key, val) {
-  try { localStorage.setItem(key, val) } catch { /* ignore */ }
-}
-function clearStored(...keys) {
-  try { keys.forEach(k => localStorage.removeItem(k)) } catch { /* ignore */ }
-}
+import { readHostCredentials, writeHostCredentials, clearHostCredentials } from '../storage'
 
 // 'create' | 'resume'
 export default function SessionGate({ onSession }) {
@@ -22,11 +12,10 @@ export default function SessionGate({ onSession }) {
   const [error, setError]       = useState('')
 
   useEffect(() => {
-    const code = getStored(SESSION_CODE_KEY)
-    const savedPin = getStored(HOST_PIN_KEY)
-    if (!code || !savedPin) return
+    const saved = readHostCredentials()
+    if (!saved) return
     setMode('restoring')
-    onSession(code, savedPin)
+    onSession(saved.sessionCode, saved.pin)
   }, [onSession])
 
   async function handleCreate(e) {
@@ -46,8 +35,7 @@ export default function SessionGate({ onSession }) {
         setError(data.error === 'invalid-pin' ? 'PIN must be 4–8 digits' : 'Could not create session. Try again.')
         return
       }
-      setStored(SESSION_CODE_KEY, data.sessionCode)
-      setStored(HOST_PIN_KEY, trimmed)
+      writeHostCredentials(data.sessionCode, trimmed)
       onSession(data.sessionCode, trimmed)
     } catch {
       setError('Network error. Is the server running?')
@@ -62,9 +50,8 @@ export default function SessionGate({ onSession }) {
     const p    = resumePin.trim()
     if (!code) { setError('Enter a session code'); return }
     if (!p)    { setError('Enter your PIN'); return }
-    clearStored(SESSION_CODE_KEY, HOST_PIN_KEY)
-    setStored(SESSION_CODE_KEY, code)
-    setStored(HOST_PIN_KEY, p)
+    clearHostCredentials()
+    writeHostCredentials(code, p)
     // Actual PIN verification happens in useGameSocket when host:auth fires
     onSession(code, p)
   }
