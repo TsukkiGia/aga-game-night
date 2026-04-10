@@ -202,7 +202,7 @@ export default {
     },
     {
       id: 'gtl-oromo',
-      video: 'https://www.youtube.com/watch?v=fAgdocz4sIk',
+      video: 'https://www.youtube.com/watch?v=fAgdocz4sIk&start=480',
       answer: 'Oromo',
       countries: ['Ethiopia', 'Kenya'],
       explanation: 'Oromo (Afaan Oromoo) is a Cushitic language and the most widely spoken language in Ethiopia, with over 40 million native speakers. The Oromo are Ethiopia\'s largest ethnic group. It was officially standardized and given equal status with Amharic in the late 20th century. Written in the Latin-based Qubee script.',

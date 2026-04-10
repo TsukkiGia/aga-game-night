@@ -36,19 +36,20 @@ export default function QuestionView({
   const displayQuestionNumber = getQuestionDisplayNumber(roundIndex, questionIndex)
   const isCharades = round?.type === 'charades'
   const isThesis   = round?.type === 'thesis'
+  const selectedTurnIndex = Math.max(0, (Number(displayQuestionNumber) || (questionIndex + 1)) - 1)
 
   const activePair = isCharades
-    ? new Set([(questionIndex * 2) % teams.length, (questionIndex * 2 + 1) % teams.length])
+    ? new Set([(selectedTurnIndex * 2) % teams.length, (selectedTurnIndex * 2 + 1) % teams.length])
     : isThesis
-    ? new Set([questionIndex % teams.length])
+    ? new Set([selectedTurnIndex % teams.length])
     : null
 
   const [sidebarOpen, setSidebarOpen] = useState(true)
   function defaultStealSelection() {
     const allTeams = new Set(teams.map((_, i) => i))
     if (!isCharades) return allTeams
-    const firstActive = (questionIndex * 2) % teams.length
-    const secondActive = (questionIndex * 2 + 1) % teams.length
+    const firstActive = (selectedTurnIndex * 2) % teams.length
+    const secondActive = (selectedTurnIndex * 2 + 1) % teams.length
     allTeams.delete(firstActive)
     allTeams.delete(secondActive)
     return allTeams
