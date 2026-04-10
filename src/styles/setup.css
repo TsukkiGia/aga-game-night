@@ -384,14 +384,24 @@
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
+  line-height: 1;
   font-size: 11px;
   font-weight: 900;
   border: 1px solid var(--border);
   color: var(--text-muted);
   background: white;
+}
+
+.game-config-question-check.plus {
+  font-size: 12px;
+  transform: translateY(-0.5px);
+}
+
+.game-config-question-check.check {
+  font-size: 10px;
+  transform: translateY(0.25px);
 }
 
 .game-config-question-item.selected {

@@ -137,7 +137,9 @@ export default function GameConfig({ initialPlanIds, onConfirm, onBack }) {
                       className={`game-config-question-item${selected ? ' selected' : ''}`}
                       onClick={() => toggleQuestion(questionId)}
                     >
-                      <span className="game-config-question-check">{selected ? '✓' : '+'}</span>
+                      <span className={`game-config-question-check${selected ? ' check' : ' plus'}`}>
+                        {selected ? '✓' : '+'}
+                      </span>
                       <span>Q{questionIndex + 1}</span>
                     </button>
                   )

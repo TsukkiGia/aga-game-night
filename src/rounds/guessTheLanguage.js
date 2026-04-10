@@ -34,14 +34,14 @@ export default {
     },
     {
       id: 'gtl-krio',
-      video: 'https://www.youtube.com/watch?v=d83HnlEWsCQ',
+      video: 'https://www.youtube.com/watch?v=d83HnlEWsCQ&start=65',
       answer: 'Krio',
       countries: ['Sierra Leone'],
       explanation: 'Krio is an English-based creole and the main lingua franca of Sierra Leone. It developed from the language of freed slaves who settled in Freetown in the late 18th and early 19th centuries.',
     },
     {
       id: 'gtl-dinka',
-      video: 'https://www.youtube.com/watch?v=zkRwVjQ3jkc',
+      video: 'https://www.youtube.com/watch?v=zkRwVjQ3jkc&start=74',
       answer: 'Dinka',
       countries: ['South Sudan'],
       explanation: 'Dinka is a Nilotic language of South Sudan, spoken by the Dinka people — the country\'s largest ethnic group. It has a complex tonal system and is one of the most widely spoken languages in South Sudan.',
@@ -83,7 +83,7 @@ export default {
     },
     {
       id: 'gtl-igbo',
-      video: 'https://www.youtube.com/watch?v=M3LgkrR6qs8&start=360',
+      video: 'https://www.youtube.com/watch?v=M3LgkrR6qs8&start=675',
       answer: 'Igbo',
       countries: ['Nigeria'],
       explanation: 'Igbo is one of Nigeria\'s major languages, spoken primarily in the southeast. It is a tonal language with many regional dialects and is an important part of the cultural identity of the Igbo people.',
@@ -144,13 +144,13 @@ export default {
     //   countries: ['Nigeria'],
     //   explanation: 'Ibibio is spoken by the Ibibio people of southeastern Nigeria, primarily in Akwa Ibom State. About 4 million speakers. It\'s closely related to Efik and part of the Cross River language group.',
     // },
-    {
-      id: 'gtl-kikuyu',
-      video: 'Kikuyu.mp4',
-      answer: 'Kikuyu',
-      countries: ['Kenya'],
-      explanation: 'Kikuyu (Gikuyu) is a Bantu language spoken by Kenya\'s largest ethnic group, the Kikuyu, primarily around Mount Kenya. About 8 million speakers. Closely related to Meru and Embu.',
-    },
+    // {
+    //   id: 'gtl-kikuyu',
+    //   video: 'Kikuyu.mp4',
+    //   answer: 'Kikuyu',
+    //   countries: ['Kenya'],
+    //   explanation: 'Kikuyu (Gikuyu) is a Bantu language spoken by Kenya\'s largest ethnic group, the Kikuyu, primarily around Mount Kenya. About 8 million speakers. Closely related to Meru and Embu.',
+    // },
     {
       id: 'gtl-meru',
       video: 'https://www.youtube.com/watch?v=0S0Bl5o99ng&start=128',
@@ -209,7 +209,7 @@ export default {
     },
     {
       id: 'gtl-hausa',
-      video: 'https://www.youtube.com/watch?v=RjnpCaVX4TQ',
+      video: 'https://www.youtube.com/watch?v=RjnpCaVX4TQ&start=11',
       answer: 'Hausa',
       countries: ['Nigeria', 'Niger', 'Ghana', 'Cameroon', 'Sudan'],
       explanation: 'Hausa is the most widely spoken language in West Africa by number of speakers — over 70 million native speakers and many more as a second language. An Afroasiatic language of northern Nigeria and Niger, it has long served as a major trade language across the Sahel. Hausa literature, music, and film (Kannywood) have a massive cultural footprint across the continent.',

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { playPower } from '../sounds'
 import BuzzModal from './BuzzModal'
 import VideoBody from './VideoBody'
@@ -9,6 +9,7 @@ import roundsData from '../rounds'
 import { buildPlanCatalog, questionItemIdFor } from '../gamePlan'
 
 const PLAN_CATALOG = buildPlanCatalog(roundsData)
+let lastQuestionSidebarScrollTop = 0
 
 function isQuestionDone(doneQuestions, roundIndex, questionIndex) {
   if (doneQuestions?.has(`${roundIndex}-${questionIndex}`)) return true
@@ -56,6 +57,20 @@ export default function QuestionView({
   const [stealSelected, setStealSelected] = useState(() => defaultStealSelection())
   const [correctGiven, setCorrectGiven] = useState(false)
   const [confirmFinish, setConfirmFinish] = useState(false)
+  const sidebarRef = useRef(null)
+
+  useEffect(() => {
+    const container = sidebarRef.current
+    if (!container) return
+    container.scrollTop = lastQuestionSidebarScrollTop
+  }, [])
+
+  function navigateFromSidebar(nextRoundIndex, nextQuestionIndex) {
+    if (sidebarRef.current) {
+      lastQuestionSidebarScrollTop = sidebarRef.current.scrollTop
+    }
+    onNavigate(nextRoundIndex, nextQuestionIndex)
+  }
 
   if (!round || !question) {
     return (
@@ -148,7 +163,14 @@ export default function QuestionView({
       <div className="qv-main">
 
         {/* Left sidebar */}
-        <div className={`qv-sidebar${sidebarOpen ? '' : ' collapsed'}`}>
+        <div
+          className={`qv-sidebar${sidebarOpen ? '' : ' collapsed'}`}
+          ref={sidebarRef}
+          onScroll={() => {
+            if (!sidebarRef.current) return
+            lastQuestionSidebarScrollTop = sidebarRef.current.scrollTop
+          }}
+        >
           <button className="qv-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)}>
             {sidebarOpen ? '‹' : '›'}
           </button>
@@ -159,7 +181,7 @@ export default function QuestionView({
               <div key={ri} className="qv-sidebar-group">
                 <button
                   className={`qv-sidebar-round-label clickable${ri === roundIndex && questionIndex === null ? ' active-round' : ''}`}
-                  onClick={() => onNavigate(ri, null)}
+                  onClick={() => navigateFromSidebar(ri, null)}
                 >
                   {getRoundDisplayLabel(ri)}
                 </button>
@@ -172,7 +194,7 @@ export default function QuestionView({
                     <button
                       key={qi}
                       className={`qv-sidebar-item${active ? ' active' : ''}${done ? ' done' : ''}`}
-                      onClick={() => onNavigate(ri, qi)}
+                      onClick={() => navigateFromSidebar(ri, qi)}
                     >
                       {done ? '✓ ' : ''}{typeLabel[r.type]} {displayNumber}
                     </button>

@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import QRImg from './QRImg'
 import MemberRoster from './MemberRoster'
 import roundsData from '../rounds'
 import { buildPlanCatalog, questionItemIdFor } from '../gamePlan'
 
 const PLAN_CATALOG = buildPlanCatalog(roundsData)
+let lastRoundIntroSidebarScrollTop = 0
 
 function isQuestionDone(doneQuestions, roundIndex, questionIndex) {
   if (doneQuestions?.has(`${roundIndex}-${questionIndex}`)) return true
@@ -130,8 +131,30 @@ function Sidebar({
   getRoundDisplayLabel,
   getQuestionDisplayNumber,
 }) {
+  const sidebarRef = useRef(null)
+
+  useEffect(() => {
+    const container = sidebarRef.current
+    if (!container) return
+    container.scrollTop = lastRoundIntroSidebarScrollTop
+  }, [])
+
+  function navigateFromSidebar(nextRoundIndex, nextQuestionIndex) {
+    if (sidebarRef.current) {
+      lastRoundIntroSidebarScrollTop = sidebarRef.current.scrollTop
+    }
+    onNavigate(nextRoundIndex, nextQuestionIndex)
+  }
+
   return (
-    <div className="qv-sidebar">
+    <div
+      className="qv-sidebar"
+      ref={sidebarRef}
+      onScroll={() => {
+        if (!sidebarRef.current) return
+        lastRoundIntroSidebarScrollTop = sidebarRef.current.scrollTop
+      }}
+    >
       {rounds.map((r, ri) => {
         if (!isRoundIncluded(ri)) return null
         const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis' }
@@ -139,7 +162,7 @@ function Sidebar({
           <div key={ri} className="qv-sidebar-group">
             <button
               className={`qv-sidebar-round-label clickable${ri === roundIndex && activeQIdx === null ? ' active-round' : ''}`}
-              onClick={() => onNavigate(ri, null)}
+              onClick={() => navigateFromSidebar(ri, null)}
             >
               {getRoundDisplayLabel(ri)}
             </button>
@@ -152,7 +175,7 @@ function Sidebar({
                 <button
                   key={qi}
                   className={`qv-sidebar-item${active ? ' active' : ''}${done ? ' done' : ''}`}
-                  onClick={() => onNavigate(ri, qi)}
+                  onClick={() => navigateFromSidebar(ri, qi)}
                 >
                   {done ? '✓ ' : ''}{typeLabel[r.type]} {displayNumber}
                 </button>
