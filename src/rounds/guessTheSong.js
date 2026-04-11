@@ -1,0 +1,70 @@
+export default {
+  id: 'guess-the-song',
+  name: 'Guess the Song',
+  type: 'video',
+  intro: 'Hear a short clip and identify the track. Give the song title first, then artist if you can.',
+  rules: [
+    'Buzz in once you know the song',
+    'Song title is the main answer (+3)',
+    'Artist name is a bonus (+1)',
+    'Wrong answer is -1',
+    'After a wrong answer, a steal is available (+2 for correct steal, 0 for wrong steal)',
+  ],
+  scoring: [
+    { label: 'Correct song', points: 3 },
+    { label: 'Correct artist', points: 1 },
+    { label: 'Wrong answer', points: -1 },
+    { label: 'Correct steal', points: 2 },
+    { label: 'Wrong steal', points: 0 },
+  ],
+  questions: [
+    {
+      id: 'gts-last-last',
+      video: 'https://www.youtube.com/watch?v=421w1j87fEM&start=38',
+      answer: 'Burna Boy - Last Last',
+      explanation: 'Released in 2022, "Last Last" became one of Burna Boy\'s biggest global crossover records.',
+    },
+    {
+      id: 'gts-water',
+      video: 'https://www.youtube.com/watch?v=XoiOOiuH8iI&start=35',
+      answer: 'Tyla - Water',
+      explanation: '"Water" helped push amapiano-influenced pop into mainstream global playlists in 2023.',
+    },
+    {
+      id: 'gts-essence',
+      video: 'https://www.youtube.com/watch?v=m77FDcKg96Q&start=42',
+      answer: 'Wizkid ft. Tems - Essence',
+      explanation: '"Essence" became a defining Afrobeats hit and charted internationally after its remix run.',
+    },
+    {
+      id: 'gts-calm-down',
+      video: 'https://www.youtube.com/watch?v=WcIcVapfqXw&start=32',
+      answer: 'Rema - Calm Down',
+      explanation: '"Calm Down" had one of the longest global chart runs for an Afrobeats song.',
+    },
+    {
+      id: 'gts-love-nwantiti',
+      video: 'https://www.youtube.com/watch?v=7V2LkSoA8F4&start=27',
+      answer: 'CKay - Love Nwantiti',
+      explanation: '"Love Nwantiti" exploded via short-form video apps before crossing into global radio.',
+    },
+    {
+      id: 'gts-johnny',
+      video: 'https://www.youtube.com/watch?v=4QcytP8FQwQ&start=34',
+      answer: 'Yemi Alade - Johnny',
+      explanation: '"Johnny" is one of the most recognizable pan-African pop anthems of the 2010s.',
+    },
+    {
+      id: 'gts-fall',
+      video: 'https://www.youtube.com/watch?v=3w1w9M4r6H8&start=30',
+      answer: 'Davido - Fall',
+      explanation: '"Fall" was an early signal of Afrobeats\' sustained growth in US and UK markets.',
+    },
+    {
+      id: 'gts-kante',
+      video: 'https://www.youtube.com/watch?v=3wNQx1rM7rY&start=36',
+      answer: 'Davido ft. Fave - Kante',
+      explanation: '"Kante" blends Afrobeats and RnB textures and became a fan favorite from Davido\'s 2023 album.',
+    },
+  ],
+}

@@ -14,6 +14,11 @@ import {
 
 const catalog = buildPlanCatalog(rounds)
 
+test('plan catalog item ids are unique to avoid cursor/plan collisions', () => {
+  const ids = catalog.items.map((item) => item.id)
+  assert.equal(new Set(ids).size, ids.length)
+})
+
 test('resolveEffectivePlanForSync keeps local plan when server plan is empty', () => {
   const localPlan = [
     questionItemIdFor(1, 0, catalog),
@@ -62,4 +67,3 @@ test('normalizeDoneQuestionIds converts legacy done keys and filters invalid/non
 
   assert.deepEqual(normalized, [qId])
 })
-
