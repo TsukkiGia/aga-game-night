@@ -6,6 +6,7 @@ export const SESSION_CODE_KEY    = 'scorekeeping_session_code'
 export const ACTIVE_QUESTION_KEY = 'scorekeeping_active_question'
 export const GAME_PLAN_KEY       = 'scorekeeping_game_plan'
 export const ROUND_CATALOG_KEY   = 'scorekeeping_round_catalog'
+export const PLAN_CONFIG_PENDING_KEY = 'scorekeeping_plan_config_pending'
 export const BUZZER_PLAYER_KEY   = 'sankofa_player'
 
 // Validates and normalizes a cursor from storage or socket.
@@ -161,5 +162,6 @@ export function clearAll() {
   removeStorageItem(DONE_KEY)
   removeStorageItem(GAME_PLAN_KEY)
   removeStorageItem(ROUND_CATALOG_KEY)
+  removeStorageItem(PLAN_CONFIG_PENDING_KEY)
   removeStorageItem(ACTIVE_QUESTION_KEY)
 }

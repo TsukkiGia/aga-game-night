@@ -6,7 +6,16 @@ import HostMobilePage from './components/HostMobilePage'
 import SessionGate from './components/SessionGate'
 import SplashScreen from './components/SplashScreen'
 import GameConfig from './components/GameConfig'
-import { TEAMS_KEY, GAME_PLAN_KEY, ROUND_CATALOG_KEY, ACTIVE_QUESTION_KEY, normalizeSavedTeams, getStorageItem, setStorageItem } from './storage'
+import {
+  TEAMS_KEY,
+  GAME_PLAN_KEY,
+  ROUND_CATALOG_KEY,
+  ACTIVE_QUESTION_KEY,
+  PLAN_CONFIG_PENDING_KEY,
+  normalizeSavedTeams,
+  getStorageItem,
+  setStorageItem,
+} from './storage'
 import { useWakeLock } from './hooks/useWakeLock'
 import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong, playHelloGetDown, playOhNoNo, playDontProvokeMe, playWhyAreYouRunning } from './sounds'
 import rounds from './rounds'
@@ -51,13 +60,24 @@ function loadGamePlan(roundCatalog) {
   }
 }
 
+function loadNeedsPlanConfig() {
+  const raw = getStorageItem(PLAN_CONFIG_PENDING_KEY)
+  if (raw === null) return false
+  try {
+    return JSON.parse(raw) === true
+  } catch {
+    const fallback = String(raw || '').trim().toLowerCase()
+    return fallback === '1' || fallback === 'true'
+  }
+}
+
 export default function App() {
   const [splashDone, setSplashDone] = useState(false)
   const [session, setSession] = useState(null) // { code, pin } | null
   const [teams, setTeams] = useState(() => loadTeams())
   const [roundCatalog, setRoundCatalog] = useState(() => loadRoundCatalog())
   const [gamePlanIds, setGamePlanIds] = useState(() => loadGamePlan(loadRoundCatalog()))
-  const [needsPlanConfig, setNeedsPlanConfig] = useState(false)
+  const [needsPlanConfig, setNeedsPlanConfig] = useState(() => loadNeedsPlanConfig())
   useWakeLock(true)
 
   useEffect(() => {
@@ -97,6 +117,7 @@ export default function App() {
     const storedRoundCatalog = loadRoundCatalog()
     setRoundCatalog(storedRoundCatalog)
     setGamePlanIds(loadGamePlan(storedRoundCatalog))
+    setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(true))
     setNeedsPlanConfig(true)
   }
 
@@ -110,16 +131,18 @@ export default function App() {
     setStorageItem(ACTIVE_QUESTION_KEY, JSON.stringify(null))
     setGamePlanIds(nextPlanIds)
     setRoundCatalog(effectiveRoundCatalog)
+    setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
     setNeedsPlanConfig(false)
   }
 
   function handleSession(code, pin) {
+    const restoredTeams = loadTeams()
     setSession({ code, pin })
-    setTeams(loadTeams())
+    setTeams(restoredTeams)
     const storedRoundCatalog = loadRoundCatalog()
     setRoundCatalog(storedRoundCatalog)
     setGamePlanIds(loadGamePlan(storedRoundCatalog))
-    setNeedsPlanConfig(false)
+    setNeedsPlanConfig(Boolean(restoredTeams) && loadNeedsPlanConfig())
   }
 
   if (isBuzzerMode) return <BuzzerPage />
@@ -150,6 +173,7 @@ export default function App() {
             initialPlanIds={gamePlanIds}
             onConfirm={handlePlanConfirm}
             onBack={() => {
+              setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
               setNeedsPlanConfig(false)
               setTeams(null)
             }}
@@ -160,12 +184,14 @@ export default function App() {
             initialRoundCatalog={roundCatalog}
             initialPlanIds={gamePlanIds}
             onReset={() => {
+              setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
               setTeams(null)
               const storedRoundCatalog = loadRoundCatalog()
               setRoundCatalog(storedRoundCatalog)
               setGamePlanIds(loadGamePlan(storedRoundCatalog))
             }}
             onEndSession={() => {
+              setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
               setTeams(null)
               setSession(null)
               const storedRoundCatalog = loadRoundCatalog()
