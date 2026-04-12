@@ -6,19 +6,17 @@ import HostMobilePage from './components/HostMobilePage'
 import SessionGate from './components/SessionGate'
 import SplashScreen from './components/SplashScreen'
 import GameConfig from './components/GameConfig'
-import { TEAMS_KEY, GAME_PLAN_KEY, ACTIVE_QUESTION_KEY, normalizeSavedTeams, getStorageItem, setStorageItem } from './storage'
+import { TEAMS_KEY, GAME_PLAN_KEY, ROUND_CATALOG_KEY, ACTIVE_QUESTION_KEY, normalizeSavedTeams, getStorageItem, setStorageItem } from './storage'
 import { useWakeLock } from './hooks/useWakeLock'
 import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong, playHelloGetDown, playOhNoNo, playDontProvokeMe, playWhyAreYouRunning } from './sounds'
 import rounds from './rounds'
 import { buildPlanCatalog, normalizePlanIdsWithRoundIntros } from './gamePlan'
+import { normalizeRoundCatalog } from './roundCatalog'
 import './App.css'
 
 const pathname = window.location.pathname
 const isBuzzerMode = pathname.startsWith('/buzz')
 const isHostMobileMode = pathname.startsWith('/host-mobile')
-const PLAN_CATALOG = buildPlanCatalog(rounds)
-
-
 function loadTeams() {
   try {
     const parsed = JSON.parse(getStorageItem(TEAMS_KEY) || 'null')
@@ -28,12 +26,28 @@ function loadTeams() {
   }
 }
 
-function loadGamePlan() {
+function defaultRoundCatalog() {
+  return normalizeRoundCatalog(rounds)
+}
+
+function loadRoundCatalog() {
+  try {
+    const parsed = JSON.parse(getStorageItem(ROUND_CATALOG_KEY) || 'null')
+    const normalized = normalizeRoundCatalog(parsed)
+    if (normalized.length > 0) return normalized
+  } catch {
+    // Ignore parse errors and fall back to defaults.
+  }
+  return defaultRoundCatalog()
+}
+
+function loadGamePlan(roundCatalog) {
+  const catalog = buildPlanCatalog(Array.isArray(roundCatalog) && roundCatalog.length > 0 ? roundCatalog : defaultRoundCatalog())
   try {
     const parsed = JSON.parse(getStorageItem(GAME_PLAN_KEY) || 'null')
-    return normalizePlanIdsWithRoundIntros(parsed, PLAN_CATALOG, { fallbackToDefault: true })
+    return normalizePlanIdsWithRoundIntros(parsed, catalog, { fallbackToDefault: true })
   } catch {
-    return normalizePlanIdsWithRoundIntros(null, PLAN_CATALOG, { fallbackToDefault: true })
+    return normalizePlanIdsWithRoundIntros(null, catalog, { fallbackToDefault: true })
   }
 }
 
@@ -41,7 +55,8 @@ export default function App() {
   const [splashDone, setSplashDone] = useState(false)
   const [session, setSession] = useState(null) // { code, pin } | null
   const [teams, setTeams] = useState(() => loadTeams())
-  const [gamePlanIds, setGamePlanIds] = useState(() => loadGamePlan())
+  const [roundCatalog, setRoundCatalog] = useState(() => loadRoundCatalog())
+  const [gamePlanIds, setGamePlanIds] = useState(() => loadGamePlan(loadRoundCatalog()))
   const [needsPlanConfig, setNeedsPlanConfig] = useState(false)
   useWakeLock(true)
 
@@ -79,22 +94,31 @@ export default function App() {
   function handleStart(newTeams) {
     setStorageItem(TEAMS_KEY, JSON.stringify(newTeams))
     setTeams(newTeams)
-    setGamePlanIds(loadGamePlan())
+    const storedRoundCatalog = loadRoundCatalog()
+    setRoundCatalog(storedRoundCatalog)
+    setGamePlanIds(loadGamePlan(storedRoundCatalog))
     setNeedsPlanConfig(true)
   }
 
-  function handlePlanConfirm(nextPlanIds) {
+  function handlePlanConfirm(payload) {
+    const nextPlanIds = Array.isArray(payload?.planIds) ? payload.planIds : []
+    const nextRoundCatalog = normalizeRoundCatalog(payload?.roundCatalog)
+    const effectiveRoundCatalog = nextRoundCatalog.length > 0 ? nextRoundCatalog : defaultRoundCatalog()
+    setStorageItem(ROUND_CATALOG_KEY, JSON.stringify(effectiveRoundCatalog))
     setStorageItem(GAME_PLAN_KEY, JSON.stringify(nextPlanIds))
     // Fresh game config should always start from home, never reuse a stale cursor.
     setStorageItem(ACTIVE_QUESTION_KEY, JSON.stringify(null))
     setGamePlanIds(nextPlanIds)
+    setRoundCatalog(effectiveRoundCatalog)
     setNeedsPlanConfig(false)
   }
 
   function handleSession(code, pin) {
     setSession({ code, pin })
     setTeams(loadTeams())
-    setGamePlanIds(loadGamePlan())
+    const storedRoundCatalog = loadRoundCatalog()
+    setRoundCatalog(storedRoundCatalog)
+    setGamePlanIds(loadGamePlan(storedRoundCatalog))
     setNeedsPlanConfig(false)
   }
 
@@ -121,6 +145,8 @@ export default function App() {
           <Setup onStart={handleStart} />
         ) : needsPlanConfig ? (
           <GameConfig
+            session={session}
+            initialRoundCatalog={roundCatalog}
             initialPlanIds={gamePlanIds}
             onConfirm={handlePlanConfirm}
             onBack={() => {
@@ -131,15 +157,20 @@ export default function App() {
         ) : (
           <Scoreboard
             teams={teams}
+            initialRoundCatalog={roundCatalog}
             initialPlanIds={gamePlanIds}
             onReset={() => {
               setTeams(null)
-              setGamePlanIds(loadGamePlan())
+              const storedRoundCatalog = loadRoundCatalog()
+              setRoundCatalog(storedRoundCatalog)
+              setGamePlanIds(loadGamePlan(storedRoundCatalog))
             }}
             onEndSession={() => {
               setTeams(null)
               setSession(null)
-              setGamePlanIds(loadGamePlan())
+              const storedRoundCatalog = loadRoundCatalog()
+              setRoundCatalog(storedRoundCatalog)
+              setGamePlanIds(loadGamePlan(storedRoundCatalog))
             }}
           />
         )}

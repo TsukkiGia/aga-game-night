@@ -1,3 +1,5 @@
+import { normalizeRoundCatalog } from './roundCatalog.js'
+
 export function initialState() {
   return {
     teams: [],
@@ -14,6 +16,7 @@ export function initialState() {
     doneQuestions: [],
     doublePoints: false,
     gamePlan: [],
+    roundCatalog: [],
   }
 }
 
@@ -56,6 +59,8 @@ export function normalizeGamePlan(rawPlan) {
   }
   return normalized
 }
+
+export { normalizeRoundCatalog }
 
 export function normalizeTeams(rawTeams) {
   if (!Array.isArray(rawTeams)) return null

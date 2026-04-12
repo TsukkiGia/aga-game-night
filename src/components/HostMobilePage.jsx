@@ -4,6 +4,7 @@ import { socket } from '../socket'
 import { mapHostAuthError } from '../auth'
 import { normalizeQuestionCursor, readHostCredentials, writeHostCredentials, clearHostCredentials } from '../storage'
 import { buildPlanCatalog, defaultPlanIds, normalizeCursorId } from '../gamePlan'
+import { normalizeRoundCatalog } from '../roundCatalog'
 
 const SOUND_BUTTONS = [
   { label: 'Crickets', key: 'crickets' },
@@ -32,16 +33,15 @@ const SHOW_SOUND_STATUS = (() => {
   return /^(1|true|yes)$/i.test(queryDebug.trim())
 })()
 
-const PLAN_CATALOG = buildPlanCatalog(rounds)
-const DEFAULT_PLAN_IDS = defaultPlanIds(PLAN_CATALOG)
+const DEFAULT_ROUND_CATALOG = normalizeRoundCatalog(rounds)
 
-function normalizeCursor(rawCursor) {
+function normalizeCursor(rawCursor, planCatalog, planIds) {
   const normalized = normalizeQuestionCursor(rawCursor)
-  return normalizeCursorId(normalized, DEFAULT_PLAN_IDS, PLAN_CATALOG)
+  return normalizeCursorId(normalized, planIds, planCatalog)
 }
 
-function extractAnswerView(activeQuestion) {
-  const cursorId = normalizeCursor(activeQuestion)
+function extractAnswerView(activeQuestion, roundCatalog, planCatalog, planIds) {
+  const cursorId = normalizeCursor(activeQuestion, planCatalog, planIds)
   if (cursorId === null) {
     return {
       status: 'waiting',
@@ -51,7 +51,7 @@ function extractAnswerView(activeQuestion) {
     }
   }
 
-  const item = PLAN_CATALOG.byId.get(cursorId)
+  const item = planCatalog.byId.get(cursorId)
   if (!item) {
     return {
       status: 'invalid',
@@ -63,7 +63,7 @@ function extractAnswerView(activeQuestion) {
 
   const roundIndex = item.roundIndex
   const questionIndex = item.questionIndex
-  const round = rounds[roundIndex]
+  const round = roundCatalog[roundIndex]
   if (!round) {
     return {
       status: 'invalid',
@@ -73,10 +73,12 @@ function extractAnswerView(activeQuestion) {
     }
   }
 
+  const roundLabel = round.label || `Round ${roundIndex + 1}`
+
   if (item.type === 'round-intro') {
     return {
       status: 'intro',
-      heading: `${round.label} — ${round.name}`,
+      heading: `${roundLabel} — ${round.name}`,
       roundLabel: round.intro,
       rows: round.rules.map((rule, i) => ({ label: `${i + 1}.`, value: rule })),
     }
@@ -95,10 +97,10 @@ function extractAnswerView(activeQuestion) {
   if (round.type === 'video') {
     return {
       status: 'ok',
-      heading: `${round.label} • Q${questionIndex + 1}`,
+      heading: `${roundLabel} • Q${questionIndex + 1}`,
       roundLabel: round.name,
       rows: [
-        { label: 'Language', value: question.answer },
+        { label: 'Answer', value: question.answer },
         ...(question.countries?.length ? [{ label: 'Countries', value: question.countries.join(', ') }] : []),
         ...(question.explanation ? [{ label: 'Explanation', value: question.explanation }] : []),
       ],
@@ -108,7 +110,7 @@ function extractAnswerView(activeQuestion) {
   if (round.type === 'slang') {
     return {
       status: 'ok',
-      heading: `${round.label} • Q${questionIndex + 1}`,
+      heading: `${roundLabel} • Q${questionIndex + 1}`,
       roundLabel: round.name,
       rows: [
         { label: 'Term', value: question.term },
@@ -120,7 +122,7 @@ function extractAnswerView(activeQuestion) {
   if (round.type === 'charades') {
     return {
       status: 'ok',
-      heading: `${round.label} • Q${questionIndex + 1}`,
+      heading: `${roundLabel} • Q${questionIndex + 1}`,
       roundLabel: round.name,
       rows: [{ label: 'Phrase', value: question.phrase }],
     }
@@ -129,11 +131,26 @@ function extractAnswerView(activeQuestion) {
   if (round.type === 'thesis') {
     return {
       status: 'ok',
-      heading: `${round.label} • Q${questionIndex + 1}`,
+      heading: `${roundLabel} • Q${questionIndex + 1}`,
       roundLabel: round.name,
       rows: [
         { label: 'Title', value: question.title },
         { label: 'Note', value: 'No fixed answer. Winner is decided by vote.' },
+      ],
+    }
+  }
+
+  if (round.type === 'custom-buzz') {
+    return {
+      status: 'ok',
+      heading: `${roundLabel} • Q${questionIndex + 1}`,
+      roundLabel: round.name,
+      rows: [
+        ...(question.promptType ? [{ label: 'Prompt', value: question.promptType }] : []),
+        ...(question.promptText ? [{ label: 'Text', value: question.promptText }] : []),
+        ...(question.mediaUrl ? [{ label: 'Media URL', value: question.mediaUrl }] : []),
+        { label: 'Answer', value: question.answer },
+        ...(question.explanation ? [{ label: 'Explanation', value: question.explanation }] : []),
       ],
     }
   }
@@ -150,7 +167,8 @@ export default function HostMobilePage() {
   const savedHostCredentials = readHostCredentials()
   const [connected, setConnected] = useState(false)
   const [authorized, setAuthorized] = useState(false)
-  const [activeQuestion, setActiveQuestion] = useState(null)
+  const [activeQuestionRaw, setActiveQuestionRaw] = useState(null)
+  const [roundCatalog, setRoundCatalog] = useState(DEFAULT_ROUND_CATALOG)
   const [buzzActive, setBuzzActive] = useState(false)
   const [timerRunning, setTimerRunning] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -161,6 +179,8 @@ export default function HostMobilePage() {
   })
   const [soundStatus, setSoundStatus] = useState('')
   const [streakStatus, setStreakStatus] = useState('')
+  const planCatalog = useMemo(() => buildPlanCatalog(roundCatalog), [roundCatalog])
+  const planIds = useMemo(() => defaultPlanIds(planCatalog), [planCatalog])
   const pendingSoundRequestIdRef = useRef('')
   const pendingSoundTimeoutRef = useRef(null)
   const soundStatusTimeoutRef = useRef(null)
@@ -232,7 +252,12 @@ export default function HostMobilePage() {
         setAuthorized(true)
         setErrorMsg('')
         socket.emit('host:question:get', (questionResult) => {
-          if (questionResult?.ok) setActiveQuestion(normalizeCursor(questionResult.activeQuestion))
+          if (questionResult?.ok) {
+            const incomingRoundCatalog = normalizeRoundCatalog(questionResult.roundCatalog)
+            const effectiveRoundCatalog = incomingRoundCatalog.length > 0 ? incomingRoundCatalog : DEFAULT_ROUND_CATALOG
+            setRoundCatalog(effectiveRoundCatalog)
+            setActiveQuestionRaw(questionResult.activeQuestion)
+          }
           setAuthLoading(false)
           resolve({ ok: true })
         })
@@ -260,7 +285,7 @@ export default function HostMobilePage() {
     }
 
     function onHostQuestion(cursor) {
-      setActiveQuestion(normalizeCursor(cursor))
+      setActiveQuestionRaw(cursor)
     }
 
     function onSoundResult(result) {
@@ -312,7 +337,10 @@ export default function HostMobilePage() {
     }
   }, [clearPendingSoundTimeout, clearSoundStatusTimeout, clearStreakStatusTimeout, setTransientSoundStatus, setTransientStreakStatus, submitAuth])
 
-  const answerView = useMemo(() => extractAnswerView(activeQuestion), [activeQuestion])
+  const answerView = useMemo(
+    () => extractAnswerView(activeQuestionRaw, roundCatalog, planCatalog, planIds),
+    [activeQuestionRaw, roundCatalog, planCatalog, planIds]
+  )
 
   function triggerSound(soundKey) {
     if (!authorized) return

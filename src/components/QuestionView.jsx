@@ -5,19 +5,19 @@ import VideoBody from './VideoBody'
 import SlangBody from './SlangBody'
 import CharadesBody from './CharadesBody'
 import ThesisBody from './ThesisBody'
-import roundsData from '../rounds'
-import { buildPlanCatalog, questionItemIdFor } from '../gamePlan'
-
-const PLAN_CATALOG = buildPlanCatalog(roundsData)
+import CustomBuzzBody from './CustomBuzzBody'
+import { questionItemIdFor } from '../gamePlan'
 let lastQuestionSidebarScrollTop = 0
 
-function isQuestionDone(doneQuestions, roundIndex, questionIndex) {
+function isQuestionDone(doneQuestions, roundIndex, questionIndex, planCatalog) {
   if (doneQuestions?.has(`${roundIndex}-${questionIndex}`)) return true
-  const itemId = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+  if (!planCatalog) return false
+  const itemId = questionItemIdFor(roundIndex, questionIndex, planCatalog)
   return Boolean(itemId && doneQuestions?.has(itemId))
 }
 
 export default function QuestionView({
+  planCatalog = null,
   rounds, roundIndex, questionIndex, doneQuestions,
   teams, streaks, buzzWinner, armed,
   onAdjust, onArm, onDismiss,
@@ -177,7 +177,7 @@ export default function QuestionView({
           </button>
           {sidebarOpen && rounds.map((r, ri) => {
             if (!isRoundIncluded(ri)) return null
-            const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis' }
+            const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis', 'custom-buzz': 'Question' }
             return (
               <div key={ri} className="qv-sidebar-group">
                 <button
@@ -188,7 +188,7 @@ export default function QuestionView({
                 </button>
                 {r.questions.map((_q, qi) => {
                   if (!isQuestionIncluded(ri, qi)) return null
-                  const done = isQuestionDone(doneQuestions, ri, qi)
+                  const done = isQuestionDone(doneQuestions, ri, qi, planCatalog)
                   const active = ri === roundIndex && qi === questionIndex
                   const displayNumber = getQuestionDisplayNumber(ri, qi)
                   return (
@@ -197,7 +197,7 @@ export default function QuestionView({
                       className={`qv-sidebar-item${active ? ' active' : ''}${done ? ' done' : ''}`}
                       onClick={() => navigateFromSidebar(ri, qi)}
                     >
-                      {done ? '✓ ' : ''}{typeLabel[r.type]} {displayNumber}
+                      {done ? '✓ ' : ''}{typeLabel[r.type] || 'Q'} {displayNumber}
                     </button>
                   )
                 })}
@@ -210,6 +210,7 @@ export default function QuestionView({
         <div className="qv-body">
           {round.type === 'video'    && <VideoBody    key={question.id} question={question} paused={!!buzzWinner} />}
           {round.type === 'slang'    && <SlangBody    key={question.id} question={question} />}
+          {round.type === 'custom-buzz' && <CustomBuzzBody key={question.id} question={question} paused={!!buzzWinner} />}
           {round.type === 'charades' && (
             <div className="charades-wrap">
               <div className="charades-active-teams">

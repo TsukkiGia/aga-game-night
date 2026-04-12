@@ -16,6 +16,7 @@ function createFakeQuery() {
   const teamsBySession = new Map()
   const gameStateBySession = new Map()
   const buzzStateBySession = new Map()
+  const roundTemplates = new Map()
 
   return async function fakeQuery(text, params = []) {
     if (text.includes('INSERT INTO sessions')) {
@@ -34,6 +35,13 @@ function createFakeQuery() {
       const session = sessions.get(id)
       if (!session || session.status !== 'active') return { rows: [], rowCount: 0 }
       return { rows: [{ pin_hash: session.pin_hash }], rowCount: 1 }
+    }
+
+    if (text.includes("SELECT id, pin_hash FROM sessions WHERE id = $1 AND status = 'active'")) {
+      const [id] = params
+      const session = sessions.get(id)
+      if (!session || session.status !== 'active') return { rows: [], rowCount: 0 }
+      return { rows: [{ id, pin_hash: session.pin_hash }], rowCount: 1 }
     }
 
     if (text.includes('DELETE FROM teams WHERE session_id = $1 AND idx >= $2')) {
@@ -67,10 +75,14 @@ function createFakeQuery() {
     }
 
     if (text.includes('INSERT INTO game_state')) {
-      const [sessionId, roundIndex, questionIndex, armed, streaksRaw, doneQuestionsRaw, hostQuestionCursorRaw, doublePoints] = params
+      const [sessionId, roundIndex, questionIndex, armed, streaksRaw, doneQuestionsRaw, hostQuestionCursorRaw, doublePoints, gamePlanRaw, roundCatalogRaw] = params
       let hostQuestionCursor = hostQuestionCursorRaw
       if (typeof hostQuestionCursorRaw === 'string') {
         try { hostQuestionCursor = JSON.parse(hostQuestionCursorRaw) } catch { hostQuestionCursor = null }
+      }
+      let roundCatalog = roundCatalogRaw
+      if (typeof roundCatalogRaw === 'string') {
+        try { roundCatalog = JSON.parse(roundCatalogRaw) } catch { roundCatalog = [] }
       }
       gameStateBySession.set(sessionId, {
         round_index: Number.parseInt(roundIndex, 10) || 0,
@@ -80,6 +92,8 @@ function createFakeQuery() {
         done_questions: Array.isArray(doneQuestionsRaw) ? [...doneQuestionsRaw] : [],
         host_question_cursor: hostQuestionCursor,
         double_points: Boolean(doublePoints),
+        game_plan: Array.isArray(gamePlanRaw) ? [...gamePlanRaw] : [],
+        round_catalog: Array.isArray(roundCatalog) ? [...roundCatalog] : [],
       })
       return { rows: [], rowCount: 1 }
     }
@@ -108,6 +122,8 @@ function createFakeQuery() {
         done_questions: [],
         host_question_cursor: null,
         double_points: false,
+        game_plan: [],
+        round_catalog: [],
       }
       const bs = buzzStateBySession.get(sessionId) || {
         winner_team_index: null,
@@ -125,6 +141,8 @@ function createFakeQuery() {
             gs_streaks: gs.streaks,
             gs_done_questions: gs.done_questions,
             gs_double_points: gs.double_points,
+            gs_game_plan: gs.game_plan,
+            gs_round_catalog: gs.round_catalog,
             gs_host_question_cursor: gs.host_question_cursor,
             bs_winner_team_index: bs.winner_team_index,
             bs_buzzed_member_name: bs.buzzed_member_name,
@@ -147,6 +165,8 @@ function createFakeQuery() {
           gs_streaks: gs.streaks,
           gs_done_questions: gs.done_questions,
           gs_double_points: gs.double_points,
+          gs_game_plan: gs.game_plan,
+          gs_round_catalog: gs.round_catalog,
           gs_host_question_cursor: gs.host_question_cursor,
           bs_winner_team_index: bs.winner_team_index,
           bs_buzzed_member_name: bs.buzzed_member_name,
@@ -166,6 +186,29 @@ function createFakeQuery() {
       if (!session) return { rows: [], rowCount: 0 }
       session.status = 'ended'
       return { rows: [], rowCount: 1 }
+    }
+
+    if (text.includes('INSERT INTO round_templates')) {
+      const [id, name, type, intro, rulesRaw, scoringRaw, questionsRaw, createdBySessionId] = params
+      const row = {
+        id,
+        name,
+        type,
+        intro,
+        rules: typeof rulesRaw === 'string' ? JSON.parse(rulesRaw) : rulesRaw,
+        scoring: typeof scoringRaw === 'string' ? JSON.parse(scoringRaw) : scoringRaw,
+        questions: typeof questionsRaw === 'string' ? JSON.parse(questionsRaw) : questionsRaw,
+        created_by_session_id: createdBySessionId,
+        created_at: new Date().toISOString(),
+      }
+      roundTemplates.set(id, row)
+      return { rows: [row], rowCount: 1 }
+    }
+
+    if (text.includes('FROM round_templates')) {
+      const rows = [...roundTemplates.values()]
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      return { rows, rowCount: rows.length }
     }
 
     throw new Error(`Unsupported query in test fake: ${text}`)
@@ -269,8 +312,86 @@ async function createHarness() {
     await server.stop()
   }
 
-  return { connect, close, createSession, getState: server.getState, getSessions: server.getSessions }
+  return { connect, close, createSession, baseUrl, getState: server.getState, getSessions: server.getSessions }
 }
+
+test('template endpoints require host credentials and return created templates', async () => {
+  const harness = await createHarness()
+  try {
+    const { sessionCode, pin } = await harness.createSession()
+    const payload = {
+      name: 'Custom Music Snippets',
+      intro: 'Name the song',
+      type: 'custom-buzz',
+      rules: ['Buzz in quickly'],
+      scoring: [
+        { label: 'Correct answer', points: 3, phase: 'normal' },
+        { label: 'Correct steal', points: 2, phase: 'steal' },
+      ],
+      questions: [
+        {
+          promptType: 'text',
+          promptText: 'Name this song',
+          answer: 'Answer A',
+        },
+      ],
+    }
+
+    const unauthenticated = await fetch(`${harness.baseUrl}/api/round-templates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    assert.equal(unauthenticated.status, 401)
+
+    const invalidPayloadRes = await fetch(`${harness.baseUrl}/api/round-templates`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-session-code': sessionCode,
+        'x-host-pin': pin,
+      },
+      body: JSON.stringify({ name: 'Bad', scoring: [], questions: [] }),
+    })
+    assert.equal(invalidPayloadRes.status, 400)
+
+    const createdRes = await fetch(`${harness.baseUrl}/api/round-templates`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-session-code': sessionCode,
+        'x-host-pin': pin,
+      },
+      body: JSON.stringify(payload),
+    })
+    assert.equal(createdRes.status, 201)
+    const created = await createdRes.json()
+    assert.equal(created.template.type, 'custom-buzz')
+    assert.equal(created.template.name, payload.name)
+    assert.ok(Array.isArray(created.template.questions))
+
+    const listRes = await fetch(`${harness.baseUrl}/api/round-templates`, {
+      headers: {
+        'x-session-code': sessionCode,
+        'x-host-pin': pin,
+      },
+    })
+    assert.equal(listRes.status, 200)
+    const listed = await listRes.json()
+    assert.ok(Array.isArray(listed.templates))
+    assert.ok(listed.templates.some((template) => template.id === created.template.id))
+
+    const wrongPinRes = await fetch(`${harness.baseUrl}/api/round-templates`, {
+      headers: {
+        'x-session-code': sessionCode,
+        'x-host-pin': 'wrong-pin',
+      },
+    })
+    assert.equal(wrongPinRes.status, 401)
+  } finally {
+    await harness.close()
+  }
+})
 
 test('first buzz wins under near-simultaneous buzzes', async () => {
   const harness = await createHarness()
@@ -502,6 +623,18 @@ test('runtime scoreboard state persists and rehydrates after reconnect', async (
       doneQuestions: ['0-0', '0-1'],
       streaks: [2, 1],
       doublePoints: true,
+      roundCatalog: [
+        {
+          id: 'custom-template-test',
+          templateId: 'test',
+          type: 'custom-buzz',
+          name: 'Custom Round',
+          intro: 'Test intro',
+          rules: ['Rule 1'],
+          scoring: [{ label: 'Correct', points: 3, phase: 'normal' }],
+          questions: [{ id: 'cq-1', promptType: 'text', promptText: 'Prompt', answer: 'Answer' }],
+        },
+      ],
     })
     assert.equal(runtimeUpdate.ok, true)
 
@@ -519,6 +652,9 @@ test('runtime scoreboard state persists and rehydrates after reconnect', async (
     assert.deepEqual(sync.doneQuestions, ['0-0', '0-1'])
     assert.deepEqual(sync.streaks, [2, 1])
     assert.equal(sync.doublePoints, true)
+    assert.equal(Array.isArray(sync.roundCatalog), true)
+    assert.equal(sync.roundCatalog[0]?.id, 'custom-template-test')
+    assert.equal(sync.roundCatalog[0]?.templateId, 'test')
   } finally {
     await harness.close()
   }
@@ -713,6 +849,41 @@ test('host question cursor sync requires auth and broadcasts updates', async () 
     const getResult = await emitAck(other, 'host:question:get')
     assert.equal(getResult.ok, true)
     assert.deepEqual(getResult.activeQuestion, [1, 2])
+  } finally {
+    await harness.close()
+  }
+})
+
+test('host:question:get returns round catalog for companion answer view', async () => {
+  const harness = await createHarness()
+  try {
+    const controller = await harness.connect()
+    const companion = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(controller, sessionCode, pin)
+    await emitAck(controller, 'host:setup', {
+      teams: TEAMS,
+      roundCatalog: [
+        {
+          id: 'custom-template-mobile',
+          templateId: 'mobile-template',
+          type: 'custom-buzz',
+          name: 'Custom Mobile Round',
+          intro: '',
+          rules: ['Rule'],
+          scoring: [{ label: 'Correct', points: 3, phase: 'normal' }],
+          questions: [{ id: 'cq-1', promptType: 'text', promptText: 'Prompt', answer: 'Answer' }],
+        },
+      ],
+    })
+
+    await authCompanion(companion, sessionCode, pin)
+    const result = await emitAck(companion, 'host:question:get')
+    assert.equal(result.ok, true)
+    assert.ok(Array.isArray(result.roundCatalog))
+    assert.equal(result.roundCatalog[0]?.id, 'custom-template-mobile')
+    assert.equal(result.roundCatalog[0]?.templateId, 'mobile-template')
   } finally {
     await harness.close()
   }

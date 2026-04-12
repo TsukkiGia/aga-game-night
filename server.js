@@ -4,6 +4,7 @@ import { Server } from 'socket.io'
 import { fileURLToPath } from 'url'
 import { dirname, join, resolve } from 'path'
 import bcrypt from 'bcryptjs'
+import { randomUUID } from 'node:crypto'
 import { runMigrations, query } from './src/db.js'
 import { generateSessionCode } from './backend/sessionCode.js'
 import { isHostAuthorized, isHostController, normalizeHostRole } from './backend/hostAuth.js'
@@ -17,10 +18,12 @@ import {
   normalizeTeams,
   normalizeAllowedTeamIndices,
   normalizeGamePlan,
+  normalizeRoundCatalog,
 } from './backend/state/sessionState.js'
 import { createRuntimeStore } from './backend/state/runtimeStore.js'
 import { hostRoom, ctrlRoom, memberTeamRoom } from './backend/socket/rooms.js'
 import { removeFromMembers, leaveTeamRooms, broadcastMembers } from './backend/socket/memberRegistry.js'
+import { normalizeRoundTemplatePayload, roundFromTemplateRow } from './backend/state/roundCatalog.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DEBUG_BUZZ = /^(1|true|yes)$/i.test(process.env.DEBUG_BUZZ || '')
@@ -63,6 +66,20 @@ export function createBuzzServer({ queryFn = query } = {}) {
   const sessions = new Map()
   const pendingSoundResults = new Map()
   const authAttempts = new Map()
+
+  async function authenticateHostRequest(sessionCodeRaw, pinRaw) {
+    const sessionCode = String(sessionCodeRaw || '').trim().toUpperCase()
+    const pin = String(pinRaw || '').trim()
+    if (!sessionCode || !pin) return { ok: false, error: 'missing-credentials' }
+    const { rows } = await queryFn(
+      "SELECT id, pin_hash FROM sessions WHERE id = $1 AND status = 'active'",
+      [sessionCode]
+    )
+    if (rows.length === 0) return { ok: false, error: 'session-not-found' }
+    const valid = await bcrypt.compare(pin, rows[0].pin_hash)
+    if (!valid) return { ok: false, error: 'unauthorized' }
+    return { ok: true, sessionCode }
+  }
 
   function authAttemptKey(socket) {
     return String(socket.handshake.address || socket.id || 'unknown')
@@ -132,6 +149,84 @@ export function createBuzzServer({ queryFn = query } = {}) {
     }
   })
 
+  app.get('/api/round-templates', async (req, res) => {
+    try {
+      const auth = await authenticateHostRequest(
+        req.header('x-session-code') || req.query?.sessionCode,
+        req.header('x-host-pin') || req.query?.pin
+      )
+      if (!auth.ok) return res.status(401).json({ error: auth.error })
+
+      const { rows } = await queryFn(
+        `
+          SELECT id, name, type, intro, rules, scoring, questions, created_at
+          FROM round_templates
+          WHERE type = 'custom-buzz'
+          ORDER BY created_at DESC
+          LIMIT 250
+        `
+      )
+
+      const templates = rows
+        .map((row) => roundFromTemplateRow(row))
+        .filter(Boolean)
+
+      res.json({ templates })
+    } catch (err) {
+      console.error('[GET /api/round-templates]', err)
+      res.status(500).json({ error: 'server-error' })
+    }
+  })
+
+  app.post('/api/round-templates', async (req, res) => {
+    try {
+      const auth = await authenticateHostRequest(
+        req.header('x-session-code') || req.body?.sessionCode,
+        req.header('x-host-pin') || req.body?.pin
+      )
+      if (!auth.ok) return res.status(401).json({ error: auth.error })
+
+      const normalizedTemplate = normalizeRoundTemplatePayload(req.body)
+      if (!normalizedTemplate) {
+        return res.status(400).json({ error: 'invalid-template' })
+      }
+
+      const templateId = randomUUID()
+      const { rows } = await queryFn(
+        `
+          INSERT INTO round_templates (
+            id,
+            name,
+            type,
+            intro,
+            rules,
+            scoring,
+            questions,
+            created_by_session_id
+          )
+          VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8)
+          RETURNING id, name, type, intro, rules, scoring, questions, created_at
+        `,
+        [
+          templateId,
+          normalizedTemplate.name,
+          normalizedTemplate.type,
+          normalizedTemplate.intro,
+          JSON.stringify(normalizedTemplate.rules),
+          JSON.stringify(normalizedTemplate.scoring),
+          JSON.stringify(normalizedTemplate.questions),
+          auth.sessionCode,
+        ]
+      )
+      const template = roundFromTemplateRow(rows[0] || null)
+      if (!template) return res.status(500).json({ error: 'invalid-template-saved' })
+      res.status(201).json({ template })
+    } catch (err) {
+      console.error('[POST /api/round-templates]', err)
+      res.status(500).json({ error: 'server-error' })
+    }
+  })
+
   // ── Socket connection ───────────────────────────────────────────────────
   io.on('connection', (socket) => {
     debugLog(`[connect] socket=${socket.id}`)
@@ -163,6 +258,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
       normalizeQuestionCursor,
       normalizeAllowedTeamIndices,
       normalizeGamePlan,
+      normalizeRoundCatalog,
       serializeEligibilityState,
       isHostAuthorized,
       isHostController,

@@ -1,19 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import QRImg from './QRImg'
 import MemberRoster from './MemberRoster'
-import roundsData from '../rounds'
-import { buildPlanCatalog, questionItemIdFor } from '../gamePlan'
+import { questionItemIdFor } from '../gamePlan'
 
-const PLAN_CATALOG = buildPlanCatalog(roundsData)
-let lastRoundIntroSidebarScrollTop = 0
-
-function isQuestionDone(doneQuestions, roundIndex, questionIndex) {
+function isQuestionDone(doneQuestions, roundIndex, questionIndex, planCatalog) {
   if (doneQuestions?.has(`${roundIndex}-${questionIndex}`)) return true
-  const itemId = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+  if (!planCatalog) return false
+  const itemId = questionItemIdFor(roundIndex, questionIndex, planCatalog)
   return Boolean(itemId && doneQuestions?.has(itemId))
 }
 
 export default function RoundIntroView({
+  planCatalog = null,
   rounds, roundIndex, doneQuestions,
   teams, members, buzzerUrl,
   onNavigate, onBack,
@@ -24,6 +22,7 @@ export default function RoundIntroView({
 }) {
   const round = rounds[roundIndex]
   const [qrOpen, setQrOpen] = useState(false)
+  const [sidebarScrollTop, setSidebarScrollTop] = useState(0)
 
   return (
     <div className="question-view">
@@ -44,6 +43,9 @@ export default function RoundIntroView({
         {/* Left sidebar */}
         <Sidebar
           rounds={rounds}
+          planCatalog={planCatalog}
+          savedScrollTop={sidebarScrollTop}
+          onRememberScroll={setSidebarScrollTop}
           roundIndex={roundIndex}
           activeQIdx={null}
           doneQuestions={doneQuestions}
@@ -80,7 +82,7 @@ export default function RoundIntroView({
                   </div>
                 ))}
               </div>
-              {round.type === 'video' && (
+              {round.type === 'video' && round.questions.some((q) => Array.isArray(q.countries) && q.countries.length > 0) && (
                 <p className="round-intro-steal-note">
                   Steal is always for the <strong>language</strong> (+2 pts), regardless of what the buzzing team got wrong. Country (+1) is only for the team that buzzed in — no country steal.
                 </p>
@@ -121,6 +123,9 @@ export default function RoundIntroView({
 }
 
 function Sidebar({
+  planCatalog,
+  savedScrollTop,
+  onRememberScroll,
   rounds,
   roundIndex,
   activeQIdx,
@@ -136,12 +141,12 @@ function Sidebar({
   useEffect(() => {
     const container = sidebarRef.current
     if (!container) return
-    container.scrollTop = lastRoundIntroSidebarScrollTop
-  }, [])
+    container.scrollTop = Number(savedScrollTop) || 0
+  }, [savedScrollTop])
 
   function navigateFromSidebar(nextRoundIndex, nextQuestionIndex) {
     if (sidebarRef.current) {
-      lastRoundIntroSidebarScrollTop = sidebarRef.current.scrollTop
+      onRememberScroll?.(sidebarRef.current.scrollTop)
     }
     onNavigate(nextRoundIndex, nextQuestionIndex)
   }
@@ -152,12 +157,12 @@ function Sidebar({
       ref={sidebarRef}
       onScroll={() => {
         if (!sidebarRef.current) return
-        lastRoundIntroSidebarScrollTop = sidebarRef.current.scrollTop
+        onRememberScroll?.(sidebarRef.current.scrollTop)
       }}
     >
       {rounds.map((r, ri) => {
         if (!isRoundIncluded(ri)) return null
-        const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis' }
+        const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis', 'custom-buzz': 'Question' }
         return (
           <div key={ri} className="qv-sidebar-group">
             <button
@@ -168,7 +173,7 @@ function Sidebar({
             </button>
             {r.questions.map((_q, qi) => {
               if (!isQuestionIncluded(ri, qi)) return null
-              const done = isQuestionDone(doneQuestions, ri, qi)
+              const done = isQuestionDone(doneQuestions, ri, qi, planCatalog)
               const active = ri === roundIndex && qi === activeQIdx
               const displayNumber = getQuestionDisplayNumber(ri, qi)
               return (
@@ -177,7 +182,7 @@ function Sidebar({
                   className={`qv-sidebar-item${active ? ' active' : ''}${done ? ' done' : ''}`}
                   onClick={() => navigateFromSidebar(ri, qi)}
                 >
-                  {done ? '✓ ' : ''}{typeLabel[r.type]} {displayNumber}
+                  {done ? '✓ ' : ''}{typeLabel[r.type] || 'Q'} {displayNumber}
                 </button>
               )
             })}

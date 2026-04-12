@@ -8,6 +8,10 @@ export function useGameSocket(initialTeams, options = {}) {
   const onBuzzWinner = typeof options.onBuzzWinner === 'function' ? options.onBuzzWinner : null
   const onBuzzAttempt = typeof options.onBuzzAttempt === 'function' ? options.onBuzzAttempt : null
   const onStateSync = typeof options.onStateSync === 'function' ? options.onStateSync : null
+  const setupPayload = (options.setupPayload && typeof options.setupPayload === 'object' && !Array.isArray(options.setupPayload))
+    ? options.setupPayload
+    : null
+  const setupPayloadRef = useRef(setupPayload)
   const onBuzzWinnerRef = useRef(onBuzzWinner)
   const onBuzzAttemptRef = useRef(onBuzzAttempt)
   const onStateSyncRef = useRef(onStateSync)
@@ -16,7 +20,8 @@ export function useGameSocket(initialTeams, options = {}) {
     onBuzzWinnerRef.current = onBuzzWinner
     onBuzzAttemptRef.current = onBuzzAttempt
     onStateSyncRef.current = onStateSync
-  }, [onBuzzWinner, onBuzzAttempt, onStateSync])
+    setupPayloadRef.current = setupPayload
+  }, [onBuzzWinner, onBuzzAttempt, onStateSync, setupPayload])
   const [armed, setArmed] = useState(false)
   const [buzzWinner, setBuzzWinner] = useState(null)
   const [members, setMembers] = useState([])
@@ -75,7 +80,12 @@ export function useGameSocket(initialTeams, options = {}) {
 
         writeHostCredentials(normalizedSessionCode, normalizedPin)
         setSessionCode(normalizedSessionCode)
-        socket.emit('host:setup', initialTeams, (setupResult) => {
+        const payload = setupPayloadRef.current
+        socket.emit('host:setup', {
+          teams: initialTeams,
+          ...(Array.isArray(payload?.gamePlan) ? { gamePlan: payload.gamePlan } : {}),
+          ...(Array.isArray(payload?.roundCatalog) ? { roundCatalog: payload.roundCatalog } : {}),
+        }, (setupResult) => {
           if (!setupResult?.ok) {
             setHostReady(false)
             setAuthState({

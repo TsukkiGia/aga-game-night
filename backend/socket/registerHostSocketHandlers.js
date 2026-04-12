@@ -15,6 +15,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     normalizeQuestionCursor,
     normalizeAllowedTeamIndices,
     normalizeGamePlan,
+    normalizeRoundCatalog,
     serializeEligibilityState,
     isHostAuthorized,
     isHostController,
@@ -94,18 +95,30 @@ export function registerHostSocketHandlers(socket, ctx) {
   })
 
   // ── Host: register teams ────────────────────────────────────────────
-  socket.on('host:setup', async (teams, callback) => {
+  socket.on('host:setup', async (payload, callback) => {
     const respond = typeof callback === 'function' ? callback : () => {}
     if (!isHostController(socket)) {
       respond({ ok: false, error: 'unauthorized' })
       return
     }
     const code = socket.data.sessionCode
-    const normalizedTeams = normalizeTeams(teams)
+    const payloadObj = (payload && typeof payload === 'object' && !Array.isArray(payload))
+      ? payload
+      : null
+    const rawTeams = payloadObj ? payloadObj.teams : payload
+    const normalizedTeams = normalizeTeams(rawTeams)
     if (!normalizedTeams) {
       respond({ ok: false, error: 'invalid-teams' })
       return
     }
+    const hasIncomingGamePlan = Boolean(payloadObj && Object.hasOwn(payloadObj, 'gamePlan'))
+    const hasIncomingRoundCatalog = Boolean(payloadObj && Object.hasOwn(payloadObj, 'roundCatalog'))
+    const incomingGamePlan = hasIncomingGamePlan
+      ? normalizeGamePlan(payloadObj.gamePlan)
+      : null
+    const incomingRoundCatalog = hasIncomingRoundCatalog
+      ? normalizeRoundCatalog(payloadObj.roundCatalog)
+      : null
     try {
       let st = await ensureState(code)
       if (!st) {
@@ -121,7 +134,8 @@ export function registerHostSocketHandlers(socket, ctx) {
           streaks: normalizedTeams.map(() => 0),
           doneQuestions: [],
           doublePoints: false,
-          gamePlan: normalizeGamePlan(st?.gamePlan),
+          gamePlan: hasIncomingGamePlan ? incomingGamePlan : normalizeGamePlan(st?.gamePlan),
+          roundCatalog: hasIncomingRoundCatalog ? incomingRoundCatalog : normalizeRoundCatalog(st?.roundCatalog),
         }
         sessions.set(code, st)
         io.to(hostRoom(code)).except(socket.id).emit('game:reset')
@@ -137,7 +151,8 @@ export function registerHostSocketHandlers(socket, ctx) {
         })
         if (!Array.isArray(st.doneQuestions)) st.doneQuestions = []
         st.doublePoints = Boolean(st.doublePoints)
-        st.gamePlan = normalizeGamePlan(st.gamePlan)
+        st.gamePlan = hasIncomingGamePlan ? incomingGamePlan : normalizeGamePlan(st.gamePlan)
+        st.roundCatalog = hasIncomingRoundCatalog ? incomingRoundCatalog : normalizeRoundCatalog(st.roundCatalog)
       }
 
       await persistTeams(code, st.teams)
@@ -194,6 +209,9 @@ export function registerHostSocketHandlers(socket, ctx) {
     const normalizedGamePlan = Array.isArray(payload.gamePlan)
       ? normalizeGamePlan(payload.gamePlan)
       : normalizeGamePlan(st.gamePlan)
+    const normalizedRoundCatalog = Array.isArray(payload.roundCatalog)
+      ? normalizeRoundCatalog(payload.roundCatalog)
+      : normalizeRoundCatalog(st.roundCatalog)
 
     st.teams = normalizedTeams.map((team, index) => ({
       ...team,
@@ -203,6 +221,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     st.streaks = normalizedStreaks
     st.doublePoints = Boolean(payload.doublePoints)
     st.gamePlan = normalizedGamePlan
+    st.roundCatalog = normalizedRoundCatalog
 
     try {
       await persistTeams(code, st.teams)
@@ -255,7 +274,12 @@ export function registerHostSocketHandlers(socket, ctx) {
       respond({ ok: false, error: 'session-not-found' })
       return
     }
-    respond({ ok: true, activeQuestion: st.hostQuestionCursor })
+    respond({
+      ok: true,
+      activeQuestion: st.hostQuestionCursor,
+      gamePlan: normalizeGamePlan(st.gamePlan),
+      roundCatalog: normalizeRoundCatalog(st.roundCatalog),
+    })
   })
 
   socket.on('host:end-session', async (callback) => {

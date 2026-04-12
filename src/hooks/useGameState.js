@@ -1,29 +1,40 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { SCORES_KEY, DONE_KEY, loadScores, loadDone, clearAll, setStorageItem } from '../storage'
 import { playCorrect, playWrong } from '../sounds'
 import rounds from '../rounds'
 import { buildPlanCatalog, normalizeDoneQuestionIds, questionItemIdFor } from '../gamePlan'
+import { normalizeRoundCatalog } from '../roundCatalog'
 
 const STREAK_THRESHOLD = 3
-const PLAN_CATALOG = buildPlanCatalog(rounds)
-
-function resolveDoneQuestionId(valueOrRoundIndex, maybeQuestionIndex) {
-  if (Number.isInteger(valueOrRoundIndex) && Number.isInteger(maybeQuestionIndex)) {
-    return questionItemIdFor(valueOrRoundIndex, maybeQuestionIndex, PLAN_CATALOG)
-  }
-  const candidate = String(valueOrRoundIndex || '').trim()
-  if (!candidate) return null
-  if (PLAN_CATALOG.byId.get(candidate)?.type === 'question') return candidate
-  return null
-}
+const DEFAULT_ROUND_CATALOG = normalizeRoundCatalog(rounds)
 
 export function useGameState(initialTeams, options = {}) {
   const onStreak = typeof options.onStreak === 'function' ? options.onStreak : null
+  const effectiveRoundCatalog = useMemo(() => {
+    const normalized = normalizeRoundCatalog(options.roundCatalog)
+    return normalized.length > 0 ? normalized : DEFAULT_ROUND_CATALOG
+  }, [options.roundCatalog])
+  const planCatalog = useMemo(() => buildPlanCatalog(effectiveRoundCatalog), [effectiveRoundCatalog])
+
+  function resolveDoneQuestionId(valueOrRoundIndex, maybeQuestionIndex) {
+    if (Number.isInteger(valueOrRoundIndex) && Number.isInteger(maybeQuestionIndex)) {
+      return questionItemIdFor(valueOrRoundIndex, maybeQuestionIndex, planCatalog)
+    }
+    const candidate = String(valueOrRoundIndex || '').trim()
+    if (!candidate) return null
+    if (planCatalog.byId.get(candidate)?.type === 'question') return candidate
+    return null
+  }
+
   const [teams, setTeams] = useState(() => loadScores(initialTeams))
-  const [doneQuestions, setDoneQuestions] = useState(() => {
+  const [doneQuestionsRaw, setDoneQuestionsRaw] = useState(() => {
     const saved = loadDone()
-    return new Set(normalizeDoneQuestionIds([...saved], PLAN_CATALOG))
+    return new Set([...saved])
   })
+  const doneQuestions = useMemo(
+    () => new Set(normalizeDoneQuestionIds([...doneQuestionsRaw], planCatalog)),
+    [doneQuestionsRaw, planCatalog]
+  )
   const [flashing, setFlashing] = useState(null)
   const [doublePoints, setDoublePoints] = useState(false)
   const [streaks, setStreaks] = useState(() => initialTeams.map(() => 0))
@@ -43,8 +54,10 @@ export function useGameState(initialTeams, options = {}) {
       }))
     }
     if (Array.isArray(snapshot.doneQuestions)) {
-      const nextDone = new Set(normalizeDoneQuestionIds(snapshot.doneQuestions, PLAN_CATALOG))
-      setDoneQuestions(nextDone)
+      const nextDone = snapshot.doneQuestions
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+      setDoneQuestionsRaw(new Set(nextDone))
     }
     if (Array.isArray(snapshot.streaks)) {
       const nextStreaks = initialTeams.map((_, index) => {
@@ -96,13 +109,13 @@ export function useGameState(initialTeams, options = {}) {
   function resetScores() {
     clearAll()
     setTeams(prev => prev.map(t => ({ ...t, score: 0 })))
-    setDoneQuestions(new Set())
+    setDoneQuestionsRaw(new Set())
     clearDoublePoints()
   }
 
   function resetForNewGame() {
     setTeams(prev => prev.map(t => ({ ...t, score: 0 })))
-    setDoneQuestions(new Set())
+    setDoneQuestionsRaw(new Set())
     setStreaks(initialTeams.map(() => 0))
     clearDoublePoints()
   }
@@ -110,8 +123,8 @@ export function useGameState(initialTeams, options = {}) {
   function toggleDone(valueOrRoundIndex, maybeQuestionIndex = null) {
     const key = resolveDoneQuestionId(valueOrRoundIndex, maybeQuestionIndex)
     if (!key) return
-    setDoneQuestions(prev => {
-      const next = new Set(prev)
+    setDoneQuestionsRaw(prevRaw => {
+      const next = new Set(normalizeDoneQuestionIds([...prevRaw], planCatalog))
       next.has(key) ? next.delete(key) : next.add(key)
       return next
     })
@@ -120,8 +133,8 @@ export function useGameState(initialTeams, options = {}) {
   function markDone(valueOrRoundIndex, maybeQuestionIndex = null) {
     const key = resolveDoneQuestionId(valueOrRoundIndex, maybeQuestionIndex)
     if (!key) return
-    setDoneQuestions(prev => {
-      const next = new Set(prev)
+    setDoneQuestionsRaw(prevRaw => {
+      const next = new Set(normalizeDoneQuestionIds([...prevRaw], planCatalog))
       next.add(key)
       return next
     })

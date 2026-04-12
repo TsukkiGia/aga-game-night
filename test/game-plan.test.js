@@ -67,3 +67,20 @@ test('normalizeDoneQuestionIds converts legacy done keys and filters invalid/non
 
   assert.deepEqual(normalized, [qId])
 })
+
+test('plan catalog keeps unique ids with built-in and custom rounds combined', () => {
+  const customCatalog = buildPlanCatalog([
+    ...rounds,
+    {
+      id: 'custom-template-xyz',
+      type: 'custom-buzz',
+      name: 'Custom',
+      intro: '',
+      rules: ['Rule'],
+      scoring: [{ label: 'Correct', points: 3, phase: 'normal' }],
+      questions: [{ id: 'cq-1', promptType: 'text', promptText: 'Prompt', answer: 'Answer' }],
+    },
+  ])
+  const ids = customCatalog.items.map((item) => item.id)
+  assert.equal(new Set(ids).size, ids.length)
+})

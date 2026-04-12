@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { playTick, stopTick, playTimeUp } from '../sounds'
 
+function scoringPhase(entry) {
+  const explicit = String(entry?.phase || '').trim().toLowerCase()
+  if (explicit === 'steal' || explicit === 'normal') return explicit
+  const label = String(entry?.label || '').trim().toLowerCase()
+  return label.includes('steal') ? 'steal' : 'normal'
+}
+
 export default function BuzzModal({
   buzzWinner, teams, round, question,
   stealMode, doublePoints, stealAllowedTeamIndices = null,
@@ -90,9 +97,9 @@ export default function BuzzModal({
         </div>
         <div className="buzz-popup-score">Current Score: {teams[buzzWinner.teamIndex]?.score ?? 0} pts</div>
         <div className="buzz-popup-scoring">
-          {round.scoring
-            .filter(({ label }) => {
-              const isStealEntry = label.toLowerCase().includes('steal')
+          {(round.scoring || [])
+            .filter((entry) => {
+              const isStealEntry = scoringPhase(entry) === 'steal'
               return stealMode ? isStealEntry : !isStealEntry
             })
             .map(({ label, points }) => {
@@ -104,12 +111,13 @@ export default function BuzzModal({
                   onClick={() => {
                     stopCountdown()
                     onAdjust(buzzWinner.teamIndex, points)
-                    const canReveal = round.type === 'slang' || round.type === 'video' || round.type === 'charades'
+                    const canReveal = round.type === 'slang' || round.type === 'video' || round.type === 'charades' || round.type === 'custom-buzz'
+                    const shouldRevealOnPositive = points > 0
                     if (stealMode) {
-                      if (canReveal) setRevealedInModal(true)
+                      if (canReveal && shouldRevealOnPositive) setRevealedInModal(true)
                     } else if (round.type === 'video' && label === 'Correct country') {
                       setRevealedCountry(true)
-                    } else if (points >= 3 && canReveal) {
+                    } else if (canReveal && shouldRevealOnPositive) {
                       setRevealedInModal(true)
                     }
                   }}
@@ -122,7 +130,7 @@ export default function BuzzModal({
             })}
         </div>
 
-        {!stealMode && round.scoring.some(({ label }) => label.toLowerCase().includes('steal')) && (
+        {!stealMode && (round.scoring || []).some((entry) => scoringPhase(entry) === 'steal') && (
           <button
             className="buzz-steal-btn"
             onClick={() => {
@@ -163,6 +171,15 @@ export default function BuzzModal({
               </>
             )}
             {round.type === 'video' && (
+              <>
+                <div className="buzz-popup-answer-label">Answer</div>
+                <div className="buzz-popup-answer-text">{question.answer}</div>
+                {question.explanation && (
+                  <div className="buzz-popup-answer-explanation">{question.explanation}</div>
+                )}
+              </>
+            )}
+            {round.type === 'custom-buzz' && (
               <>
                 <div className="buzz-popup-answer-label">Answer</div>
                 <div className="buzz-popup-answer-text">{question.answer}</div>

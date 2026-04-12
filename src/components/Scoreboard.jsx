@@ -12,6 +12,7 @@ import HomeBuzzOverlay from './HomeBuzzOverlay'
 import { ENDPOINT } from '../config'
 import { socket } from '../socket'
 import rounds from '../rounds'
+import { normalizeRoundCatalog } from '../roundCatalog'
 import { useGameState } from '../hooks/useGameState'
 import { useGameSocket } from '../hooks/useGameSocket'
 import { useNavigation } from '../hooks/useNavigation'
@@ -30,9 +31,9 @@ import {
 const RUNTIME_PERSIST_TIMEOUT_MS = 3000
 const RUNTIME_PERSIST_RETRY_BASE_MS = 600
 const RUNTIME_PERSIST_RETRY_MAX_MS = 5000
-const PLAN_CATALOG = buildPlanCatalog(rounds)
+const DEFAULT_ROUND_CATALOG = normalizeRoundCatalog(rounds)
 
-export default function Scoreboard({ teams: initialTeams, initialPlanIds, onReset, onEndSession }) {
+export default function Scoreboard({ teams: initialTeams, initialPlanIds, initialRoundCatalog, onReset, onEndSession }) {
   const emitStreak = useCallback(({ teamIndex, streakCount }) => {
     socket.emit('host:streak', { teamIndex, streakCount })
   }, [])
@@ -80,6 +81,11 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
     })
   }, [])
   const runtimeHydratedRef = useRef(false)
+  const [roundCatalog, setRoundCatalog] = useState(() => {
+    const normalized = normalizeRoundCatalog(initialRoundCatalog)
+    return normalized.length > 0 ? normalized : DEFAULT_ROUND_CATALOG
+  })
+  const planCatalog = useMemo(() => buildPlanCatalog(roundCatalog), [roundCatalog])
   const {
     teams,
     streaks,
@@ -91,7 +97,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
     resetForNewGame,
     markDone,
     hydrateFromServer,
-  } = useGameState(initialTeams, { onStreak: emitStreak })
+  } = useGameState(initialTeams, { onStreak: emitStreak, roundCatalog })
   const { activeQuestion, transition, navigate, dismissTransition } = useNavigation()
   const [showHalftime, setShowHalftime] = useState(false)
   const [showWinner, setShowWinner] = useState(false)
@@ -107,7 +113,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
   const [newGameError, setNewGameError] = useState('')
   const [authForm, setAuthForm] = useState({ sessionCode: '', pin: '' })
   const [gamePlanIds, setGamePlanIds] = useState(() =>
-    normalizePlanIdsWithRoundIntros(initialPlanIds, PLAN_CATALOG, { fallbackToDefault: true })
+    normalizePlanIdsWithRoundIntros(initialPlanIds, buildPlanCatalog(normalizeRoundCatalog(initialRoundCatalog).length > 0 ? normalizeRoundCatalog(initialRoundCatalog) : DEFAULT_ROUND_CATALOG), { fallbackToDefault: true })
   )
 
   const reactionRows = useMemo(() => {
@@ -116,21 +122,21 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
   }, [reactionStats])
 
   const normalizedPlanIds = useMemo(
-    () => normalizePlanIdsWithRoundIntros(gamePlanIds, PLAN_CATALOG, { fallbackToDefault: true }),
-    [gamePlanIds]
+    () => normalizePlanIdsWithRoundIntros(gamePlanIds, planCatalog, { fallbackToDefault: true }),
+    [gamePlanIds, planCatalog]
   )
   const planIdSet = useMemo(() => new Set(normalizedPlanIds), [normalizedPlanIds])
   const plannedItems = useMemo(
-    () => normalizedPlanIds.map((id) => PLAN_CATALOG.byId.get(id)).filter(Boolean),
-    [normalizedPlanIds]
+    () => normalizedPlanIds.map((id) => planCatalog.byId.get(id)).filter(Boolean),
+    [normalizedPlanIds, planCatalog]
   )
   const activeQuestionId = useMemo(
-    () => normalizeCursorId(activeQuestion, normalizedPlanIds, PLAN_CATALOG),
-    [activeQuestion, normalizedPlanIds]
+    () => normalizeCursorId(activeQuestion, normalizedPlanIds, planCatalog),
+    [activeQuestion, normalizedPlanIds, planCatalog]
   )
   const activeItem = useMemo(
-    () => (activeQuestionId ? PLAN_CATALOG.byId.get(activeQuestionId) || null : null),
-    [activeQuestionId]
+    () => (activeQuestionId ? planCatalog.byId.get(activeQuestionId) || null : null),
+    [activeQuestionId, planCatalog]
   )
   const activePlanIndex = useMemo(
     () => (activeQuestionId ? normalizedPlanIds.indexOf(activeQuestionId) : -1),
@@ -173,37 +179,48 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
     return `Round ${displayNumber}`
   }, [planDisplay])
   const getQuestionDisplayNumber = useCallback((roundIndex, questionIndex) => {
-    const id = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+    const id = questionItemIdFor(roundIndex, questionIndex, planCatalog)
     if (!id) return questionIndex + 1
     return planDisplay.questionDisplayNumberByItemId.get(id) || (questionIndex + 1)
-  }, [planDisplay])
+  }, [planDisplay, planCatalog])
   const getQuestionTotal = useCallback((roundIndex) => {
-    return planDisplay.questionTotalByRound.get(roundIndex) || (rounds[roundIndex]?.questions?.length || 0)
-  }, [planDisplay])
+    return planDisplay.questionTotalByRound.get(roundIndex) || (roundCatalog[roundIndex]?.questions?.length || 0)
+  }, [planDisplay, roundCatalog])
   const transitionRoundLabel = useMemo(() => {
     if (!transition) return null
-    const idx = rounds.findIndex((round) => round?.id === transition?.id)
+    const idx = roundCatalog.findIndex((round) => round?.id === transition?.id)
     if (idx < 0) return transition.label
     return getRoundDisplayLabel(idx)
-  }, [transition, getRoundDisplayLabel])
+  }, [transition, getRoundDisplayLabel, roundCatalog])
 
   const handleRuntimeSync = useCallback((serverState) => {
-    const effectivePlan = resolveEffectivePlanForSync(serverState?.gamePlan, normalizedPlanIds, PLAN_CATALOG)
+    const serverRoundCatalog = normalizeRoundCatalog(serverState?.roundCatalog)
+    const effectiveRoundCatalog = serverRoundCatalog.length > 0
+      ? serverRoundCatalog
+      : (roundCatalog.length > 0 ? roundCatalog : DEFAULT_ROUND_CATALOG)
+    const effectivePlanCatalog = buildPlanCatalog(effectiveRoundCatalog)
+    const effectivePlan = resolveEffectivePlanForSync(serverState?.gamePlan, normalizedPlanIds, effectivePlanCatalog)
 
     // On brand-new "New Game" flows, server state can temporarily have an empty
     // plan before the client's selected plan is persisted. Keep local plan in
     // that window to avoid remapping UI back to default ordering.
+    setRoundCatalog(effectiveRoundCatalog)
     setGamePlanIds(effectivePlan)
-    const normalizedDone = normalizeDoneQuestionIds(serverState?.doneQuestions, PLAN_CATALOG)
-    hydrateFromServer({ ...serverState, doneQuestions: normalizedDone })
-    const nextCursor = normalizeCursorId(serverState?.hostQuestionCursor, effectivePlan, PLAN_CATALOG)
+    const normalizedDone = normalizeDoneQuestionIds(serverState?.doneQuestions, effectivePlanCatalog)
+    hydrateFromServer({ ...serverState, doneQuestions: normalizedDone, roundCatalog: effectiveRoundCatalog })
+    const nextCursor = normalizeCursorId(serverState?.hostQuestionCursor, effectivePlan, effectivePlanCatalog)
     navigate(nextCursor, { silent: true })
     runtimeHydratedRef.current = true
-  }, [hydrateFromServer, navigate, normalizedPlanIds])
+  }, [hydrateFromServer, navigate, normalizedPlanIds, roundCatalog])
+
+  const setupPayload = useMemo(() => ({
+    gamePlan: normalizedPlanIds,
+    roundCatalog,
+  }), [normalizedPlanIds, roundCatalog])
 
   const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal, invalidateAuth } = useGameSocket(
     initialTeams,
-    { onBuzzAttempt: handleBuzzAttemptForLeaderboard, onStateSync: handleRuntimeSync }
+    { onBuzzAttempt: handleBuzzAttemptForLeaderboard, onStateSync: handleRuntimeSync, setupPayload }
   )
 
   useEffect(() => {
@@ -237,6 +254,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
       streaks: [...streaks],
       doublePoints: Boolean(doublePoints),
       gamePlan: normalizedPlanIds,
+      roundCatalog,
     }
 
     let cancelled = false
@@ -272,7 +290,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
       cancelled = true
       if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [hostReady, teams, doneQuestions, streaks, doublePoints, normalizedPlanIds, invalidateAuth])
+  }, [hostReady, teams, doneQuestions, streaks, doublePoints, normalizedPlanIds, roundCatalog, invalidateAuth])
 
   function handleTiebreaker(winners) {
     setShowWinner(false)
@@ -342,7 +360,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
   function navigateToCursor(nextCursorId, options = {}) {
     const { clearBuzz = true, transitionRound = null, silent = false } = options
     const currentQuestionId = activeItem?.type === 'question' ? activeItem.id : null
-    const nextItem = nextCursorId ? PLAN_CATALOG.byId.get(nextCursorId) : null
+    const nextItem = nextCursorId ? planCatalog.byId.get(nextCursorId) : null
     if (nextItem?.type === 'question' && nextItem.id !== currentQuestionId) {
       setReactionStats({})
     }
@@ -355,17 +373,17 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
 
   function navigateWithReset(roundIndex, questionIndex = null) {
     if (questionIndex === null) {
-      const introId = PLAN_CATALOG.introIdByRoundIndex.get(roundIndex)
+      const introId = planCatalog.introIdByRoundIndex.get(roundIndex)
       if (!introId || !planIdSet.has(introId)) return
-      navigateToCursor(introId, { transitionRound: rounds[roundIndex] })
+      navigateToCursor(introId, { transitionRound: roundCatalog[roundIndex] })
       return
     }
-    const directId = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+    const directId = questionItemIdFor(roundIndex, questionIndex, planCatalog)
     if (directId && planIdSet.has(directId)) {
       navigateToCursor(directId)
       return
     }
-    const fallback = firstQuestionIdInRound(roundIndex, normalizedPlanIds, PLAN_CATALOG)
+    const fallback = firstQuestionIdInRound(roundIndex, normalizedPlanIds, planCatalog)
     if (fallback) navigateToCursor(fallback)
   }
 
@@ -382,7 +400,8 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
       return (
         <>
           <RoundIntroView
-            rounds={rounds}
+            rounds={roundCatalog}
+            planCatalog={planCatalog}
             roundIndex={rIdx}
             doneQuestions={doneQuestions}
             teams={teams}
@@ -392,7 +411,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
             onBack={goBack}
             isRoundIncluded={(roundIndex) => plannedRoundIndexSet.has(roundIndex)}
             isQuestionIncluded={(roundIndex, questionIndex) => {
-              const id = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+              const id = questionItemIdFor(roundIndex, questionIndex, planCatalog)
               return Boolean(id && planIdSet.has(id))
             }}
             getRoundDisplayLabel={getRoundDisplayLabel}
@@ -412,7 +431,8 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
       <>
         <QuestionView
           key={activeItem.id}
-          rounds={rounds}
+          rounds={roundCatalog}
+          planCatalog={planCatalog}
           roundIndex={rIdx}
           questionIndex={qIdx}
           doneQuestions={doneQuestions}
@@ -438,14 +458,14 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
               return
             }
             navigateToCursor(next.id, {
-              transitionRound: next.type === 'round-intro' ? rounds[next.roundIndex] : null,
+              transitionRound: next.type === 'round-intro' ? roundCatalog[next.roundIndex] : null,
             })
           }}
           onPrev={() => {
             const prev = plannedItems[activePlanIndex - 1] || null
             if (!prev) return
             navigateToCursor(prev.id, {
-              transitionRound: prev.type === 'round-intro' ? rounds[prev.roundIndex] : null,
+              transitionRound: prev.type === 'round-intro' ? roundCatalog[prev.roundIndex] : null,
             })
           }}
           onHalftime={() => setShowHalftime(true)}
@@ -455,7 +475,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
           onToggleDouble={() => setDoublePoints(d => !d)}
           isRoundIncluded={(roundIndex) => plannedRoundIndexSet.has(roundIndex)}
           isQuestionIncluded={(roundIndex, questionIndex) => {
-            const id = questionItemIdFor(roundIndex, questionIndex, PLAN_CATALOG)
+            const id = questionItemIdFor(roundIndex, questionIndex, planCatalog)
             return Boolean(id && planIdSet.has(id))
           }}
           getRoundDisplayLabel={getRoundDisplayLabel}
@@ -486,7 +506,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, onRese
     setTimeout(() => {
       if (!firstItem) return
       navigate(firstItem.id, {
-        transitionRound: firstItem.type === 'round-intro' ? rounds[firstItem.roundIndex] : null,
+        transitionRound: firstItem.type === 'round-intro' ? roundCatalog[firstItem.roundIndex] : null,
         silent: true,
       })
     }, 600)
