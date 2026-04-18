@@ -7,6 +7,7 @@ import {
   normalizeRoundCatalog,
   templateToRound,
 } from '../roundCatalog'
+import { cleanUrl, mediaUrlFeedback, toYouTubeEmbedUrl } from '../utils/mediaPrompt'
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value))
@@ -47,6 +48,54 @@ function roundTooltipText(round) {
   return 'No description available for this round yet.'
 }
 
+function MediaPreview({ promptType, mediaUrl }) {
+  const url = cleanUrl(mediaUrl)
+  const [status, setStatus] = useState('idle')
+  const youtubeEmbed = useMemo(() => (
+    promptType === 'video' ? toYouTubeEmbedUrl(url) : null
+  ), [promptType, url])
+
+  if (!url || (promptType !== 'image' && promptType !== 'video')) return null
+
+  return (
+    <div className="game-config-media-preview">
+      <div className={`game-config-media-preview-badge status-${status}`}>
+        {status === 'ok' ? 'Preview loaded' : status === 'error' ? 'Could not load preview' : 'Loading preview...'}
+      </div>
+      {promptType === 'image' ? (
+        <img
+          className="game-config-media-preview-image"
+          src={url}
+          alt="Prompt preview"
+          referrerPolicy="no-referrer"
+          onLoad={() => setStatus('ok')}
+          onError={() => setStatus('error')}
+        />
+      ) : youtubeEmbed ? (
+        <iframe
+          className="game-config-media-preview-frame"
+          src={youtubeEmbed}
+          title="Video preview"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+          onLoad={() => setStatus('ok')}
+          onError={() => setStatus('error')}
+        />
+      ) : (
+        <video
+          className="game-config-media-preview-video"
+          src={url}
+          controls
+          preload="metadata"
+          onLoadedData={() => setStatus('ok')}
+          onError={() => setStatus('error')}
+        />
+      )}
+    </div>
+  )
+}
+
 export default function GameConfig({
   session,
   initialRoundCatalog,
@@ -67,6 +116,10 @@ export default function GameConfig({
   const [templatesError, setTemplatesError] = useState('')
 
   const [showCreator, setShowCreator] = useState(false)
+  const [creatorMode, setCreatorMode] = useState('create')
+  const [editingRoundId, setEditingRoundId] = useState('')
+  const [editingTemplateId, setEditingTemplateId] = useState('')
+  const [sessionEditedRoundIds, setSessionEditedRoundIds] = useState(() => new Set())
   const [createError, setCreateError] = useState('')
   const [createSubmitting, setCreateSubmitting] = useState(false)
   const [newTemplateName, setNewTemplateName] = useState('')
@@ -74,6 +127,11 @@ export default function GameConfig({
   const [newTemplateRules, setNewTemplateRules] = useState([])
   const [newTemplateScoring, setNewTemplateScoring] = useState(() => cloneJson(DEFAULT_SCORING))
   const [newTemplateQuestions, setNewTemplateQuestions] = useState(() => [cloneJson(DEFAULT_QUESTION)])
+
+  function nextQuestionId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `cq-${crypto.randomUUID()}`
+    return `cq-${Date.now()}-${Math.floor(Math.random() * 100000)}`
+  }
 
   useEffect(() => {
     if (!showCreator || typeof document === 'undefined') return undefined
@@ -244,12 +302,51 @@ export default function GameConfig({
   }
 
   function resetCreator() {
+    setCreatorMode('create')
+    setEditingRoundId('')
+    setEditingTemplateId('')
     setNewTemplateName('')
     setNewTemplateIntro('')
     setNewTemplateRules([])
     setNewTemplateScoring(cloneJson(DEFAULT_SCORING))
     setNewTemplateQuestions([cloneJson(DEFAULT_QUESTION)])
     setCreateError('')
+  }
+
+  function closeCreator() {
+    setShowCreator(false)
+    resetCreator()
+  }
+
+  function openCreateTemplateModal() {
+    resetCreator()
+    setCreatorMode('create')
+    setShowCreator(true)
+  }
+
+  function openEditRoundModal(round) {
+    if (!round || round.type !== CUSTOM_ROUND_TYPE) return
+    setCreatorMode('session-edit')
+    setEditingRoundId(String(round.id || '').trim())
+    setEditingTemplateId(String(round.templateId || '').trim())
+    setNewTemplateName(String(round.name || '').trim())
+    setNewTemplateIntro(String(round.intro || '').trim())
+    setNewTemplateRules(Array.isArray(round.rules) ? cloneJson(round.rules) : [])
+    setNewTemplateScoring(Array.isArray(round.scoring) ? cloneJson(round.scoring) : cloneJson(DEFAULT_SCORING))
+    setNewTemplateQuestions(
+      Array.isArray(round.questions) && round.questions.length > 0
+        ? round.questions.map((question) => ({
+            id: question?.id || nextQuestionId(),
+            promptType: question?.promptType || 'text',
+            promptText: question?.promptText || '',
+            mediaUrl: question?.mediaUrl || '',
+            answer: question?.answer || '',
+            explanation: question?.explanation || '',
+          }))
+        : [{ ...cloneJson(DEFAULT_QUESTION), id: nextQuestionId() }]
+    )
+    setCreateError('')
+    setShowCreator(true)
   }
 
   function validateTemplate() {
@@ -264,6 +361,8 @@ export default function GameConfig({
       if (!String(q.answer || '').trim()) return `Q${i + 1}: answer is required.`
       if (q.promptType === 'text' && !String(q.promptText || '').trim()) return `Q${i + 1}: prompt text is required.`
       if ((q.promptType === 'image' || q.promptType === 'video') && !String(q.mediaUrl || '').trim()) return `Q${i + 1}: media URL is required.`
+      const feedback = mediaUrlFeedback(q)
+      if (feedback?.kind === 'error') return `Q${i + 1}: ${feedback.message}`
     }
     return null
   }
@@ -291,6 +390,7 @@ export default function GameConfig({
         phase: row.phase,
       })),
       questions: newTemplateQuestions.map((question) => ({
+        id: question.id,
         promptType: question.promptType,
         promptText: question.promptText,
         mediaUrl: question.mediaUrl,
@@ -325,13 +425,60 @@ export default function GameConfig({
         const exists = prev.some((round) => round.id === normalized.id)
         return exists ? prev : [normalized, ...prev]
       })
-      setShowCreator(false)
-      resetCreator()
+      closeCreator()
     } catch {
       setCreateError('Could not create template.')
     } finally {
       setCreateSubmitting(false)
     }
+  }
+
+  function handleSaveSessionRoundEdits() {
+    const validationError = validateTemplate()
+    if (validationError) {
+      setCreateError(validationError)
+      return
+    }
+    const roundId = String(editingRoundId || '').trim()
+    if (!roundId) {
+      setCreateError('Could not find the selected round to edit.')
+      return
+    }
+
+    const normalized = normalizeRoundCatalog([{
+      id: roundId,
+      templateId: editingTemplateId || undefined,
+      name: newTemplateName,
+      intro: newTemplateIntro,
+      type: CUSTOM_ROUND_TYPE,
+      rules: newTemplateRules.map((rule) => String(rule || '').trim()).filter(Boolean),
+      scoring: newTemplateScoring.map((row) => ({
+        label: row.label,
+        points: Number(row.points),
+        phase: row.phase,
+      })),
+      questions: newTemplateQuestions.map((question, index) => ({
+        id: String(question?.id || '').trim() || `cq-${index + 1}`,
+        promptType: question.promptType,
+        promptText: question.promptText,
+        mediaUrl: question.mediaUrl,
+        answer: question.answer,
+        explanation: question.explanation,
+      })),
+    }])[0]
+
+    if (!normalized) {
+      setCreateError('Round is incomplete or invalid.')
+      return
+    }
+
+    setCustomTemplates((prev) => prev.map((round) => (round.id === roundId ? normalized : round)))
+    setSessionEditedRoundIds((prev) => {
+      const next = new Set(prev)
+      next.add(roundId)
+      return next
+    })
+    closeCreator()
   }
 
   return (
@@ -356,7 +503,7 @@ export default function GameConfig({
             <div className="game-config-custom-title">Custom Buzz Rounds</div>
             <div className="game-config-custom-sub">Saved rounds, available to all sessions.</div>
           </div>
-          <button type="button" className="game-config-new-template-btn" onClick={() => setShowCreator(true)}>
+          <button type="button" className="game-config-new-template-btn" onClick={openCreateTemplateModal}>
             + New Custom Round
           </button>
         </div>
@@ -384,14 +531,28 @@ export default function GameConfig({
                     </span>
                   </div>
                   <div className="game-config-round-meta">{selectedCount} of {questionIds.length} questions selected</div>
+                  {sessionEditedRoundIds.has(round.id) && (
+                    <div className="game-config-round-edited-note">Edited for this game only</div>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  className="game-config-round-action"
-                  onClick={() => toggleRound(roundIndex)}
-                >
-                  {allSelected ? 'Clear Round' : 'Select Round'}
-                </button>
+                <div className="game-config-round-actions">
+                  <button
+                    type="button"
+                    className="game-config-round-action"
+                    onClick={() => toggleRound(roundIndex)}
+                  >
+                    {allSelected ? 'Clear Round' : 'Select Round'}
+                  </button>
+                  {round.type === CUSTOM_ROUND_TYPE && (
+                    <button
+                      type="button"
+                      className="game-config-round-edit-btn"
+                      onClick={() => openEditRoundModal(round)}
+                    >
+                      Edit For Game
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="game-config-question-grid">
                 {round.questions.map((question, questionIndex) => {
@@ -429,12 +590,20 @@ export default function GameConfig({
       </div>
 
       {showCreator && (
-        <div className="help-overlay" onClick={() => { setShowCreator(false); resetCreator() }}>
+        <div className="help-overlay" onClick={closeCreator}>
           <div className="help-popup game-config-template-modal" onClick={(e) => e.stopPropagation()}>
             <div className="game-config-template-header">
-              <div className="help-popup-tag">Create Custom Round</div>
-              <h3 className="help-popup-title">Custom Buzz Template</h3>
-              <p className="help-popup-sub">Build a reusable buzz round with text, image, or video prompts.</p>
+              <div className="help-popup-tag">
+                {creatorMode === 'create' ? 'Create Custom Round' : 'Edit For This Game'}
+              </div>
+              <h3 className="help-popup-title">
+                {creatorMode === 'create' ? 'Custom Buzz Template' : 'Round Session Copy'}
+              </h3>
+              <p className="help-popup-sub">
+                {creatorMode === 'create'
+                  ? 'Build a reusable buzz round with text, image, or video prompts.'
+                  : 'These edits apply only to this game session. The shared template library stays unchanged.'}
+              </p>
             </div>
 
             <div className="game-config-template-body">
@@ -558,91 +727,104 @@ export default function GameConfig({
               <div className="game-config-template-section-head">
                 <span>Questions</span>
               </div>
-              {newTemplateQuestions.map((question, idx) => (
-                <div key={`question-${idx}`} className="game-config-template-question-card">
-                  <div className="game-config-template-question-head">
-                    <span className="game-config-template-q-label">Q{idx + 1}</span>
-                    <button
-                      type="button"
-                      className="game-config-remove-btn"
-                      onClick={() => setNewTemplateQuestions((prev) => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx))}
-                      aria-label="Remove question"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <label className="game-config-field-label">
-                    <span className="game-config-field-label-row">
-                      Prompt type
-                      <span
-                        className="game-config-inline-help game-config-tooltip-trigger"
-                        role="note"
-                        data-tooltip="Text shows written prompt only. Image shows a URL image plus optional caption. Video plays a URL video plus optional caption."
-                        aria-label="Prompt type help"
-                        tabIndex={0}
+              {newTemplateQuestions.map((question, idx) => {
+                const urlFeedback = mediaUrlFeedback(question)
+                return (
+                  <div key={`question-${idx}`} className="game-config-template-question-card">
+                    <div className="game-config-template-question-head">
+                      <span className="game-config-template-q-label">Q{idx + 1}</span>
+                      <button
+                        type="button"
+                        className="game-config-remove-btn"
+                        onClick={() => setNewTemplateQuestions((prev) => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx))}
+                        aria-label="Remove question"
                       >
-                        ?
+                        ×
+                      </button>
+                    </div>
+                    <label className="game-config-field-label">
+                      <span className="game-config-field-label-row">
+                        Prompt type
+                        <span
+                          className="game-config-inline-help game-config-tooltip-trigger"
+                          role="note"
+                          data-tooltip="Text shows written prompt only. Image shows a URL image plus optional caption. Video plays a URL video plus optional caption."
+                          aria-label="Prompt type help"
+                          tabIndex={0}
+                        >
+                          ?
+                        </span>
                       </span>
-                    </span>
-                    <select
-                      className="team-name-input game-config-field game-config-select"
-                      value={question.promptType}
-                      onChange={(e) => setNewTemplateQuestions((prev) => prev.map((item, i) => (
-                        i === idx
-                          ? { ...item, promptType: e.target.value, mediaUrl: '', promptText: '' }
-                          : item
-                      )))}
-                    >
-                      <option value="text">Text</option>
-                      <option value="image">Image</option>
-                      <option value="video">Video</option>
-                    </select>
-                  </label>
-                  {question.promptType === 'text' ? (
-                    <input
-                      className="team-name-input game-config-field"
-                      type="text"
-                      value={question.promptText}
-                      onChange={(e) => setNewTemplateQuestions((prev) => prev.map((item, i) => (i === idx ? { ...item, promptText: e.target.value } : item)))}
-                      placeholder="Prompt text (shown to host)"
-                    />
-                  ) : (
-                    <>
+                      <select
+                        className="team-name-input game-config-field game-config-select"
+                        value={question.promptType}
+                        onChange={(e) => setNewTemplateQuestions((prev) => prev.map((item, i) => (
+                          i === idx
+                            ? { ...item, promptType: e.target.value, mediaUrl: '', promptText: '' }
+                            : item
+                        )))}
+                      >
+                        <option value="text">Text</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                      </select>
+                    </label>
+                    {question.promptType === 'text' ? (
                       <input
                         className="team-name-input game-config-field"
                         type="text"
                         value={question.promptText}
                         onChange={(e) => setNewTemplateQuestions((prev) => prev.map((item, i) => (i === idx ? { ...item, promptText: e.target.value } : item)))}
-                        placeholder="Optional caption"
+                        placeholder="Prompt text"
                       />
-                      <input
-                        className="team-name-input game-config-field"
-                        type="url"
-                        value={question.mediaUrl}
-                        onChange={(e) => setNewTemplateQuestions((prev) => prev.map((item, i) => (i === idx ? { ...item, mediaUrl: e.target.value } : item)))}
-                        placeholder={question.promptType === 'image' ? 'Image URL (https://...)' : 'YouTube URL (https://youtube.com/watch?v=...)'}
-                      />
-                    </>
-                  )}
-                  <input
-                    className="team-name-input game-config-field"
-                    type="text"
-                    value={question.answer}
-                    onChange={(e) => setNewTemplateQuestions((prev) => prev.map((item, i) => (i === idx ? { ...item, answer: e.target.value } : item)))}
-                    placeholder="Correct answer"
-                  />
-                  <textarea
-                    className="team-name-input game-config-field game-config-template-textarea"
-                    value={question.explanation}
-                    onChange={(e) => setNewTemplateQuestions((prev) => prev.map((item, i) => (i === idx ? { ...item, explanation: e.target.value } : item)))}
-                    placeholder="Explanation (optional, shown after reveal)"
-                  />
-                </div>
-              ))}
+                    ) : (
+                      <>
+                        <input
+                          className="team-name-input game-config-field"
+                          type="text"
+                          value={question.promptText}
+                          onChange={(e) => setNewTemplateQuestions((prev) => prev.map((item, i) => (i === idx ? { ...item, promptText: e.target.value } : item)))}
+                          placeholder="Optional caption"
+                        />
+                        <input
+                          className="team-name-input game-config-field"
+                          type="url"
+                          value={question.mediaUrl}
+                          onChange={(e) => setNewTemplateQuestions((prev) => prev.map((item, i) => (i === idx ? { ...item, mediaUrl: e.target.value } : item)))}
+                          placeholder={question.promptType === 'image' ? 'Image URL (https://...)' : 'Video URL (https://... or YouTube link)'}
+                        />
+                        {urlFeedback && (
+                          <div className={`game-config-url-feedback status-${urlFeedback.kind}`}>
+                            {urlFeedback.message}
+                          </div>
+                        )}
+                        <MediaPreview
+                          key={`${question.promptType}:${String(question.mediaUrl || '').trim()}`}
+                          promptType={question.promptType}
+                          mediaUrl={question.mediaUrl}
+                        />
+                      </>
+                    )}
+                    <input
+                      className="team-name-input game-config-field"
+                      type="text"
+                      value={question.answer}
+                      onChange={(e) => setNewTemplateQuestions((prev) => prev.map((item, i) => (i === idx ? { ...item, answer: e.target.value } : item)))}
+                      placeholder="Correct answer"
+                    />
+                    <textarea
+                      className="team-name-input game-config-field game-config-template-textarea"
+                      value={question.explanation}
+                      onChange={(e) => setNewTemplateQuestions((prev) => prev.map((item, i) => (i === idx ? { ...item, explanation: e.target.value } : item)))}
+                      placeholder="Explanation (optional, shown after reveal)"
+                    />
+                  </div>
+                )
+              })}
               <button
                 type="button"
                 className="game-config-add-row-btn"
-                onClick={() => setNewTemplateQuestions((prev) => [...prev, cloneJson(DEFAULT_QUESTION)])}
+                onClick={() => setNewTemplateQuestions((prev) => [...prev, { ...cloneJson(DEFAULT_QUESTION), id: nextQuestionId() }])}
               >
                 + Question
               </button>
@@ -656,7 +838,7 @@ export default function GameConfig({
               <button
                 type="button"
                 className="back-btn"
-                onClick={() => { setShowCreator(false); resetCreator() }}
+                onClick={closeCreator}
                 disabled={createSubmitting}
               >
                 Cancel
@@ -664,10 +846,15 @@ export default function GameConfig({
               <button
                 type="button"
                 className="start-btn"
-                onClick={() => void handleCreateTemplate()}
+                onClick={() => {
+                  if (creatorMode === 'session-edit') handleSaveSessionRoundEdits()
+                  else void handleCreateTemplate()
+                }}
                 disabled={createSubmitting}
               >
-                {createSubmitting ? 'Creating...' : 'Create Template'}
+                {creatorMode === 'session-edit'
+                  ? 'Save Session Round'
+                  : (createSubmitting ? 'Creating...' : 'Create Template')}
               </button>
             </div>
           </div>

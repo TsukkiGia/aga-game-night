@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import VideoBody from './VideoBody'
 
 export default function CustomBuzzBody({ question, paused = false }) {
@@ -6,7 +6,14 @@ export default function CustomBuzzBody({ question, paused = false }) {
   const promptText = String(question?.promptText || '').trim()
   const mediaUrl = String(question?.mediaUrl || '').trim()
   const [revealed, setRevealed] = useState(false)
-  const [imageError, setImageError] = useState(false)
+  const [failedImageUrl, setFailedImageUrl] = useState('')
+  const imageError = Boolean(mediaUrl) && failedImageUrl === mediaUrl
+
+  useEffect(() => {
+    if (promptType === 'image' && mediaUrl) {
+      console.log('[CustomBuzzBody] image prompt URL:', mediaUrl)
+    }
+  }, [promptType, mediaUrl])
 
   if (promptType === 'video') {
     const mappedQuestion = {
@@ -35,7 +42,12 @@ export default function CustomBuzzBody({ question, paused = false }) {
               className="qv-custom-image"
               src={mediaUrl}
               alt="Custom buzz prompt"
-              onError={() => setImageError(true)}
+              referrerPolicy="no-referrer"
+              onLoad={() => console.log('[CustomBuzzBody] image loaded:', mediaUrl)}
+              onError={() => {
+                console.log('[CustomBuzzBody] image failed to load:', mediaUrl)
+                setFailedImageUrl(mediaUrl)
+              }}
             />
           )}
         </div>
