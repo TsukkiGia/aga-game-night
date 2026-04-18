@@ -4,6 +4,7 @@ import QRImg from './QRImg'
 
 export default function CompanionSetup({ sessionCode, onContinue, onBack, backLabel = '← Back to Game Plan' }) {
   const [copied, setCopied] = useState(false)
+  const [companionReady, setCompanionReady] = useState(false)
 
   const hostCompanionUrl = useMemo(() => {
     const base = ENDPOINT || window.location.origin
@@ -63,9 +64,24 @@ export default function CompanionSetup({ sessionCode, onContinue, onBack, backLa
           </div>
         </div>
 
+        <div className="companion-setup-status">
+          <span className={`companion-setup-status-chip${companionReady ? ' is-ready' : ''}`}>
+            {companionReady ? 'Companion connected' : 'Companion not connected'}
+          </span>
+          <button
+            type="button"
+            className="back-btn companion-setup-status-btn"
+            onClick={() => setCompanionReady((prev) => !prev)}
+          >
+            {companionReady ? 'Mark as Not Connected' : 'Mark as Connected'}
+          </button>
+        </div>
+
         <div className="setup-actions">
           <button type="button" className="back-btn" onClick={onBack}>{backLabel}</button>
-          <button type="button" className="start-btn" onClick={onContinue}>Continue to Lobby →</button>
+          <button type="button" className="start-btn" onClick={onContinue} disabled={!companionReady}>
+            Continue to Lobby →
+          </button>
         </div>
       </div>
     </div>

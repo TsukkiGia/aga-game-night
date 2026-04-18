@@ -101,11 +101,6 @@ export default function GameConfig({
   const {
     setRoundOrder,
     orderedCatalog,
-    dragRoundId,
-    handleRoundDragStart,
-    handleRoundDragOver,
-    handleRoundDrop,
-    handleRoundDragEnd,
   } = useRoundDragReorder(combinedCatalog)
 
   const PLAN_CATALOG = useMemo(() => buildPlanCatalog(orderedCatalog), [orderedCatalog])
@@ -298,6 +293,20 @@ export default function GameConfig({
     setRoundClearConfirmId('')
     setRecentlyClearedRound(null)
     setError('')
+  }
+
+  function moveRound(roundId, delta) {
+    const id = String(roundId || '').trim()
+    if (!id || !Number.isInteger(delta) || delta === 0) return
+    const ids = orderedCatalog.map((round) => round.id)
+    const from = ids.indexOf(id)
+    const to = from + delta
+    if (from < 0 || to < 0 || to >= ids.length) return
+    const next = [...ids]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    setRoundOrder(next)
+    setRoundClearConfirmId('')
   }
 
   function handleContinue() {
@@ -599,18 +608,17 @@ export default function GameConfig({
         {templatesError && <p className="session-gate-error">{templatesError}</p>}
 
         <div className="game-config-rounds">
-          {roundRows.map((row) => (
+          {roundRows.map((row, index) => (
             <RoundCard
               key={row.round.id}
               row={row}
-              dragRoundId={dragRoundId}
               roundClearConfirmId={roundClearConfirmId}
               sessionEditedRoundIds={sessionEditedRoundIds}
               selectedQuestionIds={selectedQuestionIds}
-              onRoundDragOver={handleRoundDragOver}
-              onRoundDrop={handleRoundDrop}
-              onRoundDragStart={handleRoundDragStart}
-              onRoundDragEnd={handleRoundDragEnd}
+              canMoveUp={index > 0}
+              canMoveDown={index < roundRows.length - 1}
+              onMoveUp={() => moveRound(row.round.id, -1)}
+              onMoveDown={() => moveRound(row.round.id, 1)}
               onOpenPreview={openRoundPreview}
               onToggleRound={handleRoundToggle}
               onToggleQuestion={toggleQuestion}

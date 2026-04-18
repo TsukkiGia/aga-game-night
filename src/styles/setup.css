@@ -296,6 +296,41 @@
   justify-content: center;
 }
 
+.companion-setup-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 auto 18px;
+  flex-wrap: wrap;
+}
+
+.companion-setup-status-chip {
+  border: 1px solid #cf4f2f;
+  background: #fbe8e2;
+  color: #a33a22;
+  border-radius: 999px;
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+}
+
+.companion-setup-status-chip.is-ready {
+  border-color: #0f7063;
+  background: #e4f1ed;
+  color: #0b6356;
+}
+
+.companion-setup-status-btn {
+  min-height: 34px;
+  padding: 8px 14px;
+}
+
 .game-plan-preview-step {
   max-width: 1060px;
   text-align: left;
@@ -887,6 +922,40 @@
   flex-direction: column;
   gap: 8px;
   align-items: stretch;
+}
+
+.game-config-round-order-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.game-config-round-order-btn {
+  border: 1px solid #ccbfae;
+  background: #fff;
+  color: #6e655b;
+  border-radius: 999px;
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+}
+
+.game-config-round-order-btn:hover {
+  border-color: #9f9284;
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.game-config-round-order-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .game-config-round-drag-handle {

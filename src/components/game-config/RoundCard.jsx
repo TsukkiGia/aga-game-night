@@ -2,14 +2,13 @@ import { roundTooltipText } from './helpers'
 
 export default function RoundCard({
   row,
-  dragRoundId,
   roundClearConfirmId,
   sessionEditedRoundIds,
   selectedQuestionIds,
-  onRoundDragOver,
-  onRoundDrop,
-  onRoundDragStart,
-  onRoundDragEnd,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
   onOpenPreview,
   onToggleRound,
   onToggleQuestion,
@@ -25,11 +24,7 @@ export default function RoundCard({
   } = row
 
   return (
-    <div
-      className={`game-config-round-card type-${round.type}${noneSelected ? ' off' : ''}${dragRoundId === round.id ? ' is-dragging' : ''}`}
-      onDragOver={(e) => onRoundDragOver(e, round.id)}
-      onDrop={(e) => onRoundDrop(e, round.id)}
-    >
+    <div className={`game-config-round-card type-${round.type}${noneSelected ? ' off' : ''}`}>
       <div className="game-config-round-head">
         <div className="game-config-round-title-wrap">
           <span className="game-config-round-pill">
@@ -53,19 +48,28 @@ export default function RoundCard({
           )}
         </div>
         <div className="game-config-round-actions">
-          <button
-            type="button"
-            className="game-config-round-drag-handle"
-            draggable
-            onDragStart={(e) => onRoundDragStart(e, round.id)}
-            onDragEnd={onRoundDragEnd}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => onRoundDrop(e, round.id)}
-            aria-label={`Drag to reorder ${round.name}`}
-            title="Drag to reorder"
-          >
-            ⋮⋮ Drag
-          </button>
+          <div className="game-config-round-order-controls">
+            <button
+              type="button"
+              className="game-config-round-order-btn"
+              onClick={onMoveUp}
+              disabled={!canMoveUp}
+              aria-label={`Move ${round.name} up`}
+              title="Move up"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="game-config-round-order-btn"
+              onClick={onMoveDown}
+              disabled={!canMoveDown}
+              aria-label={`Move ${round.name} down`}
+              title="Move down"
+            >
+              ↓
+            </button>
+          </div>
           <button
             type="button"
             className="game-config-round-preview-btn"
@@ -115,4 +119,3 @@ export default function RoundCard({
     </div>
   )
 }
-
