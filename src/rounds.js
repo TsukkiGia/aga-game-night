@@ -1,4 +1,5 @@
 import charades        from './rounds/charades.js'
+import beforeTheyWereFamous from './rounds/beforeTheyWereFamous.js'
 import capitalCities from './rounds/capitalCities.js'
 import guessTheLanguage from './rounds/guessTheLanguage.js'
 import guessTheSong    from './rounds/guessTheSong.js'
@@ -13,6 +14,7 @@ const rounds = [
   slangBee,
   thesisTranslator,
   guessTheSong,
+  beforeTheyWereFamous,
   capitalCities,
   flagsByImage,
   flagTriviaDescriptions,
