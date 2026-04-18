@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import rounds from '../rounds'
 import { buildPlanCatalog, defaultPlanIds, normalizePlanIdsWithRoundIntros } from '../gamePlan'
 import {
@@ -273,6 +273,9 @@ function MediaPreview({ promptType, mediaUrl }) {
   )
 }
 
+const DRAG_SCROLL_EDGE_PX = 120
+const DRAG_SCROLL_MAX_STEP_PX = 16
+
 export default function GameConfig({
   session,
   initialRoundCatalog,
@@ -348,7 +351,73 @@ export default function GameConfig({
     return [...byId.values()]
   }, [builtinRounds, customTemplates])
 
-  const PLAN_CATALOG = useMemo(() => buildPlanCatalog(combinedCatalog), [combinedCatalog])
+  const [roundOrder, setRoundOrder] = useState(() => combinedCatalog.map((round) => round.id))
+  const [dragRoundId, setDragRoundId] = useState('')
+  const dragPointerYRef = useRef(null)
+  const dragAutoScrollRafRef = useRef(0)
+
+  useEffect(() => {
+    setRoundOrder((prev) => {
+      const incomingIds = combinedCatalog.map((round) => round.id)
+      const incomingSet = new Set(incomingIds)
+      const kept = prev.filter((id) => incomingSet.has(id))
+      const keptSet = new Set(kept)
+      const missing = incomingIds.filter((id) => !keptSet.has(id))
+      const next = [...kept, ...missing]
+      if (next.length === prev.length && next.every((id, index) => id === prev[index])) return prev
+      return next
+    })
+  }, [combinedCatalog])
+
+  useEffect(() => {
+    function stopAutoScroll() {
+      if (typeof window !== 'undefined' && dragAutoScrollRafRef.current) {
+        window.cancelAnimationFrame(dragAutoScrollRafRef.current)
+      }
+      dragAutoScrollRafRef.current = 0
+      dragPointerYRef.current = null
+    }
+
+    if (!dragRoundId || typeof window === 'undefined') {
+      stopAutoScroll()
+      return undefined
+    }
+
+    const tick = () => {
+      const pointerY = dragPointerYRef.current
+      const viewportHeight = window.innerHeight || 0
+      if (Number.isFinite(pointerY) && viewportHeight > 0) {
+        const topEdge = DRAG_SCROLL_EDGE_PX
+        const bottomEdge = viewportHeight - DRAG_SCROLL_EDGE_PX
+        let delta = 0
+
+        if (pointerY < topEdge) {
+          const strength = Math.min(1, (topEdge - pointerY) / DRAG_SCROLL_EDGE_PX)
+          delta = -Math.max(1, Math.round(strength * DRAG_SCROLL_MAX_STEP_PX))
+        } else if (pointerY > bottomEdge) {
+          const strength = Math.min(1, (pointerY - bottomEdge) / DRAG_SCROLL_EDGE_PX)
+          delta = Math.max(1, Math.round(strength * DRAG_SCROLL_MAX_STEP_PX))
+        }
+
+        if (delta !== 0) window.scrollBy(0, delta)
+      }
+
+      dragAutoScrollRafRef.current = window.requestAnimationFrame(tick)
+    }
+
+    dragAutoScrollRafRef.current = window.requestAnimationFrame(tick)
+    return () => stopAutoScroll()
+  }, [dragRoundId])
+
+  const orderedCatalog = useMemo(() => {
+    const byId = new Map(combinedCatalog.map((round) => [round.id, round]))
+    const ordered = roundOrder.map((id) => byId.get(id)).filter(Boolean)
+    const orderedIds = new Set(ordered.map((round) => round.id))
+    const missing = combinedCatalog.filter((round) => !orderedIds.has(round.id))
+    return [...ordered, ...missing]
+  }, [combinedCatalog, roundOrder])
+
+  const PLAN_CATALOG = useMemo(() => buildPlanCatalog(orderedCatalog), [orderedCatalog])
   const [selectedQuestionIds, setSelectedQuestionIds] = useState(() =>
     buildInitialSelection(initialPlanIds, initialCatalog)
   )
@@ -405,19 +474,20 @@ export default function GameConfig({
   }, [session?.code, session?.pin])
 
   const roundRows = useMemo(() => {
-    return combinedCatalog.map((round, roundIndex) => {
+    return orderedCatalog.map((round, roundIndex) => {
       const questionIds = PLAN_CATALOG.questionIdsByRoundIndex.get(roundIndex) || []
       const selectedCount = questionIds.filter((id) => selectedQuestionIds.has(id)).length
       return {
         round,
         roundIndex,
+        displayIndex: roundIndex + 1,
         questionIds,
         selectedCount,
         allSelected: selectedCount === questionIds.length,
         noneSelected: selectedCount === 0,
       }
     })
-  }, [combinedCatalog, PLAN_CATALOG, selectedQuestionIds])
+  }, [orderedCatalog, PLAN_CATALOG, selectedQuestionIds])
 
   const totalQuestions = useMemo(
     () => roundRows.reduce((sum, row) => sum + row.questionIds.length, 0),
@@ -561,6 +631,63 @@ export default function GameConfig({
     setRoundClearConfirmId('')
   }
 
+  function reorderRound(fromRoundId, toRoundId) {
+    const fromId = String(fromRoundId || '').trim()
+    const toId = String(toRoundId || '').trim()
+    if (!fromId || !toId || fromId === toId) return
+    setRoundOrder((prev) => {
+      const fromIndex = prev.indexOf(fromId)
+      const toIndex = prev.indexOf(toId)
+      if (fromIndex < 0 || toIndex < 0) return prev
+      const next = [...prev]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+    setRoundClearConfirmId('')
+  }
+
+  function handleRoundDragStart(event, roundId) {
+    const id = String(roundId || '').trim()
+    if (!id) return
+    setDragRoundId(id)
+    dragPointerYRef.current = Number(event.clientY)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', id)
+  }
+
+  function handleRoundDragOver(event, roundId) {
+    if (!dragRoundId) return
+    event.preventDefault()
+    dragPointerYRef.current = Number(event.clientY)
+    const targetId = String(roundId || '').trim()
+    if (!targetId || targetId === dragRoundId) return
+    setRoundOrder((prev) => {
+      const fromIndex = prev.indexOf(dragRoundId)
+      const toIndex = prev.indexOf(targetId)
+      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return prev
+      const next = [...prev]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+  }
+
+  function handleRoundDrop(event, roundId) {
+    event.preventDefault()
+    dragPointerYRef.current = null
+    const targetId = String(roundId || '').trim()
+    const fromData = String(event.dataTransfer.getData('text/plain') || '').trim()
+    const sourceId = String(dragRoundId || fromData || '').trim()
+    if (sourceId && targetId && sourceId !== targetId) reorderRound(sourceId, targetId)
+    setDragRoundId('')
+  }
+
+  function handleRoundDragEnd() {
+    dragPointerYRef.current = null
+    setDragRoundId('')
+  }
+
   function closeRoundPreview() {
     setPreviewRoundId('')
     setPreviewSearch('')
@@ -583,6 +710,7 @@ export default function GameConfig({
     const defaultCatalog = buildPlanCatalog(builtinRounds)
     const defaults = defaultPlanIds(defaultCatalog)
     setSelectedQuestionIds(buildInitialSelection(defaults, builtinRounds))
+    setRoundOrder(combinedCatalog.map((round) => round.id))
     setRoundClearConfirmId('')
     setRecentlyClearedRound(null)
     setError('')
@@ -887,12 +1015,17 @@ export default function GameConfig({
         {templatesError && <p className="session-gate-error">{templatesError}</p>}
 
         <div className="game-config-rounds">
-          {roundRows.map(({ round, roundIndex, questionIds, selectedCount, allSelected, noneSelected }) => (
-            <div key={round.id} className={`game-config-round-card type-${round.type}${noneSelected ? ' off' : ''}`}>
+          {roundRows.map(({ round, roundIndex, displayIndex, questionIds, selectedCount, allSelected, noneSelected }) => (
+            <div
+              key={round.id}
+              className={`game-config-round-card type-${round.type}${noneSelected ? ' off' : ''}${dragRoundId === round.id ? ' is-dragging' : ''}`}
+              onDragOver={(e) => handleRoundDragOver(e, round.id)}
+              onDrop={(e) => handleRoundDrop(e, round.id)}
+            >
               <div className="game-config-round-head">
                 <div className="game-config-round-title-wrap">
                   <span className="game-config-round-pill">
-                    {round.type === CUSTOM_ROUND_TYPE ? 'CUSTOM' : `ROUND ${roundIndex + 1}`}
+                    {`ROUND ${displayIndex}`}
                   </span>
                   <div className="game-config-round-title-row">
                     <div className="game-config-round-title">{round.name}</div>
@@ -912,6 +1045,19 @@ export default function GameConfig({
                   )}
                 </div>
                 <div className="game-config-round-actions">
+                  <button
+                    type="button"
+                    className="game-config-round-drag-handle"
+                    draggable
+                    onDragStart={(e) => handleRoundDragStart(e, round.id)}
+                    onDragEnd={handleRoundDragEnd}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handleRoundDrop(e, round.id)}
+                    aria-label={`Drag to reorder ${round.name}`}
+                    title="Drag to reorder"
+                  >
+                    ⋮⋮ Drag
+                  </button>
                   <button
                     type="button"
                     className="game-config-round-preview-btn"
@@ -988,7 +1134,7 @@ export default function GameConfig({
           >
             <div className="game-config-preview-header">
               <div className="game-config-preview-pill">
-                {previewRow.round.type === CUSTOM_ROUND_TYPE ? 'Custom Round' : `Round ${previewRow.roundIndex + 1}`}
+                {`Round ${previewRow.displayIndex}`}
               </div>
               <div className="game-config-preview-title-row">
                 <h3 className="game-config-preview-title">{previewRow.round.name}</h3>

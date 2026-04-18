@@ -453,6 +453,10 @@
   opacity: 0.78;
 }
 
+.game-config-round-card.is-dragging {
+  opacity: 0.5;
+}
+
 .game-config-round-card.type-video {
   --gc-accent: var(--indigo);
   --gc-accent-bg: var(--indigo-bg);
@@ -554,6 +558,36 @@
   flex-direction: column;
   gap: 8px;
   align-items: stretch;
+}
+
+.game-config-round-drag-handle {
+  border: 1px solid #ccbfae;
+  background: #fff;
+  color: #6e655b;
+  border-radius: 999px;
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.18s ease;
+  cursor: grab;
+  user-select: none;
+}
+
+.game-config-round-drag-handle:hover {
+  border-color: #9f9284;
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.game-config-round-drag-handle:active {
+  cursor: grabbing;
 }
 
 .game-config-round-preview-btn {
