@@ -48,6 +48,152 @@ function roundTooltipText(round) {
   return 'No description available for this round yet.'
 }
 
+function truncatePreview(value, max = 180) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim()
+  if (!text) return ''
+  if (text.length <= max) return text
+  return `${text.slice(0, max - 1)}…`
+}
+
+function questionPreviewHeadline(round, question, questionIndex) {
+  if (!question || typeof question !== 'object') return `Question ${questionIndex + 1}`
+
+  if (round.type === CUSTOM_ROUND_TYPE) {
+    const promptType = String(question.promptType || '').trim().toLowerCase()
+    if (promptType === 'text') return truncatePreview(question.promptText, 180) || `Text prompt ${questionIndex + 1}`
+    if (promptType === 'image') return truncatePreview(question.promptText, 180) || `Image prompt ${questionIndex + 1}`
+    if (promptType === 'video') return truncatePreview(question.promptText, 180) || `Video prompt ${questionIndex + 1}`
+  }
+
+  if (round.type === 'video') return `Video clip ${questionIndex + 1}`
+  if (round.type === 'slang') return truncatePreview(question.term, 180) || `Slang term ${questionIndex + 1}`
+  if (round.type === 'charades') return truncatePreview(question.phrase, 180) || `Charade ${questionIndex + 1}`
+  if (round.type === 'thesis') return truncatePreview(question.title, 180) || `Title ${questionIndex + 1}`
+
+  return `Question ${questionIndex + 1}`
+}
+
+function questionPreviewDetail(round, question) {
+  if (!question || typeof question !== 'object') return ''
+  if (round.type === CUSTOM_ROUND_TYPE) {
+    const promptType = String(question.promptType || '').trim().toLowerCase()
+    if (promptType === 'text') return ''
+    if (promptType === 'image' || promptType === 'video') return truncatePreview(question.mediaUrl, 150)
+  }
+
+  if (round.type === 'slang') return truncatePreview(question.sentence, 190)
+  if (round.type === 'thesis' && Array.isArray(question.options) && question.options.length > 0) {
+    return truncatePreview(question.options.join(' · '), 190)
+  }
+  if (round.type === 'video' && Array.isArray(question.countries) && question.countries.length > 0) {
+    return truncatePreview(`Countries: ${question.countries.join(', ')}`, 190)
+  }
+  return ''
+}
+
+function questionPreviewTags(round, question) {
+  const tags = []
+  if (!question || typeof question !== 'object') return tags
+
+  if (round.type === CUSTOM_ROUND_TYPE) {
+    const promptType = String(question.promptType || '').trim().toLowerCase()
+    if (promptType === 'text') tags.push('Text')
+    if (promptType === 'image') tags.push('Image')
+    if (promptType === 'video') tags.push('Video')
+  }
+
+  if (round.type === 'slang') {
+    const country = String(question.country || '').trim()
+    if (country) tags.push(country)
+  }
+
+  if (round.type === 'video') tags.push('Buzz Round')
+  if (round.type === 'charades') tags.push('Acting Prompt')
+  if (round.type === 'thesis') tags.push('Translate Title')
+
+  return tags
+}
+
+function questionPreviewAnswer(round, question) {
+  if (!round || !question || typeof question !== 'object') return ''
+
+  if (round.type === CUSTOM_ROUND_TYPE) return truncatePreview(question.answer, 220)
+  if (round.type === 'video') return truncatePreview(question.answer, 220)
+  if (round.type === 'slang') return truncatePreview(question.meaning, 220)
+  if (round.type === 'charades') return truncatePreview(question.phrase, 220)
+  if (round.type === 'thesis') return ''
+
+  return ''
+}
+
+function questionPreviewMedia(round, question) {
+  if (!round || !question || typeof question !== 'object') return null
+
+  if (round.type === CUSTOM_ROUND_TYPE) {
+    const promptType = String(question.promptType || '').trim().toLowerCase()
+    const mediaUrl = cleanUrl(question.mediaUrl)
+    if ((promptType === 'image' || promptType === 'video') && mediaUrl) {
+      return { type: promptType, rawUrl: mediaUrl }
+    }
+    return null
+  }
+
+  if (round.type === 'video') {
+    const videoUrl = cleanUrl(question.video)
+    if (!videoUrl) return null
+    return { type: 'video', rawUrl: videoUrl }
+  }
+
+  return null
+}
+
+function QuestionPreviewMedia({ round, question }) {
+  const media = useMemo(() => questionPreviewMedia(round, question), [round, question])
+  const [failed, setFailed] = useState(false)
+
+  if (!media) return null
+
+  const isHttp = /^https?:\/\//i.test(media.rawUrl)
+  const youtubeEmbedUrl = media.type === 'video' && isHttp ? toYouTubeEmbedUrl(media.rawUrl) : null
+  const videoSrc = isHttp ? media.rawUrl : `/videos/${media.rawUrl.replace(/^\/+/, '')}`
+
+  return (
+    <div className="game-config-preview-media-wrap">
+      {failed ? (
+        <div className="game-config-preview-media-fallback">Could not load preview media.</div>
+      ) : media.type === 'image' ? (
+        <img
+          className="game-config-preview-media-image"
+          src={media.rawUrl}
+          alt="Question media preview"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+        />
+      ) : youtubeEmbedUrl ? (
+        <iframe
+          className="game-config-preview-media-video"
+          src={youtubeEmbedUrl}
+          title="Question media preview"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <video
+          className="game-config-preview-media-video"
+          src={videoSrc}
+          controls
+          preload="metadata"
+          muted
+          playsInline
+          onError={() => setFailed(true)}
+        />
+      )}
+    </div>
+  )
+}
+
 function MediaPreview({ promptType, mediaUrl }) {
   const url = cleanUrl(mediaUrl)
   const [status, setStatus] = useState('idle')
@@ -116,11 +262,13 @@ export default function GameConfig({
   const [templatesError, setTemplatesError] = useState('')
 
   const [showCreator, setShowCreator] = useState(false)
+  const [previewRoundId, setPreviewRoundId] = useState('')
   const [creatorMode, setCreatorMode] = useState('create')
   const [editingRoundId, setEditingRoundId] = useState('')
   const [editingTemplateId, setEditingTemplateId] = useState('')
   const [sessionEditedRoundIds, setSessionEditedRoundIds] = useState(() => new Set())
   const [createError, setCreateError] = useState('')
+  const [saveSuccess, setSaveSuccess] = useState({ roundId: '', text: '' })
   const [createSubmitting, setCreateSubmitting] = useState(false)
   const [newTemplateName, setNewTemplateName] = useState('')
   const [newTemplateIntro, setNewTemplateIntro] = useState('')
@@ -134,7 +282,7 @@ export default function GameConfig({
   }
 
   useEffect(() => {
-    if (!showCreator || typeof document === 'undefined') return undefined
+    if ((!showCreator && !previewRoundId) || typeof document === 'undefined') return undefined
     const { style } = document.body
     const prevOverflow = style.overflow
     const prevPaddingRight = style.paddingRight
@@ -147,15 +295,14 @@ export default function GameConfig({
       style.overflow = prevOverflow
       style.paddingRight = prevPaddingRight
     }
-  }, [showCreator])
+  }, [showCreator, previewRoundId])
 
   const combinedCatalog = useMemo(() => {
     const byId = new Map()
     builtinRounds.forEach((round) => byId.set(round.id, round))
-    customTemplates.forEach((round) => {
-      if (!byId.has(round.id)) byId.set(round.id, round)
-    })
-    return [...builtinRounds, ...customTemplates.filter((round) => !builtinRounds.find((base) => base.id === round.id))]
+    // Session edits/custom templates override built-ins by shared id.
+    customTemplates.forEach((round) => byId.set(round.id, round))
+    return [...byId.values()]
   }, [builtinRounds, customTemplates])
 
   const PLAN_CATALOG = useMemo(() => buildPlanCatalog(combinedCatalog), [combinedCatalog])
@@ -225,6 +372,11 @@ export default function GameConfig({
     () => roundRows.reduce((sum, row) => sum + row.questionIds.length, 0),
     [roundRows]
   )
+
+  const previewRow = useMemo(
+    () => roundRows.find((row) => row.round.id === previewRoundId) || null,
+    [roundRows, previewRoundId]
+  )
   const selectedQuestions = useMemo(
     () => roundRows.reduce((sum, row) => sum + row.selectedCount, 0),
     [roundRows]
@@ -243,6 +395,15 @@ export default function GameConfig({
       return next
     })
     setError('')
+  }
+
+  function openRoundPreview(roundId) {
+    setPreviewRoundId(String(roundId || '').trim())
+  }
+
+  function closeRoundPreview() {
+    setPreviewRoundId('')
+    setSaveSuccess((prev) => (prev.roundId ? { roundId: '', text: '' } : prev))
   }
 
   function toggleQuestion(questionId) {
@@ -313,9 +474,13 @@ export default function GameConfig({
     setCreateError('')
   }
 
-  function closeCreator() {
+  function closeCreator(options = {}) {
+    const modeAtClose = creatorMode
+    const roundIdAtClose = String(editingRoundId || '').trim()
+    const shouldReturnToPreview = options.returnToPreview ?? (modeAtClose === 'session-edit')
     setShowCreator(false)
     resetCreator()
+    if (shouldReturnToPreview && roundIdAtClose) setPreviewRoundId(roundIdAtClose)
   }
 
   function openCreateTemplateModal() {
@@ -326,6 +491,7 @@ export default function GameConfig({
 
   function openEditRoundModal(round) {
     if (!round || round.type !== CUSTOM_ROUND_TYPE) return
+    setPreviewRoundId('')
     setCreatorMode('session-edit')
     setEditingRoundId(String(round.id || '').trim())
     setEditingTemplateId(String(round.templateId || '').trim())
@@ -472,11 +638,20 @@ export default function GameConfig({
       return
     }
 
-    setCustomTemplates((prev) => prev.map((round) => (round.id === roundId ? normalized : round)))
+    setCustomTemplates((prev) => {
+      const index = prev.findIndex((round) => round.id === roundId)
+      if (index >= 0) return prev.map((round) => (round.id === roundId ? normalized : round))
+      // Built-in custom-buzz rounds are not in customTemplates; inject an override entry.
+      return [normalized, ...prev]
+    })
     setSessionEditedRoundIds((prev) => {
       const next = new Set(prev)
       next.add(roundId)
       return next
+    })
+    setSaveSuccess({
+      roundId,
+      text: 'Saved. Preview updated for this session.',
     })
     closeCreator()
   }
@@ -538,34 +713,38 @@ export default function GameConfig({
                 <div className="game-config-round-actions">
                   <button
                     type="button"
+                    className="game-config-round-preview-btn"
+                    onClick={() => openRoundPreview(round.id)}
+                  >
+                    Preview
+                  </button>
+                  <button
+                    type="button"
                     className="game-config-round-action"
                     onClick={() => toggleRound(roundIndex)}
                   >
                     {allSelected ? 'Clear Round' : 'Select Round'}
                   </button>
-                  {round.type === CUSTOM_ROUND_TYPE && (
-                    <button
-                      type="button"
-                      className="game-config-round-edit-btn"
-                      onClick={() => openEditRoundModal(round)}
-                    >
-                      Edit For Game
-                    </button>
-                  )}
                 </div>
+              </div>
+              <div className="game-config-round-preview-hint">
+                Quick-select with chips or open preview to inspect full prompt content.
               </div>
               <div className="game-config-question-grid">
                 {round.questions.map((question, questionIndex) => {
-                  const questionId = PLAN_CATALOG.questionIdByRoundQuestion.get(`${roundIndex}-${questionIndex}`)
-                  const selected = selectedQuestionIds.has(questionId)
+                  const questionId = questionIds[questionIndex]
+                  const selected = Boolean(questionId) && selectedQuestionIds.has(questionId)
                   const isMedia = question?.promptType === 'image' || question?.promptType === 'video'
                   return (
                     <button
-                      key={questionId}
+                      key={questionId || `${round.id}-q${questionIndex + 1}`}
                       type="button"
                       aria-pressed={selected}
                       className={`game-config-question-item${selected ? ' selected' : ''}`}
-                      onClick={() => toggleQuestion(questionId)}
+                      onClick={() => {
+                        if (!questionId) return
+                        toggleQuestion(questionId)
+                      }}
                       title={isMedia ? `${question.promptType.toUpperCase()} prompt` : undefined}
                     >
                       <span className={`game-config-question-check${selected ? ' check' : ' plus'}`}>
@@ -589,10 +768,119 @@ export default function GameConfig({
         </div>
       </div>
 
+      {previewRow && (
+        <div className="help-overlay">
+          <div
+            className={`help-popup game-config-preview-modal type-${previewRow.round.type}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="game-config-preview-header">
+              <div className="game-config-preview-pill">
+                {previewRow.round.type === CUSTOM_ROUND_TYPE ? 'Custom Round' : `Round ${previewRow.roundIndex + 1}`}
+              </div>
+              <div className="game-config-preview-title-row">
+                <h3 className="game-config-preview-title">{previewRow.round.name}</h3>
+                <span className="game-config-preview-count">
+                  {previewRow.selectedCount} / {previewRow.questionIds.length} selected
+                </span>
+              </div>
+              {previewRow.round.intro && (
+                <p className="game-config-preview-intro">{previewRow.round.intro}</p>
+              )}
+              {saveSuccess.roundId === previewRow.round.id && (
+                <div className="game-config-preview-success">{saveSuccess.text}</div>
+              )}
+              <div className="game-config-preview-actions">
+                <button type="button" className="back-btn" onClick={closeRoundPreview}>Close</button>
+                {previewRow.round.type === CUSTOM_ROUND_TYPE && (
+                  <button
+                    type="button"
+                    className="game-config-round-edit-btn"
+                    onClick={() => openEditRoundModal(previewRow.round)}
+                  >
+                    Edit For Game
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="game-config-round-action"
+                  onClick={() => toggleRound(previewRow.roundIndex)}
+                >
+                  {previewRow.allSelected ? 'Clear Round' : 'Select Round'}
+                </button>
+              </div>
+            </div>
+
+            <div className="game-config-preview-list">
+              {previewRow.round.questions.map((question, questionIndex) => {
+                const questionId = previewRow.questionIds[questionIndex]
+                const selected = Boolean(questionId) && selectedQuestionIds.has(questionId)
+                const headline = questionPreviewHeadline(previewRow.round, question, questionIndex)
+                const detail = questionPreviewDetail(previewRow.round, question)
+                const tags = questionPreviewTags(previewRow.round, question)
+                const answer = questionPreviewAnswer(previewRow.round, question)
+                return (
+                  <div
+                    key={questionId || `${previewRow.round.id}-q${questionIndex + 1}`}
+                    className={`game-config-preview-question${selected ? ' selected' : ''}`}
+                  >
+                    <div className="game-config-preview-question-head">
+                      <span className="game-config-preview-q-index">Q{questionIndex + 1}</span>
+                      <button
+                        type="button"
+                        className={`game-config-preview-q-state${selected ? ' selected' : ''}`}
+                        aria-pressed={selected}
+                        onClick={() => {
+                          if (!questionId) return
+                          toggleQuestion(questionId)
+                        }}
+                      >
+                        {selected ? 'Selected' : 'Select'}
+                      </button>
+                    </div>
+                    <div className="game-config-preview-q-title">{headline}</div>
+                    <QuestionPreviewMedia
+                      key={`${String(question?.id || questionIndex)}:${String(question?.promptType || '')}:${String(question?.mediaUrl || question?.video || '')}`}
+                      round={previewRow.round}
+                      question={question}
+                    />
+                    {answer && (
+                      <div className="game-config-preview-q-answer">
+                        <span>Answer</span>
+                        <strong>{answer}</strong>
+                      </div>
+                    )}
+                    {detail && <div className="game-config-preview-q-detail">{detail}</div>}
+                    {tags.length > 0 && (
+                      <div className="game-config-preview-q-tags">
+                        {tags.map((tag, tagIndex) => (
+                          <span key={`${questionId || questionIndex}-tag-${tagIndex}`}>{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCreator && (
-        <div className="help-overlay" onClick={closeCreator}>
+        <div className="help-overlay">
           <div className="help-popup game-config-template-modal" onClick={(e) => e.stopPropagation()}>
             <div className="game-config-template-header">
+              {creatorMode === 'session-edit' && (
+                <div className="game-config-template-header-actions">
+                  <button
+                    type="button"
+                    className="game-config-template-header-back"
+                    onClick={() => closeCreator({ returnToPreview: true })}
+                  >
+                    ← Back to Preview
+                  </button>
+                </div>
+              )}
               <div className="help-popup-tag">
                 {creatorMode === 'create' ? 'Create Custom Round' : 'Edit For This Game'}
               </div>
@@ -838,10 +1126,10 @@ export default function GameConfig({
               <button
                 type="button"
                 className="back-btn"
-                onClick={closeCreator}
+                onClick={() => closeCreator()}
                 disabled={createSubmitting}
               >
-                Cancel
+                {creatorMode === 'session-edit' ? 'Back to Preview' : 'Cancel'}
               </button>
               <button
                 type="button"
