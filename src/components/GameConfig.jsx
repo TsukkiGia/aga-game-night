@@ -15,7 +15,7 @@ function cloneJson(value) {
 
 function buildInitialSelection(initialPlanIds, catalogRounds) {
   const planCatalog = buildPlanCatalog(catalogRounds)
-  const normalized = normalizePlanIdsWithRoundIntros(initialPlanIds, planCatalog, { fallbackToDefault: true })
+  const normalized = normalizePlanIdsWithRoundIntros(initialPlanIds, planCatalog, { fallbackToDefault: false })
   const selected = new Set()
   for (const id of normalized) {
     const item = planCatalog.byId.get(id)
@@ -289,7 +289,9 @@ export default function GameConfig({
   const [customTemplates, setCustomTemplates] = useState(() =>
     initialCatalog.filter((round) => isCustomTemplateRound(round))
   )
-  const [templatesLoading, setTemplatesLoading] = useState(false)
+  const shouldLoadTemplates = Boolean(session?.code && session?.pin)
+  const [templatesLoading, setTemplatesLoading] = useState(() => shouldLoadTemplates)
+  const [templatesBootstrapped, setTemplatesBootstrapped] = useState(() => !shouldLoadTemplates)
   const [templatesError, setTemplatesError] = useState('')
 
   const [showCreator, setShowCreator] = useState(false)
@@ -354,9 +356,14 @@ export default function GameConfig({
 
   useEffect(() => {
     let cancelled = false
-    if (!session?.code || !session?.pin) return undefined
+    if (!session?.code || !session?.pin) {
+      setTemplatesLoading(false)
+      setTemplatesBootstrapped(true)
+      return undefined
+    }
 
     async function loadTemplates() {
+      setTemplatesBootstrapped(false)
       setTemplatesLoading(true)
       setTemplatesError('')
       try {
@@ -386,7 +393,10 @@ export default function GameConfig({
       } catch {
         if (!cancelled) setTemplatesError('Could not load custom rounds.')
       } finally {
-        if (!cancelled) setTemplatesLoading(false)
+        if (!cancelled) {
+          setTemplatesLoading(false)
+          setTemplatesBootstrapped(true)
+        }
       }
     }
 
@@ -834,6 +844,19 @@ export default function GameConfig({
   const inlineValidationError = showCreator ? validateTemplate() : null
   const canSubmitCreator = !createSubmitting && isEditorDirty && !inlineValidationError
 
+  if (!templatesBootstrapped) {
+    return (
+      <div className="setup-container">
+        <div className="setup-step game-config-step game-config-loading-step">
+          <div className="setup-icon">🧭</div>
+          <h2 className="setup-heading">Loading Rounds</h2>
+          <p className="setup-sub">Fetching custom rounds from the template library…</p>
+          <div className="game-config-loading-pulse" aria-hidden="true" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="setup-container">
       <div className="setup-step game-config-step">
@@ -951,7 +974,9 @@ export default function GameConfig({
         <div className="setup-actions">
           <button type="button" className="back-btn" onClick={onBack}>← Back</button>
           <button type="button" className="back-btn" onClick={handleResetDefault}>Default</button>
-          <button type="button" className="start-btn" onClick={handleContinue}>Continue →</button>
+          <button type="button" className="start-btn" onClick={handleContinue} disabled={selectedQuestions === 0}>
+            Continue →
+          </button>
         </div>
       </div>
 

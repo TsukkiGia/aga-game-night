@@ -165,6 +165,7 @@ function extractAnswerView(activeQuestion, roundCatalog, planCatalog, planIds) {
 
 export default function HostMobilePage() {
   const savedHostCredentials = readHostCredentials()
+  const querySessionCode = String(new URLSearchParams(window.location.search).get('s') || '').trim().toUpperCase()
   const [connected, setConnected] = useState(false)
   const [authorized, setAuthorized] = useState(false)
   const [activeQuestionRaw, setActiveQuestionRaw] = useState(null)
@@ -174,7 +175,7 @@ export default function HostMobilePage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
   const [authForm, setAuthForm] = useState({
-    sessionCode: savedHostCredentials?.sessionCode || '',
+    sessionCode: querySessionCode || savedHostCredentials?.sessionCode || '',
     pin: savedHostCredentials?.pin || '',
   })
   const [soundStatus, setSoundStatus] = useState('')
@@ -269,7 +270,15 @@ export default function HostMobilePage() {
     function onConnect() {
       setConnected(true)
       const creds = readHostCredentials()
-      if (!creds) {
+      const hasMismatchedQueryCode = Boolean(
+        creds?.sessionCode &&
+        querySessionCode &&
+        creds.sessionCode !== querySessionCode
+      )
+      if (!creds || hasMismatchedQueryCode) {
+        if (querySessionCode) {
+          setAuthForm((prev) => ({ ...prev, sessionCode: querySessionCode }))
+        }
         setAuthorized(false)
         setErrorMsg('Enter session code and host PIN.')
         return
@@ -335,7 +344,7 @@ export default function HostMobilePage() {
       socket.off('buzz:reset')
       socket.off('host:timer:expired')
     }
-  }, [clearPendingSoundTimeout, clearSoundStatusTimeout, clearStreakStatusTimeout, setTransientSoundStatus, setTransientStreakStatus, submitAuth])
+  }, [clearPendingSoundTimeout, clearSoundStatusTimeout, clearStreakStatusTimeout, querySessionCode, setTransientSoundStatus, setTransientStreakStatus, submitAuth])
 
   const answerView = useMemo(
     () => extractAnswerView(activeQuestionRaw, roundCatalog, planCatalog, planIds),
