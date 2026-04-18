@@ -40,6 +40,37 @@ const DEFAULT_QUESTION = {
   explanation: '',
 }
 
+function buildEditorSnapshot({ name, intro, rules, scoring, questions }) {
+  const normalizedRules = Array.isArray(rules)
+    ? rules.map((rule) => String(rule || '').trim())
+    : []
+  const normalizedScoring = Array.isArray(scoring)
+    ? scoring.map((row) => ({
+      label: String(row?.label || '').trim(),
+      points: Number.parseInt(row?.points, 10) || 0,
+      phase: String(row?.phase || 'normal').trim().toLowerCase() === 'steal' ? 'steal' : 'normal',
+    }))
+    : []
+  const normalizedQuestions = Array.isArray(questions)
+    ? questions.map((question, index) => ({
+      id: String(question?.id || '').trim() || `q-${index + 1}`,
+      promptType: String(question?.promptType || 'text').trim().toLowerCase(),
+      promptText: String(question?.promptText || '').trim(),
+      mediaUrl: String(question?.mediaUrl || '').trim(),
+      answer: String(question?.answer || '').trim(),
+      explanation: String(question?.explanation || '').trim(),
+    }))
+    : []
+
+  return JSON.stringify({
+    name: String(name || '').trim(),
+    intro: String(intro || '').trim(),
+    rules: normalizedRules,
+    scoring: normalizedScoring,
+    questions: normalizedQuestions,
+  })
+}
+
 function roundTooltipText(round) {
   const intro = String(round?.intro || '').trim()
   if (intro) return intro
@@ -269,6 +300,15 @@ export default function GameConfig({
   const [sessionEditedRoundIds, setSessionEditedRoundIds] = useState(() => new Set())
   const [createError, setCreateError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState({ roundId: '', text: '' })
+  const [editorBaseline, setEditorBaseline] = useState(() => buildEditorSnapshot({
+    name: '',
+    intro: '',
+    rules: [],
+    scoring: cloneJson(DEFAULT_SCORING),
+    questions: [cloneJson(DEFAULT_QUESTION)],
+  }))
+  const [roundClearConfirmId, setRoundClearConfirmId] = useState('')
+  const [recentlyClearedRound, setRecentlyClearedRound] = useState(null)
   const [createSubmitting, setCreateSubmitting] = useState(false)
   const [newTemplateName, setNewTemplateName] = useState('')
   const [newTemplateIntro, setNewTemplateIntro] = useState('')
@@ -381,28 +421,81 @@ export default function GameConfig({
     () => roundRows.reduce((sum, row) => sum + row.selectedCount, 0),
     [roundRows]
   )
+  const currentEditorSnapshot = useMemo(() => buildEditorSnapshot({
+    name: newTemplateName,
+    intro: newTemplateIntro,
+    rules: newTemplateRules,
+    scoring: newTemplateScoring,
+    questions: newTemplateQuestions,
+  }), [newTemplateName, newTemplateIntro, newTemplateRules, newTemplateScoring, newTemplateQuestions])
+  const isEditorDirty = showCreator && currentEditorSnapshot !== editorBaseline
 
-  function toggleRound(roundIndex) {
-    const questionIds = PLAN_CATALOG.questionIdsByRoundIndex.get(roundIndex) || []
+  useEffect(() => {
+    if (!roundClearConfirmId) return undefined
+    const timer = setTimeout(() => setRoundClearConfirmId(''), 3500)
+    return () => clearTimeout(timer)
+  }, [roundClearConfirmId])
+
+  useEffect(() => {
+    if (!recentlyClearedRound) return undefined
+    const timer = setTimeout(() => setRecentlyClearedRound(null), 7000)
+    return () => clearTimeout(timer)
+  }, [recentlyClearedRound])
+
+  function handleRoundToggle(row) {
+    if (!row) return
+    const { round, questionIds, allSelected } = row
+    if (allSelected && roundClearConfirmId !== round.id) {
+      setRoundClearConfirmId(round.id)
+      return
+    }
+
+    if (allSelected) {
+      const clearedQuestionIds = questionIds.filter((id) => selectedQuestionIds.has(id))
+      setSelectedQuestionIds((prev) => {
+        const next = new Set(prev)
+        questionIds.forEach((id) => next.delete(id))
+        return next
+      })
+      setRecentlyClearedRound({
+        roundId: round.id,
+        roundName: round.name,
+        questionIds: clearedQuestionIds,
+      })
+    } else {
+      setSelectedQuestionIds((prev) => {
+        const next = new Set(prev)
+        questionIds.forEach((id) => next.add(id))
+        return next
+      })
+      setRecentlyClearedRound(null)
+    }
+    setRoundClearConfirmId('')
+    setError('')
+  }
+
+  function handleUndoClearRound() {
+    if (!recentlyClearedRound?.questionIds?.length) return
+    const ids = recentlyClearedRound.questionIds
     setSelectedQuestionIds((prev) => {
       const next = new Set(prev)
-      const selectedCount = questionIds.filter((id) => next.has(id)).length
-      const shouldSelectAll = selectedCount !== questionIds.length
-      for (const id of questionIds) {
-        if (shouldSelectAll) next.add(id)
-        else next.delete(id)
-      }
+      ids.forEach((id) => {
+        if (PLAN_CATALOG.byId.has(id)) next.add(id)
+      })
       return next
     })
-    setError('')
+    setRecentlyClearedRound(null)
+    setRoundClearConfirmId('')
   }
 
   function openRoundPreview(roundId) {
     setPreviewRoundId(String(roundId || '').trim())
+    setRoundClearConfirmId('')
   }
 
   function closeRoundPreview() {
     setPreviewRoundId('')
+    setRoundClearConfirmId('')
     setSaveSuccess((prev) => (prev.roundId ? { roundId: '', text: '' } : prev))
   }
 
@@ -413,6 +506,7 @@ export default function GameConfig({
       else next.add(questionId)
       return next
     })
+    setRoundClearConfirmId('')
     setError('')
   }
 
@@ -420,6 +514,8 @@ export default function GameConfig({
     const defaultCatalog = buildPlanCatalog(builtinRounds)
     const defaults = defaultPlanIds(defaultCatalog)
     setSelectedQuestionIds(buildInitialSelection(defaults, builtinRounds))
+    setRoundClearConfirmId('')
+    setRecentlyClearedRound(null)
     setError('')
   }
 
@@ -463,6 +559,7 @@ export default function GameConfig({
   }
 
   function resetCreator() {
+    const defaultQuestions = [cloneJson(DEFAULT_QUESTION)]
     setCreatorMode('create')
     setEditingRoundId('')
     setEditingTemplateId('')
@@ -470,11 +567,22 @@ export default function GameConfig({
     setNewTemplateIntro('')
     setNewTemplateRules([])
     setNewTemplateScoring(cloneJson(DEFAULT_SCORING))
-    setNewTemplateQuestions([cloneJson(DEFAULT_QUESTION)])
+    setNewTemplateQuestions(defaultQuestions)
+    setEditorBaseline(buildEditorSnapshot({
+      name: '',
+      intro: '',
+      rules: [],
+      scoring: cloneJson(DEFAULT_SCORING),
+      questions: defaultQuestions,
+    }))
     setCreateError('')
   }
 
   function closeCreator(options = {}) {
+    if (!options.skipConfirm && isEditorDirty && typeof window !== 'undefined') {
+      const confirmed = window.confirm('Discard unsaved changes?')
+      if (!confirmed) return
+    }
     const modeAtClose = creatorMode
     const roundIdAtClose = String(editingRoundId || '').trim()
     const shouldReturnToPreview = options.returnToPreview ?? (modeAtClose === 'session-edit')
@@ -499,7 +607,7 @@ export default function GameConfig({
     setNewTemplateIntro(String(round.intro || '').trim())
     setNewTemplateRules(Array.isArray(round.rules) ? cloneJson(round.rules) : [])
     setNewTemplateScoring(Array.isArray(round.scoring) ? cloneJson(round.scoring) : cloneJson(DEFAULT_SCORING))
-    setNewTemplateQuestions(
+    const editQuestions = (
       Array.isArray(round.questions) && round.questions.length > 0
         ? round.questions.map((question) => ({
             id: question?.id || nextQuestionId(),
@@ -511,6 +619,14 @@ export default function GameConfig({
           }))
         : [{ ...cloneJson(DEFAULT_QUESTION), id: nextQuestionId() }]
     )
+    setNewTemplateQuestions(editQuestions)
+    setEditorBaseline(buildEditorSnapshot({
+      name: String(round.name || '').trim(),
+      intro: String(round.intro || '').trim(),
+      rules: Array.isArray(round.rules) ? cloneJson(round.rules) : [],
+      scoring: Array.isArray(round.scoring) ? cloneJson(round.scoring) : cloneJson(DEFAULT_SCORING),
+      questions: editQuestions,
+    }))
     setCreateError('')
     setShowCreator(true)
   }
@@ -591,7 +707,7 @@ export default function GameConfig({
         const exists = prev.some((round) => round.id === normalized.id)
         return exists ? prev : [normalized, ...prev]
       })
-      closeCreator()
+      closeCreator({ skipConfirm: true })
     } catch {
       setCreateError('Could not create template.')
     } finally {
@@ -653,8 +769,11 @@ export default function GameConfig({
       roundId,
       text: 'Saved. Preview updated for this session.',
     })
-    closeCreator()
+    closeCreator({ skipConfirm: true })
   }
+
+  const inlineValidationError = showCreator ? validateTemplate() : null
+  const canSubmitCreator = !createSubmitting && isEditorDirty && !inlineValidationError
 
   return (
     <div className="setup-container">
@@ -720,10 +839,12 @@ export default function GameConfig({
                   </button>
                   <button
                     type="button"
-                    className="game-config-round-action"
-                    onClick={() => toggleRound(roundIndex)}
+                    className={`game-config-round-action${allSelected && roundClearConfirmId === round.id ? ' confirm-clear' : ''}`}
+                    onClick={() => handleRoundToggle({ round, roundIndex, questionIds, allSelected })}
                   >
-                    {allSelected ? 'Clear Round' : 'Select Round'}
+                    {allSelected
+                      ? (roundClearConfirmId === round.id ? 'Confirm Clear' : 'Clear Round')
+                      : 'Select Round'}
                   </button>
                 </div>
               </div>
@@ -758,6 +879,13 @@ export default function GameConfig({
             </div>
           ))}
         </div>
+
+        {recentlyClearedRound && (
+          <div className="game-config-undo-banner">
+            <span>{recentlyClearedRound.roundName} cleared.</span>
+            <button type="button" onClick={handleUndoClearRound}>Undo</button>
+          </div>
+        )}
 
         {error && <p className="session-gate-error">{error}</p>}
 
@@ -803,10 +931,12 @@ export default function GameConfig({
                 )}
                 <button
                   type="button"
-                  className="game-config-round-action"
-                  onClick={() => toggleRound(previewRow.roundIndex)}
+                  className={`game-config-round-action${previewRow.allSelected && roundClearConfirmId === previewRow.round.id ? ' confirm-clear' : ''}`}
+                  onClick={() => handleRoundToggle(previewRow)}
                 >
-                  {previewRow.allSelected ? 'Clear Round' : 'Select Round'}
+                  {previewRow.allSelected
+                    ? (roundClearConfirmId === previewRow.round.id ? 'Confirm Clear' : 'Clear Round')
+                    : 'Select Round'}
                 </button>
               </div>
             </div>
@@ -830,12 +960,16 @@ export default function GameConfig({
                         type="button"
                         className={`game-config-preview-q-state${selected ? ' selected' : ''}`}
                         aria-pressed={selected}
+                        aria-label={selected ? `Unselect question ${questionIndex + 1}` : `Select question ${questionIndex + 1}`}
+                        title={selected ? 'Selected' : 'Not selected'}
                         onClick={() => {
                           if (!questionId) return
                           toggleQuestion(questionId)
                         }}
                       >
-                        {selected ? 'Selected' : 'Select'}
+                        <span className="game-config-preview-q-state-check" aria-hidden="true">
+                          {selected ? '✓' : ''}
+                        </span>
                       </button>
                     </div>
                     <div className="game-config-preview-q-title">{headline}</div>
@@ -892,6 +1026,9 @@ export default function GameConfig({
                   ? 'Build a reusable buzz round with text, image, or video prompts.'
                   : 'These edits apply only to this game session. The shared template library stays unchanged.'}
               </p>
+              <div className={`game-config-template-dirty${isEditorDirty ? ' dirty' : ''}`}>
+                {isEditorDirty ? 'Unsaved changes' : 'No unsaved changes'}
+              </div>
             </div>
 
             <div className="game-config-template-body">
@@ -1121,6 +1258,9 @@ export default function GameConfig({
             </div>{/* end game-config-template-body */}
 
             {createError && <p className="session-gate-error game-config-template-error">{createError}</p>}
+            {!createError && inlineValidationError && isEditorDirty && (
+              <p className="game-config-template-hint">Fix before saving: {inlineValidationError}</p>
+            )}
 
             <div className="setup-actions game-config-template-footer">
               <button
@@ -1138,7 +1278,7 @@ export default function GameConfig({
                   if (creatorMode === 'session-edit') handleSaveSessionRoundEdits()
                   else void handleCreateTemplate()
                 }}
-                disabled={createSubmitting}
+                disabled={!canSubmitCreator}
               >
                 {creatorMode === 'session-edit'
                   ? 'Save Session Round'

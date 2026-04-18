@@ -484,6 +484,12 @@
   box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
+.game-config-round-action.confirm-clear {
+  border-color: #c44c30;
+  background: #fbe8e2;
+  color: #a8371d;
+}
+
 .game-config-round-edit-btn {
   border: 1px solid #ccbfae;
   background: #fff;
@@ -572,6 +578,33 @@
   border-color: var(--gc-accent);
   background: var(--gc-accent);
   color: white;
+}
+
+.game-config-undo-banner {
+  margin: 4px 0 12px;
+  border: 1px solid #d8cdbd;
+  border-radius: 12px;
+  min-height: 40px;
+  padding: 7px 10px;
+  background: #fff8ef;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #5a5146;
+}
+
+.game-config-undo-banner button {
+  border: 1px solid #cdbfae;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 /* ── Round Preview Modal ────────────────────────────────────────────── */
@@ -749,23 +782,35 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 999px;
-  border: 1px solid #cdbfae;
+  border: 1px solid var(--border);
   background: #fff;
-  color: #7d7063;
-  padding: 0 10px;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: transparent;
+  padding: 0;
   transition: all 0.16s ease;
 }
 
+.game-config-preview-q-state-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  color: transparent;
+}
+
 .game-config-preview-q-state.selected {
-  color: var(--gc-accent);
-  border-color: color-mix(in srgb, var(--gc-accent) 65%, #cdbfae);
-  background: color-mix(in srgb, var(--gc-accent-bg) 65%, #fff);
+  border-color: var(--gc-accent);
+  background: var(--gc-accent);
+}
+
+.game-config-preview-q-state.selected .game-config-preview-q-state-check {
+  color: #fff;
 }
 
 .game-config-preview-q-state:hover {
@@ -944,6 +989,28 @@
   font-size: 17px;
   line-height: 1.45;
   color: var(--text-muted);
+}
+
+.game-config-template-dirty {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d8cfbf;
+  border-radius: 999px;
+  background: #f7f1e8;
+  color: #70665a;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.game-config-template-dirty.dirty {
+  border-color: #deb897;
+  background: #fff2e5;
+  color: #9a4f18;
 }
 
 .game-config-template-body {
@@ -1315,6 +1382,13 @@
 
 .game-config-template-error {
   margin: 0 20px;
+}
+
+.game-config-template-hint {
+  margin: 0 20px;
+  color: #7a5f2f;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .game-config-url-feedback {
