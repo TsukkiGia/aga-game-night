@@ -20,7 +20,7 @@ import {
 import PreviewModal from './game-config/PreviewModal'
 import RoundCard from './game-config/RoundCard'
 import TemplateEditorModal from './game-config/TemplateEditorModal'
-import { useRoundDragReorder } from './game-config/useRoundDragReorder'
+import { useRoundOrder } from './game-config/useRoundOrder'
 import { useTemplateLibrary } from './game-config/useTemplateLibrary'
 
 export default function GameConfig({
@@ -101,7 +101,7 @@ export default function GameConfig({
   const {
     setRoundOrder,
     orderedCatalog,
-  } = useRoundDragReorder(combinedCatalog)
+  } = useRoundOrder(combinedCatalog)
 
   const PLAN_CATALOG = useMemo(() => buildPlanCatalog(orderedCatalog), [orderedCatalog])
   const [selectedQuestionIds, setSelectedQuestionIds] = useState(() =>

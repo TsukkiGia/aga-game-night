@@ -326,6 +326,23 @@
   color: #0b6356;
 }
 
+.companion-setup-status-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid #cdbfae;
+  background: #f6efe4;
+  color: #6f6458;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: help;
+  flex-shrink: 0;
+}
+
 .companion-setup-status-btn {
   min-height: 34px;
   padding: 8px 14px;
@@ -817,10 +834,6 @@
   opacity: 0.78;
 }
 
-.game-config-round-card.is-dragging {
-  opacity: 0.5;
-}
-
 .game-config-round-card.type-video {
   --gc-accent: var(--indigo);
   --gc-accent-bg: var(--indigo-bg);
@@ -956,36 +969,6 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
-}
-
-.game-config-round-drag-handle {
-  border: 1px solid #ccbfae;
-  background: #fff;
-  color: #6e655b;
-  border-radius: 999px;
-  min-height: 32px;
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all 0.18s ease;
-  cursor: grab;
-  user-select: none;
-}
-
-.game-config-round-drag-handle:hover {
-  border-color: #9f9284;
-  color: var(--text);
-  transform: translateY(-1px);
-}
-
-.game-config-round-drag-handle:active {
-  cursor: grabbing;
 }
 
 .game-config-round-preview-btn {

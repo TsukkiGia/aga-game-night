@@ -12,6 +12,3 @@ export const DEFAULT_QUESTION = {
   answer: '',
   explanation: '',
 }
-
-export const DRAG_SCROLL_EDGE_PX = 120
-export const DRAG_SCROLL_MAX_STEP_PX = 16

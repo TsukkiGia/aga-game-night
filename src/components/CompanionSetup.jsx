@@ -68,6 +68,15 @@ export default function CompanionSetup({ sessionCode, onContinue, onBack, backLa
           <span className={`companion-setup-status-chip${companionReady ? ' is-ready' : ''}`}>
             {companionReady ? 'Companion connected' : 'Companion not connected'}
           </span>
+          <span
+            className="companion-setup-status-help game-config-tooltip-trigger"
+            role="note"
+            data-tooltip="This is a manual check. Mark connected after you scan the QR and can control answers/timer from the companion device."
+            aria-label="Companion readiness help"
+            tabIndex={0}
+          >
+            ?
+          </span>
           <button
             type="button"
             className="back-btn companion-setup-status-btn"
