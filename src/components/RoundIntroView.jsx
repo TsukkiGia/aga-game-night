@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import QRImg from './QRImg'
-import MemberRoster from './MemberRoster'
 import { questionItemIdFor } from '../gamePlan'
 
 function isQuestionDone(doneQuestions, roundIndex, questionIndex, planCatalog) {
@@ -13,7 +11,6 @@ function isQuestionDone(doneQuestions, roundIndex, questionIndex, planCatalog) {
 export default function RoundIntroView({
   planCatalog = null,
   rounds, roundIndex, doneQuestions,
-  teams, members, buzzerUrl,
   onNavigate, onBack,
   isRoundIncluded = () => true,
   isQuestionIncluded = () => true,
@@ -21,7 +18,6 @@ export default function RoundIntroView({
   getQuestionDisplayNumber = (_ri, qi) => qi + 1,
 }) {
   const round = rounds[roundIndex]
-  const [qrOpen, setQrOpen] = useState(false)
   const [sidebarScrollTop, setSidebarScrollTop] = useState(0)
 
   return (
@@ -37,7 +33,7 @@ export default function RoundIntroView({
         <div />
       </div>
 
-      {/* Main: sidebar + content + right sidebar */}
+      {/* Main: sidebar + content */}
       <div className="qv-main">
 
         {/* Left sidebar */}
@@ -96,25 +92,6 @@ export default function RoundIntroView({
               Start Round →
             </button>
           </div>
-        </div>
-
-        {/* Right sidebar: QR code + team chips */}
-        <div className={`qv-codes-sidebar${qrOpen ? '' : ' collapsed'}`}>
-          <button className="qv-sidebar-toggle" onClick={() => setQrOpen(o => !o)}>
-            {qrOpen ? '›' : '‹'}
-          </button>
-          {qrOpen && (
-            <>
-              <QRImg url={buzzerUrl} />
-              <div className="qv-codes-url">{buzzerUrl}</div>
-              {teams.map((t, i) => (
-                <div key={i} className={`qv-codes-chip color-${t.color}`}>
-                  <span className="qv-codes-chip-name">{t.name}</span>
-                  <MemberRoster members={members?.[i] || []} compact maxVisible={3} />
-                </div>
-              ))}
-            </>
-          )}
         </div>
 
       </div>

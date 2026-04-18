@@ -404,9 +404,6 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
             planCatalog={planCatalog}
             roundIndex={rIdx}
             doneQuestions={doneQuestions}
-            teams={teams}
-            members={members}
-            buzzerUrl={buzzerUrl}
             onNavigate={navigateWithReset}
             onBack={goBack}
             isRoundIncluded={(roundIndex) => plannedRoundIndexSet.has(roundIndex)}
@@ -433,6 +430,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
           key={activeItem.id}
           rounds={roundCatalog}
           planCatalog={planCatalog}
+          buzzerUrl={buzzerUrl}
           roundIndex={rIdx}
           questionIndex={qIdx}
           doneQuestions={doneQuestions}

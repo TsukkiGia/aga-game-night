@@ -6,6 +6,7 @@ import SlangBody from './SlangBody'
 import CharadesBody from './CharadesBody'
 import ThesisBody from './ThesisBody'
 import CustomBuzzBody from './CustomBuzzBody'
+import JoinQrModal from './JoinQrModal'
 import { questionItemIdFor } from '../gamePlan'
 let lastQuestionSidebarScrollTop = 0
 
@@ -24,6 +25,7 @@ export default function QuestionView({
   stealMode, onWrongAndSteal, onManualBuzz,
   onMarkDone, onNavigate, onBack, onNext, onPrev,
   onHalftime, onWinner, onShowReactionLeaderboard, doublePoints, onToggleDouble, timerControlSignal, onTimerExpired,
+  buzzerUrl = '',
   isRoundIncluded = () => true,
   isQuestionIncluded = () => true,
   getRoundDisplayLabel = (ri) => `Round ${ri + 1}`,
@@ -58,6 +60,7 @@ export default function QuestionView({
   const [stealSelected, setStealSelected] = useState(() => defaultStealSelection())
   const [correctGiven, setCorrectGiven] = useState(false)
   const [confirmFinish, setConfirmFinish] = useState(false)
+  const [showJoinQr, setShowJoinQr] = useState(false)
   const sidebarRef = useRef(null)
 
   useEffect(() => {
@@ -72,6 +75,18 @@ export default function QuestionView({
     }
     onNavigate(nextRoundIndex, nextQuestionIndex)
   }
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (!e.shiftKey) return
+      const key = String(e.key || '').toUpperCase()
+      if (key !== 'J') return
+      e.preventDefault()
+      setShowJoinQr(true)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   if (!round || !question) {
     return (
@@ -109,6 +124,7 @@ export default function QuestionView({
           <button className="qv-arrow" onClick={onPrev} disabled={questionIndex === 0}>‹</button>
           <button className="qv-arrow" onClick={() => { onMarkDone(); onNext() }}>›</button>
           <button className="qv-reaction-btn" onClick={onShowReactionLeaderboard}>⏱ Times</button>
+          <button className="qv-join-btn" onClick={() => setShowJoinQr(true)}>📱 Join</button>
           <button className="halftime-btn" onClick={onHalftime}>⏸ Halftime</button>
           {confirmFinish
             ? <>
@@ -286,6 +302,12 @@ export default function QuestionView({
           </button>
         )}
       </div>
+
+      <JoinQrModal
+        open={showJoinQr}
+        buzzerUrl={buzzerUrl}
+        onClose={() => setShowJoinQr(false)}
+      />
 
       {/* ── Steal picker ─────────────────────────────── */}
       {stealPickerOpen && !armed && !buzzWinner && (

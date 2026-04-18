@@ -112,9 +112,11 @@ export default function BuzzModal({
                     stopCountdown()
                     onAdjust(buzzWinner.teamIndex, points)
                     const canReveal = round.type === 'slang' || round.type === 'video' || round.type === 'charades' || round.type === 'custom-buzz'
-                    const shouldRevealOnPositive = points > 0
+                    const normalizedLabel = String(label || '').trim().toLowerCase()
+                    const isFunnyBonus = normalizedLabel === 'funny bonus'
+                    const shouldRevealOnPositive = points > 0 && !isFunnyBonus
                     if (stealMode) {
-                      if (canReveal && shouldRevealOnPositive) setRevealedInModal(true)
+                      if (canReveal) setRevealedInModal(true)
                     } else if (round.type === 'video' && label === 'Correct country') {
                       setRevealedCountry(true)
                     } else if (canReveal && shouldRevealOnPositive) {
