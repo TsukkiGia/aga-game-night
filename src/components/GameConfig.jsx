@@ -627,7 +627,7 @@ export default function GameConfig({
 
         {error && <p className="session-gate-error">{error}</p>}
 
-        <div className="setup-actions">
+        <div className="setup-actions game-config-footer-actions">
           <button type="button" className="back-btn" onClick={onBack}>← Back</button>
           <button type="button" className="back-btn" onClick={handleResetDefault}>Default</button>
           <button type="button" className="start-btn" onClick={handleContinue} disabled={selectedQuestions === 0}>

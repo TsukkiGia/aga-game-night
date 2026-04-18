@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ENDPOINT } from '../config'
 import QRImg from './QRImg'
 
-export default function CompanionSetup({ sessionCode, onContinue, onBack }) {
+export default function CompanionSetup({ sessionCode, onContinue, onBack, backLabel = '← Back to Game Plan' }) {
   const [copied, setCopied] = useState(false)
 
   const hostCompanionUrl = useMemo(() => {
@@ -64,7 +64,7 @@ export default function CompanionSetup({ sessionCode, onContinue, onBack }) {
         </div>
 
         <div className="setup-actions">
-          <button type="button" className="back-btn" onClick={onBack}>← Back to Game Plan</button>
+          <button type="button" className="back-btn" onClick={onBack}>{backLabel}</button>
           <button type="button" className="start-btn" onClick={onContinue}>Continue to Lobby →</button>
         </div>
       </div>
