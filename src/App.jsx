@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Setup from './components/Setup'
 import Scoreboard from './components/Scoreboard'
 import BuzzerPage from './components/BuzzerPage'
@@ -8,6 +8,7 @@ import SplashScreen from './components/SplashScreen'
 import GameConfig from './components/GameConfig'
 import GamePlanPreview from './components/GamePlanPreview'
 import CompanionSetup from './components/CompanionSetup'
+import SetupProgress from './components/SetupProgress'
 import {
   TEAMS_KEY,
   GAME_PLAN_KEY,
@@ -108,6 +109,15 @@ export default function App() {
   const [needsCompanionSetup, setNeedsCompanionSetup] = useState(() => loadNeedsCompanionSetup())
   useWakeLock(true)
 
+  const setupProgressStep = useMemo(() => {
+    if (!session) return null
+    if (!teams) return 1
+    if (needsPlanConfig) return 2
+    if (needsPlanPreview) return 3
+    if (needsCompanionSetup) return 4
+    return null
+  }, [session, teams, needsPlanConfig, needsPlanPreview, needsCompanionSetup])
+
   useEffect(() => {
     if (isBuzzerMode || isHostMobileMode) return
 
@@ -205,6 +215,12 @@ export default function App() {
       </header>
 
       <main className="app-main">
+        {setupProgressStep && (
+          <SetupProgress
+            steps={['Teams', 'Game Plan', 'Preview', 'Companion']}
+            current={setupProgressStep}
+          />
+        )}
         {!session ? (
           <SessionGate onSession={handleSession} />
         ) : !teams ? (

@@ -21,7 +21,13 @@ export default function GamePlanPreview({
     () => rounds.reduce((sum, round) => sum + round.questions.length, 0),
     [rounds]
   )
+  const allRoundKeys = useMemo(
+    () => rounds.map((round, roundIndex) => String(round?.id || `preview-round-${roundIndex}`)),
+    [rounds]
+  )
   const [expandedRoundIds, setExpandedRoundIds] = useState(() => new Set())
+  const allExpanded = allRoundKeys.length > 0 && allRoundKeys.every((key) => expandedRoundIds.has(key))
+  const allCollapsed = allRoundKeys.every((key) => !expandedRoundIds.has(key))
 
   function toggleRoundCollapsed(roundKey) {
     setExpandedRoundIds((prev) => {
@@ -30,6 +36,14 @@ export default function GamePlanPreview({
       else next.add(roundKey)
       return next
     })
+  }
+
+  function handleExpandAll() {
+    setExpandedRoundIds(new Set(allRoundKeys))
+  }
+
+  function handleCollapseAll() {
+    setExpandedRoundIds(new Set())
   }
 
   return (
@@ -52,71 +66,91 @@ export default function GamePlanPreview({
           </div>
         </div>
 
+        <div className="game-plan-preview-bulk-actions">
+          <button
+            type="button"
+            className="back-btn"
+            onClick={handleExpandAll}
+            disabled={allExpanded}
+          >
+            Expand all
+          </button>
+          <button
+            type="button"
+            className="back-btn"
+            onClick={handleCollapseAll}
+            disabled={allCollapsed}
+          >
+            Collapse all
+          </button>
+        </div>
+
         <div className="game-plan-preview-rounds">
           {rounds.map((round, roundIndex) => {
             const roundKey = String(round?.id || `preview-round-${roundIndex}`)
             const collapsed = !expandedRoundIds.has(roundKey)
             return (
-            <section key={roundKey} className={`game-plan-preview-round type-${round.type}`}>
-              <header className="game-plan-preview-round-head">
-                <div className="game-plan-preview-round-head-top">
-                  <span className="game-plan-preview-round-pill">{`Round ${roundIndex + 1}`}</span>
-                  <button
-                    type="button"
-                    className="game-plan-preview-collapse-btn"
-                    onClick={() => toggleRoundCollapsed(roundKey)}
-                    aria-expanded={!collapsed}
-                    aria-controls={`${roundKey}-questions`}
-                  >
-                    {collapsed ? 'Expand' : 'Collapse'}
-                  </button>
-                </div>
-                <h3>{round.name || `Round ${roundIndex + 1}`}</h3>
-                <p>{round.questions.length} question{round.questions.length === 1 ? '' : 's'}</p>
-              </header>
-
-              {!collapsed && (
-              <div className="game-plan-preview-question-list" id={`${roundKey}-questions`}>
-                {round.questions.map((question, questionIndex) => {
-                  const headline = questionPreviewHeadline(round, question, questionIndex)
-                  const detail = questionPreviewDetail(round, question)
-                  const answer = questionPreviewAnswer(round, question)
-                  const tags = questionPreviewTags(round, question)
-                  return (
-                    <article
-                      key={question?.id || `${round.id || roundIndex}-q-${questionIndex + 1}`}
-                      className="game-plan-preview-question"
+              <section key={roundKey} className={`game-plan-preview-round type-${round.type}`}>
+                <header className="game-plan-preview-round-head">
+                  <div className="game-plan-preview-round-head-top">
+                    <span className="game-plan-preview-round-pill">{`Round ${roundIndex + 1}`}</span>
+                    <button
+                      type="button"
+                      className="game-plan-preview-collapse-btn"
+                      onClick={() => toggleRoundCollapsed(roundKey)}
+                      aria-expanded={!collapsed}
+                      aria-controls={`${roundKey}-questions`}
                     >
-                      <div className="game-plan-preview-question-top">
-                        <span className="game-plan-preview-q-pill">Q{questionIndex + 1}</span>
-                        {tags.length > 0 && (
-                          <div className="game-plan-preview-tags">
-                            {tags.slice(0, 3).map((tag, tagIndex) => (
-                              <span key={`${questionIndex}-tag-${tagIndex}`}>{tag}</span>
-                            ))}
+                      {collapsed ? 'Expand' : 'Collapse'}
+                    </button>
+                  </div>
+                  <h3>{round.name || `Round ${roundIndex + 1}`}</h3>
+                  <p>{round.questions.length} question{round.questions.length === 1 ? '' : 's'}</p>
+                </header>
+
+                {!collapsed && (
+                  <div className="game-plan-preview-question-list" id={`${roundKey}-questions`}>
+                    {round.questions.map((question, questionIndex) => {
+                      const headline = questionPreviewHeadline(round, question, questionIndex)
+                      const detail = questionPreviewDetail(round, question)
+                      const answer = questionPreviewAnswer(round, question)
+                      const tags = questionPreviewTags(round, question)
+                      return (
+                        <article
+                          key={question?.id || `${round.id || roundIndex}-q-${questionIndex + 1}`}
+                          className="game-plan-preview-question"
+                        >
+                          <div className="game-plan-preview-question-top">
+                            <span className="game-plan-preview-q-pill">Q{questionIndex + 1}</span>
+                            {tags.length > 0 && (
+                              <div className="game-plan-preview-tags">
+                                {tags.slice(0, 3).map((tag, tagIndex) => (
+                                  <span key={`${questionIndex}-tag-${tagIndex}`}>{tag}</span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <div className="game-plan-preview-question-title">{headline}</div>
-                      <QuestionPreviewMedia
-                        key={`${String(question?.id || questionIndex)}:${String(question?.promptType || '')}:${String(question?.mediaUrl || question?.video || '')}`}
-                        round={round}
-                        question={question}
-                      />
-                      {answer && (
-                        <div className="game-plan-preview-answer">
-                          <span>Answer</span>
-                          <strong>{answer}</strong>
-                        </div>
-                      )}
-                      {detail && <div className="game-plan-preview-detail">{detail}</div>}
-                    </article>
-                  )
-                })}
-              </div>
-              )}
-            </section>
-          )})}
+                          <div className="game-plan-preview-question-title">{headline}</div>
+                          <QuestionPreviewMedia
+                            key={`${String(question?.id || questionIndex)}:${String(question?.promptType || '')}:${String(question?.mediaUrl || question?.video || '')}`}
+                            round={round}
+                            question={question}
+                          />
+                          {answer && (
+                            <div className="game-plan-preview-answer">
+                              <span>Answer</span>
+                              <strong>{answer}</strong>
+                            </div>
+                          )}
+                          {detail && <div className="game-plan-preview-detail">{detail}</div>}
+                        </article>
+                      )
+                    })}
+                  </div>
+                )}
+              </section>
+            )
+          })}
         </div>
 
         <div className="setup-actions">
