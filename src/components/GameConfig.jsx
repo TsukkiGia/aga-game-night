@@ -294,6 +294,7 @@ export default function GameConfig({
 
   const [showCreator, setShowCreator] = useState(false)
   const [previewRoundId, setPreviewRoundId] = useState('')
+  const [previewSearch, setPreviewSearch] = useState('')
   const [creatorMode, setCreatorMode] = useState('create')
   const [editingRoundId, setEditingRoundId] = useState('')
   const [editingTemplateId, setEditingTemplateId] = useState('')
@@ -417,6 +418,62 @@ export default function GameConfig({
     () => roundRows.find((row) => row.round.id === previewRoundId) || null,
     [roundRows, previewRoundId]
   )
+  const previewSearchNormalized = useMemo(
+    () => String(previewSearch || '').trim().toLowerCase(),
+    [previewSearch]
+  )
+  const previewItems = useMemo(() => {
+    if (!previewRow) return []
+    return previewRow.round.questions
+      .map((question, questionIndex) => {
+        const questionId = previewRow.questionIds[questionIndex]
+        const selected = Boolean(questionId) && selectedQuestionIds.has(questionId)
+        const headline = questionPreviewHeadline(previewRow.round, question, questionIndex)
+        const detail = questionPreviewDetail(previewRow.round, question)
+        const tags = questionPreviewTags(previewRow.round, question)
+        const answer = questionPreviewAnswer(previewRow.round, question)
+        const searchable = [
+          `q${questionIndex + 1}`,
+          headline,
+          detail,
+          answer,
+          ...tags,
+          question?.promptText,
+          question?.mediaUrl,
+          question?.explanation,
+          question?.answer,
+          question?.term,
+          question?.meaning,
+          question?.sentence,
+          question?.phrase,
+          question?.title,
+          Array.isArray(question?.options) ? question.options.join(' ') : '',
+          Array.isArray(question?.countries) ? question.countries.join(' ') : '',
+        ]
+          .map((value) => String(value || '').toLowerCase())
+          .join(' ')
+
+        return {
+          key: questionId || `${previewRow.round.id}-q${questionIndex + 1}`,
+          question,
+          questionIndex,
+          questionId,
+          selected,
+          headline,
+          detail,
+          tags,
+          answer,
+          searchable,
+        }
+      })
+      .filter((item) => !previewSearchNormalized || item.searchable.includes(previewSearchNormalized))
+  }, [previewRow, previewSearchNormalized, selectedQuestionIds])
+  const previewMatchesLabel = useMemo(() => {
+    if (!previewRow || !previewSearchNormalized) return ''
+    const count = previewItems.length
+    const total = previewRow.questionIds.length
+    return `${count} of ${total} match${count === 1 ? '' : 'es'}`
+  }, [previewItems.length, previewRow, previewSearchNormalized])
   const selectedQuestions = useMemo(
     () => roundRows.reduce((sum, row) => sum + row.selectedCount, 0),
     [roundRows]
@@ -490,11 +547,13 @@ export default function GameConfig({
 
   function openRoundPreview(roundId) {
     setPreviewRoundId(String(roundId || '').trim())
+    setPreviewSearch('')
     setRoundClearConfirmId('')
   }
 
   function closeRoundPreview() {
     setPreviewRoundId('')
+    setPreviewSearch('')
     setRoundClearConfirmId('')
     setSaveSuccess((prev) => (prev.roundId ? { roundId: '', text: '' } : prev))
   }
@@ -939,19 +998,50 @@ export default function GameConfig({
                     : 'Select Round'}
                 </button>
               </div>
+              <div className="game-config-preview-search-row">
+                <input
+                  type="text"
+                  className="team-name-input game-config-preview-search-input"
+                  value={previewSearch}
+                  onChange={(e) => setPreviewSearch(e.target.value)}
+                  placeholder="Search by question, answer, clue, or tag"
+                />
+                {previewSearchNormalized && (
+                  <button
+                    type="button"
+                    className="game-config-preview-search-clear"
+                    onClick={() => setPreviewSearch('')}
+                  >
+                    Clear
+                  </button>
+                )}
+                {previewMatchesLabel && (
+                  <span className="game-config-preview-search-count">{previewMatchesLabel}</span>
+                )}
+              </div>
             </div>
 
             <div className="game-config-preview-list">
-              {previewRow.round.questions.map((question, questionIndex) => {
-                const questionId = previewRow.questionIds[questionIndex]
-                const selected = Boolean(questionId) && selectedQuestionIds.has(questionId)
-                const headline = questionPreviewHeadline(previewRow.round, question, questionIndex)
-                const detail = questionPreviewDetail(previewRow.round, question)
-                const tags = questionPreviewTags(previewRow.round, question)
-                const answer = questionPreviewAnswer(previewRow.round, question)
+              {previewItems.length === 0 && previewSearchNormalized && (
+                <div className="game-config-preview-empty">
+                  No matches for "{previewSearch.trim()}". Try a broader term.
+                </div>
+              )}
+              {previewItems.map((item) => {
+                const {
+                  key,
+                  question,
+                  questionId,
+                  questionIndex,
+                  selected,
+                  headline,
+                  detail,
+                  tags,
+                  answer,
+                } = item
                 return (
                   <div
-                    key={questionId || `${previewRow.round.id}-q${questionIndex + 1}`}
+                    key={key}
                     className={`game-config-preview-question${selected ? ' selected' : ''}`}
                   >
                     <div className="game-config-preview-question-head">

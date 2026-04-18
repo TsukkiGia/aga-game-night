@@ -726,11 +726,63 @@
   flex-wrap: wrap;
 }
 
+.game-config-preview-search-row {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-config-preview-search-input {
+  min-height: 40px;
+  font-size: 15px;
+  border-radius: 10px;
+}
+
+.game-config-preview-search-clear {
+  border: 1px solid #d4c8b7;
+  background: #fff;
+  color: var(--text-muted);
+  border-radius: 10px;
+  min-height: 38px;
+  padding: 0 12px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.game-config-preview-search-clear:hover {
+  border-color: #bfb09f;
+  color: var(--text);
+}
+
+.game-config-preview-search-count {
+  justify-self: end;
+  color: #6f665b;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
 .game-config-preview-list {
   padding: 14px 16px 18px;
   overflow-y: auto;
   display: grid;
   gap: 10px;
+}
+
+.game-config-preview-empty {
+  border: 1px dashed #cdbfab;
+  border-radius: 12px;
+  background: #fff9ef;
+  color: #6f6254;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  padding: 16px 12px;
 }
 
 .game-config-preview-question {
@@ -1520,6 +1572,15 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
+  }
+
+  .game-config-preview-search-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .game-config-preview-search-count {
+    justify-self: start;
   }
 
   .game-config-preview-actions .back-btn,
