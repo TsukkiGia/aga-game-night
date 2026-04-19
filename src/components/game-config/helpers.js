@@ -30,14 +30,18 @@ export function buildEditorSnapshot({ name, intro, rules, scoring, questions }) 
     }))
     : []
   const normalizedQuestions = Array.isArray(questions)
-    ? questions.map((question, index) => ({
-      id: String(question?.id || '').trim() || `q-${index + 1}`,
-      promptType: String(question?.promptType || 'text').trim().toLowerCase(),
-      promptText: String(question?.promptText || '').trim(),
-      mediaUrl: String(question?.mediaUrl || '').trim(),
-      answer: String(question?.answer || '').trim(),
-      explanation: String(question?.explanation || '').trim(),
-    }))
+    ? questions.map((question, index) => {
+      const promptType = String(question?.promptType || 'text').trim().toLowerCase()
+      const hasMedia = promptType === 'image' || promptType === 'video'
+      return {
+        id: String(question?.id || '').trim() || `q-${index + 1}`,
+        promptType,
+        promptText: String(question?.promptText || '').trim(),
+        mediaUrl: hasMedia ? String(question?.mediaUrl || '').trim() : '',
+        answer: String(question?.answer || '').trim(),
+        explanation: String(question?.explanation || '').trim(),
+      }
+    })
     : []
 
   return JSON.stringify({
