@@ -11,8 +11,6 @@ const pool = new Pool({
     : false,
 })
 
-export default pool
-
 export async function query(text, params) {
   const client = await pool.connect()
   try {

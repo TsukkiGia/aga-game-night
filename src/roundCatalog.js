@@ -33,7 +33,7 @@ function normalizeRules(rawRules) {
     .slice(0, 20)
 }
 
-export function scoringPhase(entry) {
+function scoringPhase(entry) {
   const explicit = cleanString(entry?.phase, 16).toLowerCase()
   if (explicit === 'steal') return 'steal'
   if (explicit === 'normal') return 'normal'
@@ -41,7 +41,7 @@ export function scoringPhase(entry) {
   return label.includes('steal') ? 'steal' : 'normal'
 }
 
-export function normalizeScoring(rawScoring) {
+function normalizeScoring(rawScoring) {
   if (!Array.isArray(rawScoring)) return []
   const out = []
   const seen = new Set()
@@ -208,10 +208,7 @@ export function templateToRound(template) {
   return normalized
 }
 
-export function isCustomRound(round) {
-  return cleanString(round?.type, 40).toLowerCase() === CUSTOM_ROUND_TYPE
-}
-
 export function isCustomTemplateRound(round) {
-  return isCustomRound(round) && Boolean(cleanString(round?.templateId, 120))
+  return cleanString(round?.type, 40).toLowerCase() === CUSTOM_ROUND_TYPE
+    && Boolean(cleanString(round?.templateId, 120))
 }

@@ -6,6 +6,7 @@ import WinnerScreen from './WinnerScreen'
 import SuddenDeathOverlay from './SuddenDeathOverlay'
 import RoundTransitionScreen from './RoundTransitionScreen'
 import ReactionLeaderboardModal from './ReactionLeaderboardModal'
+import StatsModal from './StatsModal'
 import HostHelpModal from './HostHelpModal'
 import HomeLobbyView from './HomeLobbyView'
 import HomeBuzzOverlay from './HomeBuzzOverlay'
@@ -19,6 +20,7 @@ import { useNavigation } from '../hooks/useNavigation'
 import { clearAll, clearHostCredentials } from '../storage'
 import { playGameStart } from '../sounds'
 import { clearQuestionLastFromReactionStats, normalizeReactionStats, updateReactionStatsWithAttempt } from '../reactionStats'
+import { questionPreviewHeadline } from './game-config/helpers'
 import {
   buildPlanCatalog,
   normalizePlanIdsWithRoundIntros,
@@ -39,8 +41,15 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
     socket.emit('host:streak', { teamIndex, streakCount })
   }, [])
   const [reactionStats, setReactionStats] = useState({})
+  const [showStats, setShowStats] = useState(false)
+  const activeQuestionContextRef = useRef(null)
   const handleBuzzAttemptForLeaderboard = useCallback((data) => {
-    setReactionStats((prev) => updateReactionStatsWithAttempt(prev, data))
+    const ctx = activeQuestionContextRef.current
+    setReactionStats((prev) => updateReactionStatsWithAttempt(prev, {
+      ...data,
+      questionLabel: ctx?.label ?? null,
+      questionHeadline: ctx?.headline ?? null,
+    }))
   }, [])
   const runtimeHydratedRef = useRef(false)
   const [roundCatalog, setRoundCatalog] = useState(() => {
@@ -162,6 +171,20 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
   const getQuestionTotal = useCallback((roundIndex) => {
     return planDisplay.questionTotalByRound.get(roundIndex) || (roundCatalog[roundIndex]?.questions?.length || 0)
   }, [planDisplay, roundCatalog])
+  // Keep a ref to the current question context so the buzz callback can read it
+  // without being re-created on every navigation.
+  useEffect(() => {
+    if (!activeItem) { activeQuestionContextRef.current = null; return }
+    const round = roundCatalog[activeItem.roundIndex]
+    const question = round?.questions?.[activeItem.questionIndex]
+    const roundNum = planDisplay.roundDisplayNumberByIndex.get(activeItem.roundIndex) ?? (activeItem.roundIndex + 1)
+    const qNum = planDisplay.questionDisplayNumberByItemId.get(activeItem.id) ?? (activeItem.questionIndex + 1)
+    activeQuestionContextRef.current = {
+      label: `R${roundNum}Q${qNum}`,
+      headline: questionPreviewHeadline(round, question, activeItem.questionIndex),
+    }
+  }, [activeItem, roundCatalog, planDisplay])
+
   const transitionRoundLabel = useMemo(() => {
     if (!transition) return null
     const idx = roundCatalog.findIndex((round) => round?.id === transition?.id)
@@ -461,7 +484,8 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
           getQuestionTotal={getQuestionTotal}
         />
         {showHalftime && <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />}
-        {showWinner   && <WinnerScreen   teams={teams} onDismiss={() => setShowWinner(false)} onClose={() => { setShowWinner(false); clearAll(); onReset() }} onTiebreaker={handleTiebreaker} />}
+        {showWinner   && <WinnerScreen   teams={teams} onDismiss={() => setShowWinner(false)} onClose={() => { setShowWinner(false); clearAll(); onReset() }} onTiebreaker={handleTiebreaker} onViewStats={() => setShowStats(true)} />}
+        {showStats && <StatsModal reactionStats={reactionStats} onClose={() => setShowStats(false)} />}
         {suddenDeath  && <SuddenDeathOverlay tiedTeams={tiedTeams} buzzWinner={buzzWinner} onAward={handleSuddenDeathAward} onWrong={handleSuddenDeathWrong} onCancel={handleSuddenDeathCancel} />}
         <ReactionLeaderboardModal
           open={showReactionLeaderboard}

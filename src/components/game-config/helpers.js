@@ -49,14 +49,6 @@ export function buildEditorSnapshot({ name, intro, rules, scoring, questions }) 
   })
 }
 
-export function roundTooltipText(round) {
-  const intro = String(round?.intro || '').trim()
-  if (intro) return intro
-  const firstRule = Array.isArray(round?.rules) ? String(round.rules[0] || '').trim() : ''
-  if (firstRule) return firstRule
-  return 'No description available for this round yet.'
-}
-
 function truncatePreview(value, max = 180) {
   const text = String(value || '').replace(/\s+/g, ' ').trim()
   if (!text) return ''

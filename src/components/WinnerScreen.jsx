@@ -12,7 +12,7 @@ const COLOR_VARS = {
   sage:   'var(--sage)',
 }
 
-export default function WinnerScreen({ teams, onClose, onDismiss, onTiebreaker }) {
+export default function WinnerScreen({ teams, onClose, onDismiss, onTiebreaker, onViewStats }) {
   const canvasRef = useRef(null)
 
   const sorted = [...teams]
@@ -182,6 +182,9 @@ export default function WinnerScreen({ teams, onClose, onDismiss, onTiebreaker }
         {step >= 5 && (
           <div className="winner-actions winner-actions-reveal">
             <button className="winner-dismiss-btn" onClick={onDismiss}>✕ Close</button>
+            {onViewStats && (
+              <button className="winner-stats-btn" onClick={onViewStats}>⏱ View Stats</button>
+            )}
             <button className="winner-close-btn"   onClick={onClose}>↺ Play Again</button>
           </div>
         )}

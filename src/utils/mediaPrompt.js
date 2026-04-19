@@ -105,10 +105,6 @@ function mediaUrlFeedback(question) {
 
 export {
   cleanUrl,
-  isHttpUrl,
-  isKnownWebPageUrl,
-  looksLikeDirectImageUrl,
-  parseTimeToSeconds,
   toYouTubeEmbedUrl,
   mediaUrlFeedback,
 }

@@ -10,6 +10,7 @@ export default function HomeLobbyView({
   onNewGame,
   newGamePending,
   newGameError,
+  onEndSession,
   endingSession,
   onStart,
   startDisabled,
@@ -28,6 +29,9 @@ export default function HomeLobbyView({
           <button className="home-help-btn" onClick={onOpenReactionLeaderboard}>⏱ Question Race</button>
           <button className="home-new-game-btn" onClick={onNewGame} disabled={newGamePending || endingSession}>
             {newGamePending ? 'Resetting…' : 'Restart Lobby'}
+          </button>
+          <button className="home-end-session-btn" onClick={onEndSession} disabled={endingSession}>
+            {endingSession ? 'Ending…' : 'End Session'}
           </button>
         </div>
         {newGameError && <div className="host-auth-error">{newGameError}</div>}

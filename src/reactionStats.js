@@ -55,6 +55,8 @@ function normalizeReactionStatEntry(rawKey, value) {
     questionLastMs,
     totalMs,
     attempts: safeAttempts,
+    bestQuestionLabel: cleanText(value.bestQuestionLabel, 20) || null,
+    bestQuestionHeadline: cleanText(value.bestQuestionHeadline, 120) || null,
   }
 }
 
@@ -85,6 +87,9 @@ export function updateReactionStatsWithAttempt(prevStats, buzzAttemptData) {
   const key = `${teamIndex}:${name.toLowerCase()}`
   const ms = Math.max(0, Math.round(buzzAttemptData.reactionMs))
 
+  const questionLabel = cleanText(buzzAttemptData.questionLabel, 20) || null
+  const questionHeadline = cleanText(buzzAttemptData.questionHeadline, 120) || null
+
   const current = prev[key]
   if (!current) {
     return {
@@ -99,21 +104,26 @@ export function updateReactionStatsWithAttempt(prevStats, buzzAttemptData) {
         questionLastMs: ms,
         totalMs: ms,
         attempts: 1,
+        bestQuestionLabel: questionLabel,
+        bestQuestionHeadline: questionHeadline,
       },
     }
   }
 
+  const newBest = ms < current.bestMs
   return {
     ...prev,
     [key]: {
       ...current,
       teamName,
       teamIndex,
-      bestMs: Math.min(current.bestMs, ms),
+      bestMs: newBest ? ms : current.bestMs,
       lastMs: ms,
       questionLastMs: ms,
       totalMs: current.totalMs + ms,
       attempts: current.attempts + 1,
+      bestQuestionLabel: newBest ? questionLabel : current.bestQuestionLabel,
+      bestQuestionHeadline: newBest ? questionHeadline : current.bestQuestionHeadline,
     },
   }
 }

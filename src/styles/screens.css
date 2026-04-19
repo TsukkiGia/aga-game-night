@@ -386,6 +386,7 @@
 
 .winner-dismiss-btn,
 .winner-close-btn,
+.winner-stats-btn,
 .winner-tiebreaker-btn {
   border-radius: var(--radius-md);
   padding: 14px 28px;
@@ -403,6 +404,13 @@
   color: var(--text-muted);
 }
 .winner-dismiss-btn:hover { border-color: var(--terra); color: var(--terra); }
+
+.winner-stats-btn {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+}
+.winner-stats-btn:hover { border-color: var(--amber); color: var(--amber); }
 
 .winner-close-btn {
   background: var(--teal);
