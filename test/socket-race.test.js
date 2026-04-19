@@ -653,6 +653,8 @@ test('runtime scoreboard state persists and rehydrates after reconnect', async (
           lastMs: 644,
           totalMs: 1156,
           attempts: 2,
+          bestQuestionLabel: 'Q4',
+          bestQuestionHeadline: 'Flag of Benin',
         },
       },
     })
@@ -678,6 +680,8 @@ test('runtime scoreboard state persists and rehydrates after reconnect', async (
     assert.equal(sync.reactionStats?.['0:alice']?.bestMs, 512)
     assert.equal(sync.reactionStats?.['0:alice']?.lastMs, 644)
     assert.equal(sync.reactionStats?.['0:alice']?.attempts, 2)
+    assert.equal(sync.reactionStats?.['0:alice']?.bestQuestionLabel, 'Q4')
+    assert.equal(sync.reactionStats?.['0:alice']?.bestQuestionHeadline, 'Flag of Benin')
   } finally {
     await harness.close()
   }
@@ -842,6 +846,31 @@ test('member switching teams does not leave ghost roster entries', async () => {
     const state = harness.getState(sessionCode)
     assert.equal(state.members[0]?.[member.id], undefined)
     assert.equal(state.members[1]?.[member.id], 'Alice')
+  } finally {
+    await harness.close()
+  }
+})
+
+test('member can switch sessions even if previous in-memory state is missing', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const member = await harness.connect()
+    const first = await harness.createSession('pin-one')
+    const second = await harness.createSession('pin-two')
+
+    await authHost(host, first.sessionCode, first.pin)
+    await emitAck(host, 'host:setup', TEAMS)
+    const firstJoin = await emitAck(member, 'member:join', first.sessionCode, 0, 'Alice')
+    assert.equal(firstJoin.teamIndex, 0)
+
+    harness.getSessions().delete(first.sessionCode)
+
+    await authHost(host, second.sessionCode, second.pin)
+    await emitAck(host, 'host:setup', TEAMS)
+    const secondJoin = await emitAck(member, 'member:join', second.sessionCode, 1, 'Alice')
+    assert.equal(secondJoin.teamIndex, 1)
+    assert.equal(secondJoin.team?.name, TEAMS[1].name)
   } finally {
     await harness.close()
   }

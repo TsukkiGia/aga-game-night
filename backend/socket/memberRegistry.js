@@ -1,4 +1,6 @@
 export function removeFromMembers(socketId, st) {
+  if (!st || typeof st !== 'object') return false
+  if (!st.members || typeof st.members !== 'object') return false
   let changed = false
   for (const [teamKey, roster] of Object.entries(st.members)) {
     if (!roster || typeof roster !== 'object') continue

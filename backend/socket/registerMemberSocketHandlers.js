@@ -65,7 +65,10 @@ export function registerMemberSocketHandlers(socket, ctx) {
     // Leave any previous session's team rooms
     const prevCode = socket.data.sessionCode
     if (prevCode && prevCode !== code) leaveTeamRooms(socket, prevCode, (sessions.get(prevCode)?.teams.length || 0))
-    if (prevCode) removeFromMembers(socket.id, sessions.get(prevCode) || {})
+    if (prevCode) {
+      const prevState = sessions.get(prevCode)
+      if (prevState) removeFromMembers(socket.id, prevState)
+    }
     leaveTeamRooms(socket, code, st.teams.length)
     removeFromMembers(socket.id, st)
 

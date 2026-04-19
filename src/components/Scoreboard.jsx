@@ -105,11 +105,11 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
   const [authForm, setAuthForm] = useState({ sessionCode: '', pin: '' })
 
   const runtimeHydratedRef = useRef(false)
-  const questionSidebarScrollTopRef = useRef(0)
+  const [questionSidebarScrollTop, setQuestionSidebarScrollTop] = useState(0)
 
   const rememberQuestionSidebarScroll = useCallback((nextScrollTop) => {
     const parsed = Number(nextScrollTop)
-    questionSidebarScrollTopRef.current = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+    setQuestionSidebarScrollTop(Number.isFinite(parsed) && parsed >= 0 ? parsed : 0)
   }, [])
 
   const handleRuntimeSync = useCallback((serverState) => {
@@ -313,7 +313,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
             isQuestionIncluded={isQuestionIncluded}
             getRoundDisplayLabel={getRoundDisplayLabel}
             getQuestionDisplayNumber={getQuestionDisplayNumber}
-            savedSidebarScrollTop={questionSidebarScrollTopRef.current}
+            savedSidebarScrollTop={questionSidebarScrollTop}
             onRememberSidebarScroll={rememberQuestionSidebarScroll}
           />
           {showHalftime && <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />}
@@ -371,7 +371,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
           getRoundDisplayLabel={getRoundDisplayLabel}
           getQuestionDisplayNumber={getQuestionDisplayNumber}
           getQuestionTotal={getQuestionTotal}
-          savedSidebarScrollTop={questionSidebarScrollTopRef.current}
+          savedSidebarScrollTop={questionSidebarScrollTop}
           onRememberSidebarScroll={rememberQuestionSidebarScroll}
         />
         {showHalftime && <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />}

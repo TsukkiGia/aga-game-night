@@ -101,6 +101,8 @@ export function normalizeReactionStats(rawStats) {
     const lastMs = cleanMs(value.lastMs)
     const questionLastMs = cleanMs(value.questionLastMs)
     const attempts = cleanAttempts(value.attempts)
+    const bestQuestionLabel = cleanText(value.bestQuestionLabel, 20)
+    const bestQuestionHeadline = cleanText(value.bestQuestionHeadline, 120)
 
     if (!key || !name) continue
 
@@ -121,6 +123,8 @@ export function normalizeReactionStats(rawStats) {
       questionLastMs,
       totalMs,
       attempts: safeAttempts,
+      bestQuestionLabel: bestQuestionLabel || null,
+      bestQuestionHeadline: bestQuestionHeadline || null,
     }
     count += 1
   }

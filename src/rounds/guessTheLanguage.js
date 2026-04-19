@@ -137,20 +137,6 @@ export default {
       countries: ['Botswana', 'South Africa'],
       explanation: 'Setswana is a Bantu language and the national language of Botswana, also widely spoken in South Africa. About 5 million speakers. Closely related to Sesotho and Sepedi — together these are called the Sotho-Tswana languages.',
     },
-    // {
-    //   id: 'gtl-ibibio',
-    //   video: 'Ibibio.mp4',
-    //   answer: 'Ibibio',
-    //   countries: ['Nigeria'],
-    //   explanation: 'Ibibio is spoken by the Ibibio people of southeastern Nigeria, primarily in Akwa Ibom State. About 4 million speakers. It\'s closely related to Efik and part of the Cross River language group.',
-    // },
-    // {
-    //   id: 'gtl-kikuyu',
-    //   video: 'Kikuyu.mp4',
-    //   answer: 'Kikuyu',
-    //   countries: ['Kenya'],
-    //   explanation: 'Kikuyu (Gikuyu) is a Bantu language spoken by Kenya\'s largest ethnic group, the Kikuyu, primarily around Mount Kenya. About 8 million speakers. Closely related to Meru and Embu.',
-    // },
     {
       id: 'gtl-meru',
       video: 'https://www.youtube.com/watch?v=0S0Bl5o99ng&start=128',
@@ -230,7 +216,7 @@ export default {
     },
     {
       id: 'gtl-cameroonian-pidgin',
-      video: 'https://www.youtube.com/watch?v=lozSaftH4jI&start=10',
+      video: 'https://www.youtube.com/watch?v=l_LFkckORwQ&start=63',
       answer: 'Cameroonian Pidgin',
       countries: ['Cameroon'],
       explanation: 'Cameroonian Pidgin English is a creole and the most widely used lingua franca in Cameroon, spoken by millions across the Anglophone and beyond. It developed from contact between English traders and local populations and is distinct from Nigerian Pidgin — slower, with different vowel sounds and vocabulary.',

@@ -192,27 +192,44 @@ export function useGameSocket(initialTeams, options = {}) {
       setTimerControlSignal((prev) => ({ sequence: prev.sequence + 1, action: 'restart' }))
     }
 
+    function onBuzzArmed() {
+      setArmed(true)
+    }
+
+    function onBuzzReset() {
+      setArmed(false)
+      setBuzzWinner(null)
+    }
+
+    function onBuzzWinnerEvent(data) {
+      if (!data || typeof data.teamIndex !== 'number' || !data.team?.name || !data.team?.color) return
+      setArmed(false)
+      setBuzzWinner(data)
+      playBuzzIn()
+      onBuzzWinnerRef.current?.(data)
+    }
+
+    function onBuzzAttemptEvent(data) {
+      if (!data || typeof data.teamIndex !== 'number' || !data.team?.name || !data.team?.color) return
+      if (!Number.isFinite(data.reactionMs)) return
+      onBuzzAttemptRef.current?.(data)
+    }
+
+    function onHostMembers(data) {
+      setMembers(data)
+    }
+
     socket.on('connect', authenticateAndSetup)
     socket.on('disconnect', onDisconnect)
     if (socket.connected) authenticateAndSetup()
     socket.connect()
 
     socket.on('state:sync',   syncState)
-    socket.on('buzz:armed',   () => setArmed(true))
-    socket.on('buzz:reset',   () => { setArmed(false); setBuzzWinner(null) })
-    socket.on('buzz:winner',  (data) => {
-      if (!data || typeof data.teamIndex !== 'number' || !data.team?.name || !data.team?.color) return
-      setArmed(false)
-      setBuzzWinner(data)
-      playBuzzIn()
-      onBuzzWinnerRef.current?.(data)
-    })
-    socket.on('buzz:attempt', (data) => {
-      if (!data || typeof data.teamIndex !== 'number' || !data.team?.name || !data.team?.color) return
-      if (!Number.isFinite(data.reactionMs)) return
-      onBuzzAttemptRef.current?.(data)
-    })
-    socket.on('host:members', (data) => setMembers(data))
+    socket.on('buzz:armed', onBuzzArmed)
+    socket.on('buzz:reset', onBuzzReset)
+    socket.on('buzz:winner', onBuzzWinnerEvent)
+    socket.on('buzz:attempt', onBuzzAttemptEvent)
+    socket.on('host:members', onHostMembers)
     socket.on('host:sfx:play', onRemoteSound)
     socket.on('host:timer:stop', onTimerStop)
     socket.on('host:timer:restart', onTimerRestart)
@@ -223,11 +240,11 @@ export function useGameSocket(initialTeams, options = {}) {
       socket.off('connect', authenticateAndSetup)
       socket.off('disconnect', onDisconnect)
       socket.off('state:sync', syncState)
-      socket.off('buzz:armed')
-      socket.off('buzz:reset')
-      socket.off('buzz:winner')
-      socket.off('buzz:attempt')
-      socket.off('host:members')
+      socket.off('buzz:armed', onBuzzArmed)
+      socket.off('buzz:reset', onBuzzReset)
+      socket.off('buzz:winner', onBuzzWinnerEvent)
+      socket.off('buzz:attempt', onBuzzAttemptEvent)
+      socket.off('host:members', onHostMembers)
       socket.off('host:sfx:play', onRemoteSound)
       socket.off('host:timer:stop', onTimerStop)
       socket.off('host:timer:restart', onTimerRestart)
