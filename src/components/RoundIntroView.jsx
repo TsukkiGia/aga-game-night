@@ -12,6 +12,7 @@ export default function RoundIntroView({
   planCatalog = null,
   rounds, roundIndex, doneQuestions,
   onNavigate, onBack,
+  onHalftime = null,
   isRoundIncluded = () => true,
   isQuestionIncluded = () => true,
   getRoundDisplayLabel = (ri) => `Round ${ri + 1}`,
@@ -30,7 +31,11 @@ export default function RoundIntroView({
           <span className="qv-round-tag">{getRoundDisplayLabel(roundIndex)}</span>
           <span className="qv-round-name">{round.name}</span>
         </div>
-        <div />
+        <div className="qv-pagination">
+          {typeof onHalftime === 'function' && (
+            <button className="halftime-btn" onClick={onHalftime}>⏸ Halftime</button>
+          )}
+        </div>
       </div>
 
       {/* Main: sidebar + content */}

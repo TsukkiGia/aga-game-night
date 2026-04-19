@@ -118,6 +118,47 @@ export default function App() {
     return null
   }, [session, teams, needsPlanConfig, needsPlanPreview, needsCompanionSetup])
 
+  function navigateSetupStep(stepNumber) {
+    if (!session || !Number.isInteger(stepNumber)) return
+    if (stepNumber === 1) {
+      setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
+      setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
+      setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
+      setNeedsPlanConfig(false)
+      setNeedsPlanPreview(false)
+      setNeedsCompanionSetup(false)
+      setTeams(null)
+      return
+    }
+    if (!teams) return
+    if (stepNumber === 2) {
+      setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(true))
+      setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
+      setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
+      setNeedsPlanConfig(true)
+      setNeedsPlanPreview(false)
+      setNeedsCompanionSetup(false)
+      return
+    }
+    if (stepNumber === 3) {
+      setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
+      setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(true))
+      setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
+      setNeedsPlanConfig(false)
+      setNeedsPlanPreview(true)
+      setNeedsCompanionSetup(false)
+      return
+    }
+    if (stepNumber === 4) {
+      setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
+      setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
+      setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(true))
+      setNeedsPlanConfig(false)
+      setNeedsPlanPreview(false)
+      setNeedsCompanionSetup(true)
+    }
+  }
+
   useEffect(() => {
     if (isBuzzerMode || isHostMobileMode) return
 
@@ -219,6 +260,7 @@ export default function App() {
           <SetupProgress
             steps={['Teams', 'Game Plan', 'Preview', 'Companion']}
             current={setupProgressStep}
+            onStepClick={navigateSetupStep}
           />
         )}
         {!session ? (
@@ -244,6 +286,7 @@ export default function App() {
         ) : needsPlanPreview ? (
           <GamePlanPreview
             roundCatalog={roundCatalog}
+            teams={teams}
             onContinue={() => {
               setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
               setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(true))
@@ -262,7 +305,7 @@ export default function App() {
         ) : needsCompanionSetup ? (
           <CompanionSetup
             sessionCode={session?.code}
-            backLabel="← Back to Preview"
+            backLabel="← Back"
             onContinue={() => {
               setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
               setNeedsCompanionSetup(false)

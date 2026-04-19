@@ -406,6 +406,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
             doneQuestions={doneQuestions}
             onNavigate={navigateWithReset}
             onBack={goBack}
+            onHalftime={() => setShowHalftime(true)}
             isRoundIncluded={(roundIndex) => plannedRoundIndexSet.has(roundIndex)}
             isQuestionIncluded={(roundIndex, questionIndex) => {
               const id = questionItemIdFor(roundIndex, questionIndex, planCatalog)
@@ -414,6 +415,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
             getRoundDisplayLabel={getRoundDisplayLabel}
             getQuestionDisplayNumber={getQuestionDisplayNumber}
           />
+          {showHalftime && <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />}
           {transition && <RoundTransitionScreen round={transition} roundLabel={transitionRoundLabel} onDone={dismissTransition} />}
           <ReactionLeaderboardModal
             open={showReactionLeaderboard}

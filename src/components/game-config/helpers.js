@@ -87,7 +87,7 @@ export function questionPreviewDetail(round, question) {
   if (round.type === CUSTOM_ROUND_TYPE) {
     const promptType = String(question.promptType || '').trim().toLowerCase()
     if (promptType === 'text') return ''
-    if (promptType === 'image' || promptType === 'video') return truncatePreview(question.mediaUrl, 150)
+    if (promptType === 'image' || promptType === 'video') return ''
   }
 
   if (round.type === 'slang') return truncatePreview(question.sentence, 190)

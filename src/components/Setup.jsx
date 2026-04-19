@@ -65,7 +65,7 @@ export default function Setup({ onStart }) {
         </div>
         <div className="setup-actions">
           <button className="start-btn" onClick={handleStart}>
-            Begin Game →
+            Continue →
           </button>
         </div>
       </div>

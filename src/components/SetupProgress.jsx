@@ -1,6 +1,7 @@
-export default function SetupProgress({ steps, current }) {
+export default function SetupProgress({ steps, current, onStepClick }) {
   if (!Array.isArray(steps) || steps.length === 0) return null
   const currentStep = Number.isInteger(current) ? current : 0
+  const canHandleClick = typeof onStepClick === 'function'
 
   return (
     <nav className="setup-progress" aria-label="Setup progress">
@@ -9,14 +10,22 @@ export default function SetupProgress({ steps, current }) {
           const stepNumber = index + 1
           const complete = stepNumber < currentStep
           const active = stepNumber === currentStep
+          const clickable = canHandleClick && stepNumber <= currentStep
           return (
-            <li
-              key={`${label}-${stepNumber}`}
-              className={`setup-progress-item${complete ? ' complete' : ''}${active ? ' active' : ''}`}
-              aria-current={active ? 'step' : undefined}
-            >
-              <span className="setup-progress-index">{stepNumber}</span>
-              <span className="setup-progress-label">{label}</span>
+            <li key={`${label}-${stepNumber}`}>
+              <button
+                type="button"
+                className={`setup-progress-item${complete ? ' complete' : ''}${active ? ' active' : ''}${clickable ? ' is-clickable' : ''}`}
+                aria-current={active ? 'step' : undefined}
+                onClick={() => {
+                  if (!clickable) return
+                  onStepClick(stepNumber)
+                }}
+                disabled={!clickable}
+              >
+                <span className="setup-progress-index">{stepNumber}</span>
+                <span className="setup-progress-label">{label}</span>
+              </button>
             </li>
           )
         })}
@@ -24,4 +33,3 @@ export default function SetupProgress({ steps, current }) {
     </nav>
   )
 }
-

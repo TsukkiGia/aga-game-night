@@ -1,153 +1,155 @@
-import { CUSTOM_ROUND_TYPE } from '../../roundCatalog'
-import { QuestionPreviewMedia } from './MediaPreviewBlocks'
+import { questionPreviewMedia } from './helpers'
+import { toYouTubeEmbedUrl } from '../../utils/mediaPrompt'
+
+function getPreviewMedia(round, question) {
+  const media = questionPreviewMedia(round, question)
+  if (!media) return null
+  if (media.type === 'image') return { type: 'image', src: media.rawUrl }
+  const embedUrl = toYouTubeEmbedUrl(media.rawUrl)
+  if (embedUrl) return { type: 'video-embed', src: embedUrl }
+  return { type: 'video-file', src: media.rawUrl }
+}
 
 export default function PreviewModal({
   previewRow,
   saveSuccess,
-  roundClearConfirmId,
   previewSearch,
   setPreviewSearch,
   previewSearchNormalized,
   previewMatchesLabel,
   previewItems,
   onClose,
-  onEditRound,
   onToggleRound,
   onToggleQuestion,
 }) {
+  const { round, displayIndex, selectedCount, questionIds, allSelected } = previewRow
+  const total = questionIds.length
+
   return (
-    <div className="help-overlay">
-      <div
-        className={`help-popup game-config-preview-modal type-${previewRow.round.type}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="game-config-preview-header">
-          <div className="game-config-preview-pill">
-            {`Round ${previewRow.displayIndex}`}
-          </div>
-          <div className="game-config-preview-title-row">
-            <h3 className="game-config-preview-title">{previewRow.round.name}</h3>
-            <span className="game-config-preview-count">
-              {previewRow.selectedCount} / {previewRow.questionIds.length} selected
+    <div className="help-overlay" onClick={onClose}>
+      <div className="gcpv-modal" onClick={(e) => e.stopPropagation()}>
+
+        {/* ── Header ── */}
+        <div className="gcpv-header">
+          <div className="gcpv-header-top">
+            <span className={`gcpv-round-pill type-${round.type}`}>
+              Round {displayIndex} · {round.name}
             </span>
+            <div className="gcpv-header-right">
+              <span className="gcpv-selected-count">{selectedCount} / {total} selected</span>
+              <button type="button" className="gcpv-close-btn" onClick={onClose} aria-label="Close">×</button>
+            </div>
           </div>
-          {previewRow.round.intro && (
-            <p className="game-config-preview-intro">{previewRow.round.intro}</p>
+
+          <h2 className="gcpv-title">{round.name}</h2>
+          {round.intro && <p className="gcpv-intro">{round.intro}</p>}
+          {saveSuccess.roundId === round.id && (
+            <div className="gcpv-success">{saveSuccess.text}</div>
           )}
-          {saveSuccess.roundId === previewRow.round.id && (
-            <div className="game-config-preview-success">{saveSuccess.text}</div>
-          )}
-          <div className="game-config-preview-actions">
-            <button type="button" className="back-btn" onClick={onClose}>Close</button>
-            {previewRow.round.type === CUSTOM_ROUND_TYPE && (
-              <button
-                type="button"
-                className="game-config-round-edit-btn"
-                onClick={() => onEditRound(previewRow.round)}
-              >
-                Edit For Game
-              </button>
-            )}
-            <button
-              type="button"
-              className={`game-config-round-action${previewRow.allSelected && roundClearConfirmId === previewRow.round.id ? ' confirm-clear' : ''}`}
-              onClick={() => onToggleRound(previewRow)}
-            >
-              {previewRow.allSelected
-                ? (roundClearConfirmId === previewRow.round.id ? 'Confirm Clear' : 'Clear Round')
-                : 'Select Round'}
-            </button>
-          </div>
-          <div className="game-config-preview-search-row">
+
+          <div className="gcpv-search-row">
             <input
               type="text"
-              className="team-name-input game-config-preview-search-input"
+              className="gcpv-search"
               value={previewSearch}
               onChange={(e) => setPreviewSearch(e.target.value)}
               placeholder="Search by question, answer, clue, or tag"
             />
             {previewSearchNormalized && (
-              <button
-                type="button"
-                className="game-config-preview-search-clear"
-                onClick={() => setPreviewSearch('')}
-              >
-                Clear
-              </button>
+              <button type="button" className="gcpv-search-clear" onClick={() => setPreviewSearch('')}>Clear</button>
             )}
             {previewMatchesLabel && (
-              <span className="game-config-preview-search-count">{previewMatchesLabel}</span>
+              <span className="gcpv-search-count">{previewMatchesLabel}</span>
             )}
           </div>
         </div>
 
-        <div className="game-config-preview-list">
+        {/* ── Question list ── */}
+        <div className="gcpv-list">
           {previewItems.length === 0 && previewSearchNormalized && (
-            <div className="game-config-preview-empty">
-              No matches for "{previewSearch.trim()}". Try a broader term.
-            </div>
+            <div className="gcpv-empty">No matches for "{previewSearch.trim()}".</div>
           )}
-          {previewItems.map((item) => {
-            const {
-              key,
-              question,
-              questionId,
-              questionIndex,
-              selected,
-              headline,
-              detail,
-              tags,
-              answer,
-            } = item
+          {previewItems.map(({ key, question, questionId, questionIndex, selected, headline, detail, tags, answer }) => {
+            const previewMedia = getPreviewMedia(round, question)
             return (
-              <div
-                key={key}
-                className={`game-config-preview-question${selected ? ' selected' : ''}`}
-              >
-                <div className="game-config-preview-question-head">
-                  <span className="game-config-preview-q-index">Q{questionIndex + 1}</span>
-                  <button
-                    type="button"
-                    className={`game-config-preview-q-state${selected ? ' selected' : ''}`}
-                    aria-pressed={selected}
-                    aria-label={selected ? `Unselect question ${questionIndex + 1}` : `Select question ${questionIndex + 1}`}
-                    title={selected ? 'Selected' : 'Not selected'}
-                    onClick={() => {
-                      if (!questionId) return
-                      onToggleQuestion(questionId)
-                    }}
-                  >
-                    <span className="game-config-preview-q-state-check" aria-hidden="true">
-                      {selected ? '✓' : ''}
-                    </span>
-                  </button>
-                </div>
-                <div className="game-config-preview-q-title">{headline}</div>
-                <QuestionPreviewMedia
-                  key={`${String(question?.id || questionIndex)}:${String(question?.promptType || '')}:${String(question?.mediaUrl || question?.video || '')}`}
-                  round={previewRow.round}
-                  question={question}
-                />
-                {answer && (
-                  <div className="game-config-preview-q-answer">
-                    <span>Answer</span>
-                    <strong>{answer}</strong>
-                  </div>
-                )}
-                {detail && <div className="game-config-preview-q-detail">{detail}</div>}
-                {tags.length > 0 && (
-                  <div className="game-config-preview-q-tags">
-                    {tags.map((tag, tagIndex) => (
-                      <span key={`${questionId || questionIndex}-tag-${tagIndex}`}>{tag}</span>
-                    ))}
-                  </div>
-                )}
+            <div key={key} className={`gcpv-question${selected ? ' selected' : ''}`}>
+              <div className="gcpv-q-head">
+                <span className="gcpv-q-num">Q{questionIndex + 1}</span>
+                <button
+                  type="button"
+                  className={`gcpv-q-check${selected ? ' selected' : ''}`}
+                  aria-pressed={selected}
+                  onClick={() => { if (questionId) onToggleQuestion(questionId) }}
+                >
+                  {selected ? '✓' : ''}
+                </button>
               </div>
-            )
-          })}
+
+              <div className="gcpv-q-title">{headline}</div>
+              {detail && <div className="gcpv-q-detail">{detail}</div>}
+
+              {previewMedia && (
+                <div className="gcpv-media-box">
+                  {previewMedia.type === 'image' ? (
+                    <img
+                      className="gcpv-media-image"
+                      src={previewMedia.src}
+                      alt={`Question ${questionIndex + 1} prompt`}
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : previewMedia.type === 'video-embed' ? (
+                    <iframe
+                      className="gcpv-media-video"
+                      src={previewMedia.src}
+                      title={`Question ${questionIndex + 1} video`}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video
+                      className="gcpv-media-video"
+                      src={previewMedia.src}
+                      controls
+                      preload="metadata"
+                      muted
+                      playsInline
+                    />
+                  )}
+                </div>
+              )}
+
+              {answer && round.type !== 'charades' && round.type !== 'thesis' && (
+                <div className="gcpv-answer">
+                  <span className="gcpv-answer-label">Answer</span>
+                  <strong>{answer}</strong>
+                </div>
+              )}
+
+              {tags.length > 0 && (
+                <div className="gcpv-tags">
+                  {tags.map((tag, i) => <span key={i} className="gcpv-tag">{tag}</span>)}
+                </div>
+              )}
+            </div>
+          )})}
+        </div>
+
+        {/* ── Footer ── */}
+        <div className="gcpv-footer">
+          <span className="gcpv-footer-count">{selectedCount} selected</span>
+          <div className="gcpv-footer-actions">
+            <button type="button" className="gcpv-footer-close" onClick={onClose}>Close</button>
+            <button
+              type="button"
+              className="gcpv-footer-select"
+              onClick={() => onToggleRound(previewRow)}
+            >
+              {allSelected ? 'Clear all' : 'Select all'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   )
 }
-

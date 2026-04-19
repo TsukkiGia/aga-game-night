@@ -89,7 +89,7 @@ export default function CompanionSetup({ sessionCode, onContinue, onBack, backLa
         <div className="setup-actions">
           <button type="button" className="back-btn" onClick={onBack}>{backLabel}</button>
           <button type="button" className="start-btn" onClick={onContinue} disabled={!companionReady}>
-            Continue to Lobby →
+            Enter Lobby →
           </button>
         </div>
       </div>

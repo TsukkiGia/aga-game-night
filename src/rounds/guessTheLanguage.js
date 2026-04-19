@@ -237,7 +237,7 @@ export default {
     },
     {
       id: 'gtl-xhosa',
-      video: 'https://www.youtube.com/watch?v=bd7QuovP4Mo&start=20',
+      video: 'https://www.youtube.com/watch?v=bd7QuovP4Mo&start=134',
       answer: 'Xhosa',
       countries: ['South Africa'],
       explanation: 'IsiXhosa is one of South Africa\'s 11 official languages and the home language of Nelson Mandela and Miriam Makeba. It is famous for its distinctive click consonants — three types: dental (c), lateral (x), and palatal (q). About 8 million native speakers, mostly in the Eastern Cape.',
@@ -258,7 +258,7 @@ export default {
     },
     {
       id: 'gtl-egyptian-arabic',
-      video: 'https://www.youtube.com/watch?v=wUO-RjBjYxU&start=10',
+      video: 'https://www.youtube.com/watch?v=wUO-RjBjYxU&start=210',
       answer: 'Egyptian Arabic',
       countries: ['Egypt'],
       explanation: 'Egyptian Arabic (Masri) is the most widely understood Arabic dialect in the world, largely because of Egypt\'s dominance in Arab film, TV, and music. Over 100 million speakers. It differs from Modern Standard Arabic and other dialects in pronunciation, vocabulary, and rhythm — famously melodic and expressive.',
