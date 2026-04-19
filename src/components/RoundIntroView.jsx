@@ -1,12 +1,4 @@
-import { useEffect, useRef } from 'react'
-import { questionItemIdFor } from '../gamePlan'
-
-function isQuestionDone(doneQuestions, roundIndex, questionIndex, planCatalog) {
-  if (doneQuestions?.has(`${roundIndex}-${questionIndex}`)) return true
-  if (!planCatalog) return false
-  const itemId = questionItemIdFor(roundIndex, questionIndex, planCatalog)
-  return Boolean(itemId && doneQuestions?.has(itemId))
-}
+import QuestionSidebar from './QuestionSidebar'
 
 export default function RoundIntroView({
   planCatalog = null,
@@ -71,13 +63,13 @@ export default function RoundIntroView({
       <div className="qv-main">
 
         {/* Left sidebar */}
-        <Sidebar
+        <QuestionSidebar
           rounds={rounds}
           planCatalog={planCatalog}
           savedScrollTop={savedSidebarScrollTop}
           onRememberScroll={onRememberSidebarScroll}
           roundIndex={roundIndex}
-          activeQIdx={null}
+          activeQuestionIndex={null}
           doneQuestions={doneQuestions}
           onNavigate={onNavigate}
           isRoundIncluded={isRoundIncluded}
@@ -129,77 +121,6 @@ export default function RoundIntroView({
         </div>
 
       </div>
-    </div>
-  )
-}
-
-function Sidebar({
-  planCatalog,
-  savedScrollTop,
-  onRememberScroll,
-  rounds,
-  roundIndex,
-  activeQIdx,
-  doneQuestions,
-  onNavigate,
-  isRoundIncluded,
-  isQuestionIncluded,
-  getRoundDisplayLabel,
-  getQuestionDisplayNumber,
-}) {
-  const sidebarRef = useRef(null)
-
-  useEffect(() => {
-    const container = sidebarRef.current
-    if (!container) return
-    container.scrollTop = Number(savedScrollTop) || 0
-  }, [savedScrollTop])
-
-  function navigateFromSidebar(nextRoundIndex, nextQuestionIndex) {
-    if (sidebarRef.current) {
-      onRememberScroll?.(sidebarRef.current.scrollTop)
-    }
-    onNavigate(nextRoundIndex, nextQuestionIndex)
-  }
-
-  return (
-    <div
-      className="qv-sidebar"
-      ref={sidebarRef}
-      onScroll={() => {
-        if (!sidebarRef.current) return
-        onRememberScroll?.(sidebarRef.current.scrollTop)
-      }}
-    >
-      {rounds.map((r, ri) => {
-        if (!isRoundIncluded(ri)) return null
-        const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis', 'custom-buzz': 'Question' }
-        return (
-          <div key={ri} className="qv-sidebar-group">
-            <button
-              className={`qv-sidebar-round-label clickable${ri === roundIndex && activeQIdx === null ? ' active-round' : ''}`}
-              onClick={() => navigateFromSidebar(ri, null)}
-            >
-              {getRoundDisplayLabel(ri)}
-            </button>
-            {r.questions.map((_q, qi) => {
-              if (!isQuestionIncluded(ri, qi)) return null
-              const done = isQuestionDone(doneQuestions, ri, qi, planCatalog)
-              const active = ri === roundIndex && qi === activeQIdx
-              const displayNumber = getQuestionDisplayNumber(ri, qi)
-              return (
-                <button
-                  key={qi}
-                  className={`qv-sidebar-item${active ? ' active' : ''}${done ? ' done' : ''}`}
-                  onClick={() => navigateFromSidebar(ri, qi)}
-                >
-                  {done ? '✓ ' : ''}{typeLabel[r.type] || 'Q'} {displayNumber}
-                </button>
-              )
-            })}
-          </div>
-        )
-      })}
     </div>
   )
 }

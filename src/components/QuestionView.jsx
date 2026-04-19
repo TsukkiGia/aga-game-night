@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { playPower } from '../sounds'
 import BuzzModal from './BuzzModal'
 import VideoBody from './VideoBody'
@@ -7,14 +7,7 @@ import CharadesBody from './CharadesBody'
 import ThesisBody from './ThesisBody'
 import CustomBuzzBody from './CustomBuzzBody'
 import JoinQrModal from './JoinQrModal'
-import { questionItemIdFor } from '../gamePlan'
-
-function isQuestionDone(doneQuestions, roundIndex, questionIndex, planCatalog) {
-  if (doneQuestions?.has(`${roundIndex}-${questionIndex}`)) return true
-  if (!planCatalog) return false
-  const itemId = questionItemIdFor(roundIndex, questionIndex, planCatalog)
-  return Boolean(itemId && doneQuestions?.has(itemId))
-}
+import QuestionSidebar from './QuestionSidebar'
 
 export default function QuestionView({
   planCatalog = null,
@@ -47,7 +40,6 @@ export default function QuestionView({
     ? new Set([selectedTurnIndex % teams.length])
     : null
 
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   function defaultStealSelection() {
     const allTeams = new Set(teams.map((_, i) => i))
     if (!isCharades) return allTeams
@@ -62,20 +54,6 @@ export default function QuestionView({
   const [correctGiven, setCorrectGiven] = useState(false)
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [showJoinQr, setShowJoinQr] = useState(false)
-  const sidebarRef = useRef(null)
-
-  useEffect(() => {
-    const container = sidebarRef.current
-    if (!container) return
-    container.scrollTop = Number(savedSidebarScrollTop) || 0
-  }, [savedSidebarScrollTop])
-
-  function navigateFromSidebar(nextRoundIndex, nextQuestionIndex) {
-    if (sidebarRef.current) {
-      onRememberSidebarScroll?.(sidebarRef.current.scrollTop)
-    }
-    onNavigate(nextRoundIndex, nextQuestionIndex)
-  }
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -180,47 +158,21 @@ export default function QuestionView({
       <div className="qv-main">
 
         {/* Left sidebar */}
-        <div
-          className={`qv-sidebar${sidebarOpen ? '' : ' collapsed'}`}
-          ref={sidebarRef}
-          onScroll={() => {
-            if (!sidebarRef.current) return
-            onRememberSidebarScroll?.(sidebarRef.current.scrollTop)
-          }}
-        >
-          <button className="qv-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)}>
-            {sidebarOpen ? '‹' : '›'}
-          </button>
-          {sidebarOpen && rounds.map((r, ri) => {
-            if (!isRoundIncluded(ri)) return null
-            const typeLabel = { video: 'Video', slang: 'Slang', charades: 'Charades', thesis: 'Thesis', 'custom-buzz': 'Question' }
-            return (
-              <div key={ri} className="qv-sidebar-group">
-                <button
-                  className={`qv-sidebar-round-label clickable${ri === roundIndex && questionIndex === null ? ' active-round' : ''}`}
-                  onClick={() => navigateFromSidebar(ri, null)}
-                >
-                  {getRoundDisplayLabel(ri)}
-                </button>
-                {r.questions.map((_q, qi) => {
-                  if (!isQuestionIncluded(ri, qi)) return null
-                  const done = isQuestionDone(doneQuestions, ri, qi, planCatalog)
-                  const active = ri === roundIndex && qi === questionIndex
-                  const displayNumber = getQuestionDisplayNumber(ri, qi)
-                  return (
-                    <button
-                      key={qi}
-                      className={`qv-sidebar-item${active ? ' active' : ''}${done ? ' done' : ''}`}
-                      onClick={() => navigateFromSidebar(ri, qi)}
-                    >
-                      {done ? '✓ ' : ''}{typeLabel[r.type] || 'Q'} {displayNumber}
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
-        </div>
+        <QuestionSidebar
+          planCatalog={planCatalog}
+          rounds={rounds}
+          roundIndex={roundIndex}
+          activeQuestionIndex={questionIndex}
+          doneQuestions={doneQuestions}
+          onNavigate={onNavigate}
+          isRoundIncluded={isRoundIncluded}
+          isQuestionIncluded={isQuestionIncluded}
+          getRoundDisplayLabel={getRoundDisplayLabel}
+          getQuestionDisplayNumber={getQuestionDisplayNumber}
+          savedScrollTop={savedSidebarScrollTop}
+          onRememberScroll={onRememberSidebarScroll}
+          collapsible
+        />
 
         {/* ── Question body ── */}
         <div className="qv-body">
