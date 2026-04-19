@@ -9,6 +9,7 @@ export default function GamePlanPreview({
   roundCatalog,
   teams,
   onBack,
+  onEditRound,
   onContinue,
 }) {
   const rounds = useMemo(
@@ -91,24 +92,36 @@ export default function GamePlanPreview({
 
           return (
             <div key={key} className="gpp-round" style={{ '--gpp-accent': color }}>
-              <button
-                type="button"
-                className="gpp-round-row"
-                onClick={() => toggleRound(key)}
-                aria-expanded={expanded}
-              >
-                <div className="gpp-round-left">
-                  <span className="gpp-round-dot" />
-                  <div className="gpp-round-info">
-                    <span className="gpp-round-num">Round {roundIndex + 1}</span>
-                    <span className="gpp-round-name">{round.name || `Round ${roundIndex + 1}`}</span>
+              <div className="gpp-round-row">
+                <button
+                  type="button"
+                  className="gpp-round-toggle"
+                  onClick={() => toggleRound(key)}
+                  aria-expanded={expanded}
+                >
+                  <div className="gpp-round-left">
+                    <span className="gpp-round-dot" />
+                    <div className="gpp-round-info">
+                      <span className="gpp-round-num">Round {roundIndex + 1}</span>
+                      <span className="gpp-round-name">{round.name || `Round ${roundIndex + 1}`}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="gpp-round-right">
-                  <span className="gpp-q-count">{qCount} {qCount === 1 ? 'question' : 'questions'}</span>
-                  <span className={`gpp-chevron${expanded ? ' open' : ''}`}>⌄</span>
-                </div>
-              </button>
+                  <div className="gpp-round-right">
+                    <span className="gpp-q-count">{qCount} {qCount === 1 ? 'question' : 'questions'}</span>
+                    <span className={`gpp-chevron${expanded ? ' open' : ''}`}>⌄</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="gpp-round-edit-btn"
+                  onClick={() => {
+                    if (typeof onEditRound === 'function') onEditRound(round?.id)
+                    else onBack()
+                  }}
+                >
+                  Edit
+                </button>
+              </div>
 
               {expanded && (
                 <div className="gpp-round-body">

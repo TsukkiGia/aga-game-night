@@ -34,9 +34,9 @@ export default function TemplateEditorModal({
               <button
                 type="button"
                 className="game-config-template-header-back"
-                onClick={() => onCloseCreator({ returnToPreview: true })}
+                onClick={() => onCloseCreator()}
               >
-                ← Back to Preview
+                Cancel
               </button>
             </div>
           )}
@@ -288,15 +288,15 @@ export default function TemplateEditorModal({
         <div className="setup-actions game-config-template-footer">
           <button
             type="button"
-            className="back-btn"
+            className="game-config-template-cancel-btn"
             onClick={() => onCloseCreator()}
             disabled={createSubmitting}
           >
-            {creatorMode === 'session-edit' ? 'Back to Preview' : 'Cancel'}
+            Cancel
           </button>
           <button
             type="button"
-            className="start-btn"
+            className="game-config-template-save-btn"
             onClick={() => {
               if (creatorMode === 'session-edit') onSaveSessionRoundEdits()
               else void onCreateTemplate()
@@ -312,4 +312,3 @@ export default function TemplateEditorModal({
     </div>
   )
 }
-

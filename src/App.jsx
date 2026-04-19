@@ -287,6 +287,14 @@ export default function App() {
           <GamePlanPreview
             roundCatalog={roundCatalog}
             teams={teams}
+            onEditRound={() => {
+              setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(true))
+              setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
+              setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
+              setNeedsPlanConfig(true)
+              setNeedsPlanPreview(false)
+              setNeedsCompanionSetup(false)
+            }}
             onContinue={() => {
               setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
               setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(true))

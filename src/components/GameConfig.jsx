@@ -405,9 +405,8 @@ export default function GameConfig({
       const confirmed = window.confirm('Discard unsaved changes?')
       if (!confirmed) return
     }
-    const modeAtClose = creatorMode
     const roundIdAtClose = String(editingRoundId || '').trim()
-    const shouldReturnToPreview = options.returnToPreview ?? (modeAtClose === 'session-edit')
+    const shouldReturnToPreview = options.returnToPreview ?? false
     setShowCreator(false)
     resetCreator()
     if (shouldReturnToPreview && roundIdAtClose) setPreviewRoundId(roundIdAtClose)
@@ -416,6 +415,55 @@ export default function GameConfig({
   function openCreateTemplateModal() {
     resetCreator()
     setCreatorMode('create')
+    setShowCreator(true)
+  }
+
+  function openSessionRoundEditor(roundId) {
+    const id = String(roundId || '').trim()
+    if (!id) return
+    const row = roundRows.find((item) => item.round.id === id)
+    if (!row) return
+    const round = row.round
+    if (round.type !== CUSTOM_ROUND_TYPE) return
+
+    const nextRules = Array.isArray(round.rules) ? cloneJson(round.rules) : []
+    const scoringSource = Array.isArray(round.scoring) && round.scoring.length > 0
+      ? round.scoring
+      : cloneJson(DEFAULT_SCORING)
+    const nextScoring = scoringSource.map((entry) => ({
+      label: String(entry?.label || '').trim(),
+      points: Number.parseInt(entry?.points, 10) || 0,
+      phase: String(entry?.phase || 'normal').trim().toLowerCase() === 'steal' ? 'steal' : 'normal',
+    }))
+    const questionsSource = Array.isArray(round.questions) && round.questions.length > 0
+      ? round.questions
+      : [cloneJson(DEFAULT_QUESTION)]
+    const nextQuestions = questionsSource.map((question, index) => {
+      const base = cloneJson(DEFAULT_QUESTION)
+      const merged = { ...base, ...(cloneJson(question || {})) }
+      return {
+        ...merged,
+        id: String(merged?.id || '').trim() || `${id}-q${index + 1}`,
+      }
+    })
+
+    setCreatorMode('session-edit')
+    setEditingRoundId(id)
+    setEditingTemplateId(String(round.templateId || '').trim())
+    setNewTemplateName(String(round.name || '').trim())
+    setNewTemplateIntro(String(round.intro || '').trim())
+    setNewTemplateRules(nextRules)
+    setNewTemplateScoring(nextScoring)
+    setNewTemplateQuestions(nextQuestions)
+    setEditorBaseline(buildEditorSnapshot({
+      name: String(round.name || '').trim(),
+      intro: String(round.intro || '').trim(),
+      rules: nextRules,
+      scoring: nextScoring,
+      questions: nextQuestions,
+    }))
+    setCreateError('')
+    setRoundClearConfirmId('')
     setShowCreator(true)
   }
 
@@ -504,6 +552,7 @@ export default function GameConfig({
 
   const inlineValidationError = showCreator ? validateTemplate() : null
   const canSubmitCreator = !createSubmitting && isEditorDirty && !inlineValidationError
+  const canEditActiveRound = Boolean(activeRow && activeRow.round.type === CUSTOM_ROUND_TYPE)
 
   if (!templatesBootstrapped) {
     return (
@@ -643,6 +692,17 @@ export default function GameConfig({
                 </button>
                 <button type="button" className="gc2-toolbar-btn" onClick={handleClearActive}>
                   Clear
+                </button>
+                <button
+                  type="button"
+                  className="gc2-toolbar-btn"
+                  onClick={() => activeRow && openSessionRoundEditor(activeRow.round.id)}
+                  disabled={!canEditActiveRound}
+                  title={canEditActiveRound
+                    ? 'Edit this custom round for this session only.'
+                    : 'Built-in rounds support question selection only.'}
+                >
+                  {canEditActiveRound ? 'Edit session copy' : 'Edit selection'}
                 </button>
               </div>
 

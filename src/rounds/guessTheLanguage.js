@@ -270,5 +270,33 @@ export default {
       countries: ['Morocco', 'Algeria', 'Tunisia'],
       explanation: 'Darija is the colloquial Arabic of North Africa\'s Maghreb region — distinct enough from Modern Standard Arabic that other Arab speakers often can\'t understand it. It mixes Arabic with Amazigh, French, and Spanish loanwords. About 40 million speakers, primarily in Morocco and Algeria.',
     },
+    {
+      id: 'gtl-itshekiri',
+      video: 'https://www.youtube.com/watch?v=QGMwupjOwYI&start=120',
+      answer: 'Itshekiri',
+      countries: ['Nigeria'],
+      explanation: 'Itshekiri (also written Itsekiri) is a language spoken in Nigeria\'s Niger Delta, especially in Delta State around Warri. It has strong historical contact with neighboring Edo and Yoruba-speaking communities through trade and migration.',
+    },
+    {
+      id: 'gtl-urhobo',
+      video: 'https://www.youtube.com/watch?v=XtaN4v5wPwo&start=134',
+      answer: 'Urhobo',
+      countries: ['Nigeria'],
+      explanation: 'Urhobo is spoken by the Urhobo people of southern Nigeria, mainly in Delta State. It is part of the larger Niger-Congo family and is one of the key indigenous languages of the western Niger Delta.',
+    },
+    {
+      id: 'gtl-efik-ibibio',
+      video: 'https://www.youtube.com/watch?v=I57xP7MsOD0&start=39',
+      answer: 'Efik / Ibibio',
+      countries: ['Nigeria'],
+      explanation: 'Efik and Ibibio are closely related Lower Cross languages spoken in southeastern Nigeria, especially in Akwa Ibom and Cross River states. They share substantial vocabulary and cultural overlap while remaining distinct varieties.',
+    },
+    {
+      id: 'gtl-ijaw',
+      video: 'https://www.youtube.com/watch?v=IF2OllCp-0o&start=7',
+      answer: 'Ijaw',
+      countries: ['Nigeria'],
+      explanation: 'Ijaw refers to a cluster of related languages spoken by Ijaw communities across the Niger Delta in southern Nigeria. It is central to the linguistic and cultural identity of many riverine communities in Bayelsa, Delta, and Rivers states.',
+    },
   ],
 }
