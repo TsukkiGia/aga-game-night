@@ -123,7 +123,7 @@ export default function QuestionView({
           <span className="qv-counter">Q {displayQuestionNumber} / {total}</span>
           <button className="qv-arrow" onClick={onPrev} disabled={questionIndex === 0}>‹</button>
           <button className="qv-arrow" onClick={() => { onMarkDone(); onNext() }}>›</button>
-          <button className="qv-reaction-btn" onClick={onShowReactionLeaderboard}>⏱ Times</button>
+          <button className="qv-reaction-btn" onClick={onShowReactionLeaderboard}>⏱ Question Race</button>
           <button className="qv-join-btn" onClick={() => setShowJoinQr(true)}>📱 Join</button>
           <button className="halftime-btn" onClick={onHalftime}>⏸ Halftime</button>
           {confirmFinish

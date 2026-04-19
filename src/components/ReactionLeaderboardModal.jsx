@@ -12,14 +12,14 @@ export default function ReactionLeaderboardModal({ open, rows, onClose }) {
       <div className="reaction-popup" onClick={(e) => e.stopPropagation()}>
         <div className="help-popup-head">
           <div>
-            <div className="help-popup-tag">Reaction Leaderboard</div>
-            <h2 className="help-popup-title">Fastest Buzzers</h2>
+            <div className="help-popup-tag">Question Race</div>
+            <h2 className="help-popup-title">Current Question Times</h2>
           </div>
           <button className="help-close-btn" onClick={onClose}>✕</button>
         </div>
-        <div className="reaction-sub">Most recent question only • Shortcut: <strong>Shift + T</strong></div>
+        <div className="reaction-sub">Sorted by fastest current-question buzz • Shortcut: <strong>Shift + T</strong></div>
         {rows.length === 0 ? (
-          <div className="reaction-empty">No buzzes recorded for the current question yet.</div>
+          <div className="reaction-empty">No buzzes recorded for this question yet.</div>
         ) : (
           <div className="reaction-table-wrap">
             <table className="reaction-table">
@@ -28,10 +28,7 @@ export default function ReactionLeaderboardModal({ open, rows, onClose }) {
                   <th>#</th>
                   <th>Name</th>
                   <th>Team</th>
-                  <th>Best</th>
-                  <th>Last</th>
-                  <th>Avg</th>
-                  <th>Buzzes</th>
+                  <th>Time</th>
                 </tr>
               </thead>
               <tbody>
@@ -40,10 +37,7 @@ export default function ReactionLeaderboardModal({ open, rows, onClose }) {
                     <td>{idx + 1}</td>
                     <td>{row.name}</td>
                     <td>{row.teamName || '—'}</td>
-                    <td>{formatMs(row.bestMs)}</td>
-                    <td>{formatMs(row.lastMs)}</td>
-                    <td>{formatMs(Math.round(row.totalMs / row.attempts))}</td>
-                    <td>{row.attempts}</td>
+                    <td>{formatMs(row.questionLastMs)}</td>
                   </tr>
                 ))}
               </tbody>

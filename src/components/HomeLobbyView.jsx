@@ -25,7 +25,7 @@ export default function HomeLobbyView({
       <div className="home-actions-bar">
         <div className="home-actions-secondary">
           <button className="home-help-btn" onClick={onOpenHelp}>? Help</button>
-          <button className="home-help-btn" onClick={onOpenReactionLeaderboard}>⏱ Reaction Times</button>
+          <button className="home-help-btn" onClick={onOpenReactionLeaderboard}>⏱ Question Race</button>
           <button className="home-new-game-btn" onClick={onNewGame} disabled={newGamePending || endingSession}>
             {newGamePending ? 'Resetting…' : 'Restart Lobby'}
           </button>

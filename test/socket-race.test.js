@@ -75,7 +75,7 @@ function createFakeQuery() {
     }
 
     if (text.includes('INSERT INTO game_state')) {
-      const [sessionId, roundIndex, questionIndex, armed, streaksRaw, doneQuestionsRaw, hostQuestionCursorRaw, doublePoints, gamePlanRaw, roundCatalogRaw] = params
+      const [sessionId, roundIndex, questionIndex, armed, streaksRaw, doneQuestionsRaw, hostQuestionCursorRaw, doublePoints, gamePlanRaw, roundCatalogRaw, reactionStatsRaw] = params
       let hostQuestionCursor = hostQuestionCursorRaw
       if (typeof hostQuestionCursorRaw === 'string') {
         try { hostQuestionCursor = JSON.parse(hostQuestionCursorRaw) } catch { hostQuestionCursor = null }
@@ -83,6 +83,10 @@ function createFakeQuery() {
       let roundCatalog = roundCatalogRaw
       if (typeof roundCatalogRaw === 'string') {
         try { roundCatalog = JSON.parse(roundCatalogRaw) } catch { roundCatalog = [] }
+      }
+      let reactionStats = reactionStatsRaw
+      if (typeof reactionStatsRaw === 'string') {
+        try { reactionStats = JSON.parse(reactionStatsRaw) } catch { reactionStats = {} }
       }
       gameStateBySession.set(sessionId, {
         round_index: Number.parseInt(roundIndex, 10) || 0,
@@ -94,6 +98,7 @@ function createFakeQuery() {
         double_points: Boolean(doublePoints),
         game_plan: Array.isArray(gamePlanRaw) ? [...gamePlanRaw] : [],
         round_catalog: Array.isArray(roundCatalog) ? [...roundCatalog] : [],
+        reaction_stats: reactionStats && typeof reactionStats === 'object' && !Array.isArray(reactionStats) ? { ...reactionStats } : {},
       })
       return { rows: [], rowCount: 1 }
     }
@@ -124,6 +129,7 @@ function createFakeQuery() {
         double_points: false,
         game_plan: [],
         round_catalog: [],
+        reaction_stats: {},
       }
       const bs = buzzStateBySession.get(sessionId) || {
         winner_team_index: null,
@@ -143,6 +149,7 @@ function createFakeQuery() {
             gs_double_points: gs.double_points,
             gs_game_plan: gs.game_plan,
             gs_round_catalog: gs.round_catalog,
+            gs_reaction_stats: gs.reaction_stats,
             gs_host_question_cursor: gs.host_question_cursor,
             bs_winner_team_index: bs.winner_team_index,
             bs_buzzed_member_name: bs.buzzed_member_name,
@@ -167,6 +174,7 @@ function createFakeQuery() {
           gs_double_points: gs.double_points,
           gs_game_plan: gs.game_plan,
           gs_round_catalog: gs.round_catalog,
+          gs_reaction_stats: gs.reaction_stats,
           gs_host_question_cursor: gs.host_question_cursor,
           bs_winner_team_index: bs.winner_team_index,
           bs_buzzed_member_name: bs.buzzed_member_name,
@@ -635,6 +643,18 @@ test('runtime scoreboard state persists and rehydrates after reconnect', async (
           questions: [{ id: 'cq-1', promptType: 'text', promptText: 'Prompt', answer: 'Answer' }],
         },
       ],
+      reactionStats: {
+        '0:alice': {
+          key: '0:alice',
+          name: 'Alice',
+          teamName: 'Team A',
+          teamIndex: 0,
+          bestMs: 512,
+          lastMs: 644,
+          totalMs: 1156,
+          attempts: 2,
+        },
+      },
     })
     assert.equal(runtimeUpdate.ok, true)
 
@@ -655,6 +675,9 @@ test('runtime scoreboard state persists and rehydrates after reconnect', async (
     assert.equal(Array.isArray(sync.roundCatalog), true)
     assert.equal(sync.roundCatalog[0]?.id, 'custom-template-test')
     assert.equal(sync.roundCatalog[0]?.templateId, 'test')
+    assert.equal(sync.reactionStats?.['0:alice']?.bestMs, 512)
+    assert.equal(sync.reactionStats?.['0:alice']?.lastMs, 644)
+    assert.equal(sync.reactionStats?.['0:alice']?.attempts, 2)
   } finally {
     await harness.close()
   }

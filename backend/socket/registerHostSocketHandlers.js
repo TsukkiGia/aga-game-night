@@ -16,6 +16,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     normalizeAllowedTeamIndices,
     normalizeGamePlan,
     normalizeRoundCatalog,
+    normalizeReactionStats,
     serializeEligibilityState,
     isHostAuthorized,
     isHostController,
@@ -136,6 +137,7 @@ export function registerHostSocketHandlers(socket, ctx) {
           doublePoints: false,
           gamePlan: hasIncomingGamePlan ? incomingGamePlan : normalizeGamePlan(st?.gamePlan),
           roundCatalog: hasIncomingRoundCatalog ? incomingRoundCatalog : normalizeRoundCatalog(st?.roundCatalog),
+          reactionStats: {},
         }
         sessions.set(code, st)
         io.to(hostRoom(code)).except(socket.id).emit('game:reset')
@@ -153,6 +155,7 @@ export function registerHostSocketHandlers(socket, ctx) {
         st.doublePoints = Boolean(st.doublePoints)
         st.gamePlan = hasIncomingGamePlan ? incomingGamePlan : normalizeGamePlan(st.gamePlan)
         st.roundCatalog = hasIncomingRoundCatalog ? incomingRoundCatalog : normalizeRoundCatalog(st.roundCatalog)
+        st.reactionStats = normalizeReactionStats(st.reactionStats)
       }
 
       await persistTeams(code, st.teams)
@@ -212,6 +215,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     const normalizedRoundCatalog = Array.isArray(payload.roundCatalog)
       ? normalizeRoundCatalog(payload.roundCatalog)
       : normalizeRoundCatalog(st.roundCatalog)
+    const normalizedReactionStats = normalizeReactionStats(payload.reactionStats ?? st.reactionStats)
 
     st.teams = normalizedTeams.map((team, index) => ({
       ...team,
@@ -222,6 +226,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     st.doublePoints = Boolean(payload.doublePoints)
     st.gamePlan = normalizedGamePlan
     st.roundCatalog = normalizedRoundCatalog
+    st.reactionStats = normalizedReactionStats
 
     try {
       await persistTeams(code, st.teams)

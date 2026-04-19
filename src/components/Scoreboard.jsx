@@ -18,6 +18,7 @@ import { useGameSocket } from '../hooks/useGameSocket'
 import { useNavigation } from '../hooks/useNavigation'
 import { clearAll, clearHostCredentials } from '../storage'
 import { playGameStart } from '../sounds'
+import { clearQuestionLastFromReactionStats, normalizeReactionStats, updateReactionStatsWithAttempt } from '../reactionStats'
 import {
   buildPlanCatalog,
   normalizePlanIdsWithRoundIntros,
@@ -39,46 +40,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
   }, [])
   const [reactionStats, setReactionStats] = useState({})
   const handleBuzzAttemptForLeaderboard = useCallback((data) => {
-    if (!data?.memberName) return
-    if (!Number.isFinite(data.reactionMs)) return
-    const name = String(data.memberName).trim()
-    if (!name) return
-
-    const teamIndex = Number.isInteger(data.teamIndex) ? data.teamIndex : -1
-    const teamName = data.team?.name || ''
-    const key = `${teamIndex}:${name.toLowerCase()}`
-    const ms = Math.max(0, Math.round(data.reactionMs))
-
-    setReactionStats((prev) => {
-      const current = prev[key]
-      if (!current) {
-        return {
-          ...prev,
-          [key]: {
-            key,
-            name,
-            teamName,
-            teamIndex,
-            bestMs: ms,
-            lastMs: ms,
-            totalMs: ms,
-            attempts: 1,
-          },
-        }
-      }
-      return {
-        ...prev,
-        [key]: {
-          ...current,
-          teamName,
-          teamIndex,
-          bestMs: Math.min(current.bestMs, ms),
-          lastMs: ms,
-          totalMs: current.totalMs + ms,
-          attempts: current.attempts + 1,
-        },
-      }
-    })
+    setReactionStats((prev) => updateReactionStatsWithAttempt(prev, data))
   }, [])
   const runtimeHydratedRef = useRef(false)
   const [roundCatalog, setRoundCatalog] = useState(() => {
@@ -118,8 +80,22 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
 
   const reactionRows = useMemo(() => {
     return Object.values(reactionStats)
-      .sort((a, b) => a.bestMs - b.bestMs)
+      .sort((a, b) => {
+        const aHasQuestionLast = Number.isInteger(a.questionLastMs)
+        const bHasQuestionLast = Number.isInteger(b.questionLastMs)
+        if (aHasQuestionLast && bHasQuestionLast) {
+          if (a.questionLastMs !== b.questionLastMs) return a.questionLastMs - b.questionLastMs
+        } else if (aHasQuestionLast !== bHasQuestionLast) {
+          return aHasQuestionLast ? -1 : 1
+        }
+        if (a.bestMs !== b.bestMs) return a.bestMs - b.bestMs
+        return a.name.localeCompare(b.name)
+      })
   }, [reactionStats])
+  const questionRaceRows = useMemo(
+    () => reactionRows.filter((row) => Number.isInteger(row.questionLastMs)),
+    [reactionRows]
+  )
 
   const normalizedPlanIds = useMemo(
     () => normalizePlanIdsWithRoundIntros(gamePlanIds, planCatalog, { fallbackToDefault: true }),
@@ -206,6 +182,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
     // that window to avoid remapping UI back to default ordering.
     setRoundCatalog(effectiveRoundCatalog)
     setGamePlanIds(effectivePlan)
+    setReactionStats(normalizeReactionStats(serverState?.reactionStats))
     const normalizedDone = normalizeDoneQuestionIds(serverState?.doneQuestions, effectivePlanCatalog)
     hydrateFromServer({ ...serverState, doneQuestions: normalizedDone, roundCatalog: effectiveRoundCatalog })
     const nextCursor = normalizeCursorId(serverState?.hostQuestionCursor, effectivePlan, effectivePlanCatalog)
@@ -255,6 +232,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
       doublePoints: Boolean(doublePoints),
       gamePlan: normalizedPlanIds,
       roundCatalog,
+      reactionStats: normalizeReactionStats(reactionStats),
     }
 
     let cancelled = false
@@ -290,7 +268,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
       cancelled = true
       if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [hostReady, teams, doneQuestions, streaks, doublePoints, normalizedPlanIds, roundCatalog, invalidateAuth])
+  }, [hostReady, teams, doneQuestions, streaks, doublePoints, normalizedPlanIds, roundCatalog, reactionStats, invalidateAuth])
 
   function handleTiebreaker(winners) {
     setShowWinner(false)
@@ -361,8 +339,9 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
     const { clearBuzz = true, transitionRound = null, silent = false } = options
     const currentQuestionId = activeItem?.type === 'question' ? activeItem.id : null
     const nextItem = nextCursorId ? planCatalog.byId.get(nextCursorId) : null
-    if (nextItem?.type === 'question' && nextItem.id !== currentQuestionId) {
-      setReactionStats({})
+    const nextQuestionId = nextItem?.type === 'question' ? nextItem.id : null
+    if (currentQuestionId !== nextQuestionId) {
+      setReactionStats((prev) => clearQuestionLastFromReactionStats(prev))
     }
     if (clearBuzz) {
       clearDoublePoints()
@@ -390,7 +369,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
   function goBack() {
     dismissBuzzAndResetMultiplier()
     setLaunching(false)
-    navigate(null, { silent: true })
+    navigateToCursor(null, { clearBuzz: false, silent: true })
   }
 
   if (activeItem !== null) {
@@ -419,7 +398,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
           {transition && <RoundTransitionScreen round={transition} roundLabel={transitionRoundLabel} onDone={dismissTransition} />}
           <ReactionLeaderboardModal
             open={showReactionLeaderboard}
-            rows={reactionRows}
+            rows={questionRaceRows}
             onClose={() => setShowReactionLeaderboard(false)}
           />
         </>
@@ -487,7 +466,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
         {suddenDeath  && <SuddenDeathOverlay tiedTeams={tiedTeams} buzzWinner={buzzWinner} onAward={handleSuddenDeathAward} onWrong={handleSuddenDeathWrong} onCancel={handleSuddenDeathCancel} />}
         <ReactionLeaderboardModal
           open={showReactionLeaderboard}
-          rows={reactionRows}
+          rows={questionRaceRows}
           onClose={() => setShowReactionLeaderboard(false)}
         />
       </>
@@ -638,7 +617,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
       )}
       <ReactionLeaderboardModal
         open={showReactionLeaderboard}
-        rows={reactionRows}
+        rows={questionRaceRows}
         onClose={() => setShowReactionLeaderboard(false)}
       />
       {showEndSessionConfirm && (

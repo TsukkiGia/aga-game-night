@@ -17,6 +17,7 @@ export function initialState() {
     doublePoints: false,
     gamePlan: [],
     roundCatalog: [],
+    reactionStats: {},
   }
 }
 
@@ -61,6 +62,70 @@ export function normalizeGamePlan(rawPlan) {
 }
 
 export { normalizeRoundCatalog }
+
+function cleanText(value, maxLen = 80) {
+  return String(value || '').trim().slice(0, maxLen)
+}
+
+function cleanTeamIndex(value) {
+  const parsed = Number.parseInt(value, 10)
+  return Number.isInteger(parsed) ? parsed : -1
+}
+
+function cleanMs(value) {
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isInteger(parsed) || parsed < 0) return null
+  return parsed
+}
+
+function cleanAttempts(value) {
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isInteger(parsed) || parsed < 1) return null
+  return parsed
+}
+
+export function normalizeReactionStats(rawStats) {
+  if (!rawStats || typeof rawStats !== 'object' || Array.isArray(rawStats)) return {}
+  const out = {}
+  let count = 0
+  for (const [rawKey, value] of Object.entries(rawStats)) {
+    if (count >= 500) break
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+
+    const fallbackKey = cleanText(rawKey, 120)
+    const key = cleanText(value.key || fallbackKey, 120)
+    const name = cleanText(value.name)
+    const teamName = cleanText(value.teamName)
+    const teamIndex = cleanTeamIndex(value.teamIndex)
+    const bestMs = cleanMs(value.bestMs)
+    const lastMs = cleanMs(value.lastMs)
+    const questionLastMs = cleanMs(value.questionLastMs)
+    const attempts = cleanAttempts(value.attempts)
+
+    if (!key || !name) continue
+
+    const safeLastMs = lastMs ?? bestMs
+    const safeBestMs = bestMs ?? safeLastMs
+    if (!Number.isInteger(safeBestMs) || !Number.isInteger(safeLastMs)) continue
+
+    const safeAttempts = attempts ?? 1
+    const totalMs = cleanMs(value.totalMs) ?? (safeLastMs * safeAttempts)
+
+    out[key] = {
+      key,
+      name,
+      teamName,
+      teamIndex,
+      bestMs: Math.min(safeBestMs, safeLastMs),
+      lastMs: safeLastMs,
+      questionLastMs,
+      totalMs,
+      attempts: safeAttempts,
+    }
+    count += 1
+  }
+  return out
+}
 
 export function normalizeTeams(rawTeams) {
   if (!Array.isArray(rawTeams)) return null

@@ -1,4 +1,4 @@
-import { initialState, normalizeAllowedTeamIndices, normalizeQuestionCursor, normalizeGamePlan, normalizeRoundCatalog } from './sessionState.js'
+import { initialState, normalizeAllowedTeamIndices, normalizeQuestionCursor, normalizeGamePlan, normalizeRoundCatalog, normalizeReactionStats } from './sessionState.js'
 
 export function createRuntimeStore({ queryFn, sessions }) {
   function getState(code) {
@@ -19,6 +19,7 @@ export function createRuntimeStore({ queryFn, sessions }) {
           gs.double_points AS gs_double_points,
           gs.game_plan AS gs_game_plan,
           gs.round_catalog AS gs_round_catalog,
+          gs.reaction_stats AS gs_reaction_stats,
           gs.host_question_cursor AS gs_host_question_cursor,
           bs.winner_team_index AS bs_winner_team_index,
           bs.buzzed_member_name AS bs_buzzed_member_name,
@@ -63,6 +64,7 @@ export function createRuntimeStore({ queryFn, sessions }) {
     next.doublePoints = Boolean(first.gs_double_points)
     next.gamePlan = normalizeGamePlan(first.gs_game_plan)
     next.roundCatalog = normalizeRoundCatalog(first.gs_round_catalog)
+    next.reactionStats = normalizeReactionStats(first.gs_reaction_stats)
 
     next.armed = Boolean(first.gs_armed)
 
@@ -140,6 +142,7 @@ export function createRuntimeStore({ queryFn, sessions }) {
       : []
     const gamePlan = normalizeGamePlan(st.gamePlan)
     const roundCatalog = normalizeRoundCatalog(st.roundCatalog)
+    const reactionStats = normalizeReactionStats(st.reactionStats)
     await queryFn(
       `
         INSERT INTO game_state (
@@ -152,9 +155,10 @@ export function createRuntimeStore({ queryFn, sessions }) {
           host_question_cursor,
           double_points,
           game_plan,
-          round_catalog
+          round_catalog,
+          reaction_stats
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11::jsonb)
         ON CONFLICT (session_id)
         DO UPDATE SET
           round_index = EXCLUDED.round_index,
@@ -165,9 +169,10 @@ export function createRuntimeStore({ queryFn, sessions }) {
           host_question_cursor = EXCLUDED.host_question_cursor,
           double_points = EXCLUDED.double_points,
           game_plan = EXCLUDED.game_plan,
-          round_catalog = EXCLUDED.round_catalog
+          round_catalog = EXCLUDED.round_catalog,
+          reaction_stats = EXCLUDED.reaction_stats
       `,
-      [code, roundIndex, questionIndex, st.armed, streaks, doneQuestions, hostQuestionCursor, Boolean(st.doublePoints), gamePlan, JSON.stringify(roundCatalog)]
+      [code, roundIndex, questionIndex, st.armed, streaks, doneQuestions, hostQuestionCursor, Boolean(st.doublePoints), gamePlan, JSON.stringify(roundCatalog), JSON.stringify(reactionStats)]
     )
     await queryFn(
       `

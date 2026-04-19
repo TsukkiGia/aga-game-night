@@ -19,6 +19,7 @@ import {
   normalizeAllowedTeamIndices,
   normalizeGamePlan,
   normalizeRoundCatalog,
+  normalizeReactionStats,
 } from './backend/state/sessionState.js'
 import { createRuntimeStore } from './backend/state/runtimeStore.js'
 import { hostRoom, ctrlRoom, memberTeamRoom } from './backend/socket/rooms.js'
@@ -259,6 +260,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
       normalizeAllowedTeamIndices,
       normalizeGamePlan,
       normalizeRoundCatalog,
+      normalizeReactionStats,
       serializeEligibilityState,
       isHostAuthorized,
       isHostController,
