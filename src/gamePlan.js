@@ -131,12 +131,6 @@ export function legacyPairToItemId(cursorPair, catalog = DEFAULT_CATALOG) {
   return catalog.questionIdByRoundQuestion.get(`${roundIndex}-${questionIndex}`) || null
 }
 
-export function itemIdToLegacyPair(itemId, catalog = DEFAULT_CATALOG) {
-  const item = catalog.byId.get(String(itemId || '').trim())
-  if (!item) return null
-  return [item.roundIndex, item.questionIndex]
-}
-
 export function normalizeCursorId(rawCursor, planIds, catalog = DEFAULT_CATALOG) {
   const planSet = new Set(Array.isArray(planIds) ? planIds : [])
   if (rawCursor === null || rawCursor === undefined) return null
