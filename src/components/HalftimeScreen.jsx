@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { playWhistle } from '../sounds'
+import { computePlaces } from '../utils/teamRanking'
 
 export default function HalftimeScreen({ teams, onClose }) {
   useEffect(() => { playWhistle() }, [])
@@ -9,7 +10,7 @@ export default function HalftimeScreen({ teams, onClose }) {
 
   const leader = sorted[0]
   const hasScores = leader.score > 0
-  const places = sorted.map(team => sorted.filter(t => t.score > team.score).length)
+  const places = computePlaces(sorted)
   const medals = ['🥇','🥈','🥉']
   const topTied = hasScores ? sorted.filter(t => t.score === leader.score) : []
 

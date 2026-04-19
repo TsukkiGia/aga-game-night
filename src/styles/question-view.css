@@ -120,6 +120,15 @@
   transition: all 0.2s;
 }
 
+.qv-team-strip-readonly {
+  gap: 0;
+  min-width: 170px;
+}
+
+.qv-team-strip-with-controls {
+  gap: 8px;
+}
+
 .qv-team-strip.qv-buzzed {
   border-color: var(--team-accent);
   background: var(--team-accent-bg);
@@ -423,6 +432,12 @@
   min-width: 0;
   overflow-y: auto;
   align-items: safe center;
+}
+
+/* Media rounds: tighter padding so content fills available height */
+.qv-main .qv-body:has(.qv-custom-image-shell),
+.qv-main .qv-body:has(.qv-video-wrap) {
+  padding: 16px 24px;
 }
 
 .qv-empty-state {

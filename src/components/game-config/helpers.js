@@ -1,4 +1,4 @@
-import { buildPlanCatalog, normalizePlanIdsWithRoundIntros } from '../../gamePlan.js'
+import { buildPlanCatalog, defaultPlanIds, normalizePlanIdsWithRoundIntros } from '../../gamePlan.js'
 import { CUSTOM_ROUND_TYPE } from '../../roundCatalog.js'
 import { cleanUrl } from '../../utils/mediaPrompt.js'
 
@@ -76,6 +76,44 @@ export function buildInitialSelection(initialPlanIds, catalogRounds) {
     selected.add(item.id)
   }
   return selected
+}
+
+export function buildSnapshotPayloadFromSelection({ roundRows, planCatalog, selectedQuestionIds }) {
+  const rows = Array.isArray(roundRows) ? roundRows : []
+  const selected = selectedQuestionIds instanceof Set ? selectedQuestionIds : new Set()
+  const catalog = planCatalog || null
+  const snapshotRounds = []
+
+  for (const row of rows) {
+    const questionIds = Array.isArray(row?.questionIds) ? row.questionIds : []
+    const selectedForRound = questionIds.filter((id) => selected.has(id))
+    if (selectedForRound.length === 0) continue
+    const questions = selectedForRound
+      .map((id) => {
+        const item = catalog?.byId?.get(id)
+        if (!item || item.type !== 'question') return null
+        const question = row?.round?.questions?.[item.questionIndex]
+        return question ? cloneJson(question) : null
+      })
+      .filter(Boolean)
+    if (questions.length === 0) continue
+    snapshotRounds.push({
+      id: row.round.id,
+      templateId: row.round.templateId || undefined,
+      name: row.round.name,
+      type: row.round.type,
+      intro: row.round.intro || '',
+      rules: cloneJson(row.round.rules || []),
+      scoring: cloneJson(row.round.scoring || []),
+      questions,
+    })
+  }
+
+  const snapshotPlanCatalog = buildPlanCatalog(snapshotRounds)
+  return {
+    roundCatalog: snapshotRounds,
+    planIds: defaultPlanIds(snapshotPlanCatalog),
+  }
 }
 
 export function buildEditorSnapshot({ name, intro, rules, scoring, questions }) {

@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { playWinner, playWinnerMusical, playApplause, stopWinnerSounds, playSuspenseSequence, stopSuspense } from '../sounds'
+import { computePlaces } from '../utils/teamRanking'
+
+// Reveal sequence timing
+const TIE_STEP_MS        = 800   // interval between podium slots in a tie
+const WINNER_TEASER_MS   = 2000  // "And the winner is..." hold
+const WINNER_3RD_MS      = 3200  // 3rd place slot appears
+const WINNER_2ND_MS      = 4000  // 2nd place slot
+const WINNER_1ST_MS      = 4800  // 1st place slot
+const WINNER_ACTIONS_MS  = 6200  // action buttons appear
+const SUDDEN_DEATH_MS    = 10000 // suspense kicks in for ties
+const SD_BUTTON_MS       = 14000 // sudden death button appears
 
 const COLOR_VARS = {
   ember:  'var(--terra)',
@@ -25,7 +36,7 @@ export default function WinnerScreen({ teams, onClose, onDismiss, onTiebreaker, 
   const isTie       = winners.length > 1
   const winnerColor = !isTie && winners[0] ? COLOR_VARS[winners[0].color] : 'var(--amber)'
 
-  const places     = sorted.map(team => sorted.filter(t => t.score > team.score).length)
+  const places     = computePlaces(sorted)
   const medals     = ['🥇', '🥈', '🥉']
   const showPodium = !sorted[3] || places[3] > places[2]
 
@@ -50,25 +61,25 @@ export default function WinnerScreen({ teams, onClose, onDismiss, onTiebreaker, 
   useEffect(() => {
     const timers = isTie
       ? [
-          setTimeout(() => setStep(2), 800),
-          setTimeout(() => setStep(3), 1600),
-          setTimeout(() => setStep(4), 2400),
-          setTimeout(() => setStep(5), 3600),
+          setTimeout(() => setStep(2), TIE_STEP_MS),
+          setTimeout(() => setStep(3), TIE_STEP_MS * 2),
+          setTimeout(() => setStep(4), TIE_STEP_MS * 3),
+          setTimeout(() => setStep(5), TIE_STEP_MS * 4 + 400),
         ]
       : [
-          setTimeout(() => setStep(1), 2000),  // name pops in
-          setTimeout(() => setStep(2), 3200),  // 3rd place
-          setTimeout(() => setStep(3), 4000),  // 2nd place
-          setTimeout(() => setStep(4), 4800),  // 1st place
-          setTimeout(() => setStep(5), 6200),  // actions
+          setTimeout(() => setStep(1), WINNER_TEASER_MS),
+          setTimeout(() => setStep(2), WINNER_3RD_MS),
+          setTimeout(() => setStep(3), WINNER_2ND_MS),
+          setTimeout(() => setStep(4), WINNER_1ST_MS),
+          setTimeout(() => setStep(5), WINNER_ACTIONS_MS),
         ]
     return () => timers.forEach(clearTimeout)
   }, [isTie])
 
   useEffect(() => {
     if (!isTie || !onTiebreaker) return
-    const t1 = setTimeout(() => { setShowSuddenDeath(true); stopWinnerSounds(); playSuspenseSequence() }, 10000)
-    const t2 = setTimeout(() => setShowSdButton(true), 14000)
+    const t1 = setTimeout(() => { setShowSuddenDeath(true); stopWinnerSounds(); playSuspenseSequence() }, SUDDEN_DEATH_MS)
+    const t2 = setTimeout(() => setShowSdButton(true), SD_BUTTON_MS)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [isTie, onTiebreaker])
 

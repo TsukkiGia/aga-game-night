@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { questionItemIdFor } from '../gamePlan'
 
 function isQuestionDone(doneQuestions, roundIndex, questionIndex, planCatalog) {
@@ -11,15 +11,19 @@ function isQuestionDone(doneQuestions, roundIndex, questionIndex, planCatalog) {
 export default function RoundIntroView({
   planCatalog = null,
   rounds, roundIndex, doneQuestions,
+  teams = [],
+  streaks = [],
+  onAdjust = null,
   onNavigate, onBack,
   onHalftime = null,
   isRoundIncluded = () => true,
   isQuestionIncluded = () => true,
   getRoundDisplayLabel = (ri) => `Round ${ri + 1}`,
   getQuestionDisplayNumber = (_ri, qi) => qi + 1,
+  savedSidebarScrollTop = 0,
+  onRememberSidebarScroll = null,
 }) {
   const round = rounds[roundIndex]
-  const [sidebarScrollTop, setSidebarScrollTop] = useState(0)
 
   return (
     <div className="question-view">
@@ -38,6 +42,31 @@ export default function RoundIntroView({
         </div>
       </div>
 
+      {teams.length > 0 && (
+        <div className="qv-scores">
+          {teams.map((team, i) => (
+            <div
+              key={i}
+              className={`qv-team-strip${typeof onAdjust === 'function' ? ' qv-team-strip-with-controls' : ''} color-${team.color}`}
+            >
+              <div className="qv-strip-info">
+                <span className="qv-strip-name">
+                  {team.name}
+                  {streaks?.[i] >= 3 && <span className="qv-streak">🔥</span>}
+                </span>
+                <span className="qv-strip-score">{team.score}</span>
+              </div>
+              {typeof onAdjust === 'function' && (
+                <div className="qv-strip-btns">
+                  <button className="qv-pts-btn neg" onClick={() => onAdjust(i, -1)}>−1</button>
+                  <button className="qv-pts-btn pos" onClick={() => onAdjust(i, +1)}>+1</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Main: sidebar + content */}
       <div className="qv-main">
 
@@ -45,8 +74,8 @@ export default function RoundIntroView({
         <Sidebar
           rounds={rounds}
           planCatalog={planCatalog}
-          savedScrollTop={sidebarScrollTop}
-          onRememberScroll={setSidebarScrollTop}
+          savedScrollTop={savedSidebarScrollTop}
+          onRememberScroll={onRememberSidebarScroll}
           roundIndex={roundIndex}
           activeQIdx={null}
           doneQuestions={doneQuestions}

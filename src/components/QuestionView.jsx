@@ -8,7 +8,6 @@ import ThesisBody from './ThesisBody'
 import CustomBuzzBody from './CustomBuzzBody'
 import JoinQrModal from './JoinQrModal'
 import { questionItemIdFor } from '../gamePlan'
-let lastQuestionSidebarScrollTop = 0
 
 function isQuestionDone(doneQuestions, roundIndex, questionIndex, planCatalog) {
   if (doneQuestions?.has(`${roundIndex}-${questionIndex}`)) return true
@@ -31,6 +30,8 @@ export default function QuestionView({
   getRoundDisplayLabel = (ri) => `Round ${ri + 1}`,
   getQuestionDisplayNumber = (_ri, qi) => qi + 1,
   getQuestionTotal = (ri) => rounds[ri]?.questions?.length || 0,
+  savedSidebarScrollTop = 0,
+  onRememberSidebarScroll = null,
 }) {
   const round = rounds[roundIndex]
   const question = round?.questions?.[questionIndex]
@@ -66,12 +67,12 @@ export default function QuestionView({
   useEffect(() => {
     const container = sidebarRef.current
     if (!container) return
-    container.scrollTop = lastQuestionSidebarScrollTop
-  }, [])
+    container.scrollTop = Number(savedSidebarScrollTop) || 0
+  }, [savedSidebarScrollTop])
 
   function navigateFromSidebar(nextRoundIndex, nextQuestionIndex) {
     if (sidebarRef.current) {
-      lastQuestionSidebarScrollTop = sidebarRef.current.scrollTop
+      onRememberSidebarScroll?.(sidebarRef.current.scrollTop)
     }
     onNavigate(nextRoundIndex, nextQuestionIndex)
   }
@@ -184,7 +185,7 @@ export default function QuestionView({
           ref={sidebarRef}
           onScroll={() => {
             if (!sidebarRef.current) return
-            lastQuestionSidebarScrollTop = sidebarRef.current.scrollTop
+            onRememberSidebarScroll?.(sidebarRef.current.scrollTop)
           }}
         >
           <button className="qv-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)}>

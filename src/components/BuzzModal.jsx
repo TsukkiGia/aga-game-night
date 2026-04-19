@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { playTick, stopTick, playTimeUp } from '../sounds'
+import { getRevealOutcome } from '../utils/buzzReveal'
+
+// Round types that support in-modal answer reveal
+const REVEAL_ANSWER_CONFIG = {
+  slang:         { label: 'Meaning', getText: (q) => q.meaning },
+  charades:      { label: 'Phrase',  getText: (q) => q.phrase },
+  video:         { label: 'Answer',  getText: (q) => q.answer, showExplanation: true },
+  'custom-buzz': { label: 'Answer',  getText: (q) => q.answer, showExplanation: true },
+}
 
 function scoringPhase(entry) {
   const explicit = String(entry?.phase || '').trim().toLowerCase()
@@ -111,17 +120,14 @@ export default function BuzzModal({
                   onClick={() => {
                     stopCountdown()
                     onAdjust(buzzWinner.teamIndex, points)
-                    const canReveal = round.type === 'slang' || round.type === 'video' || round.type === 'charades' || round.type === 'custom-buzz'
-                    const normalizedLabel = String(label || '').trim().toLowerCase()
-                    const isFunnyBonus = normalizedLabel === 'funny bonus'
-                    const shouldRevealOnPositive = points > 0 && !isFunnyBonus
-                    if (stealMode) {
-                      if (canReveal) setRevealedInModal(true)
-                    } else if (round.type === 'video' && label === 'Correct country') {
-                      setRevealedCountry(true)
-                    } else if (canReveal && shouldRevealOnPositive) {
-                      setRevealedInModal(true)
-                    }
+                    const outcome = getRevealOutcome({
+                      roundType: round.type,
+                      label,
+                      points,
+                      stealMode,
+                    })
+                    if (outcome.revealCountry) setRevealedCountry(true)
+                    if (outcome.revealAnswer) setRevealedInModal(true)
                   }}
                   title={label}
                 >
@@ -158,40 +164,19 @@ export default function BuzzModal({
           </div>
         )}
 
-        {revealedInModal && (
-          <div className="buzz-popup-answer">
-            {round.type === 'slang' && (
-              <>
-                <div className="buzz-popup-answer-label">Meaning</div>
-                <div className="buzz-popup-answer-text">{question.meaning}</div>
-              </>
-            )}
-            {round.type === 'charades' && (
-              <>
-                <div className="buzz-popup-answer-label">Phrase</div>
-                <div className="buzz-popup-answer-text">{question.phrase}</div>
-              </>
-            )}
-            {round.type === 'video' && (
-              <>
-                <div className="buzz-popup-answer-label">Answer</div>
-                <div className="buzz-popup-answer-text">{question.answer}</div>
-                {question.explanation && (
-                  <div className="buzz-popup-answer-explanation">{question.explanation}</div>
-                )}
-              </>
-            )}
-            {round.type === 'custom-buzz' && (
-              <>
-                <div className="buzz-popup-answer-label">Answer</div>
-                <div className="buzz-popup-answer-text">{question.answer}</div>
-                {question.explanation && (
-                  <div className="buzz-popup-answer-explanation">{question.explanation}</div>
-                )}
-              </>
-            )}
-          </div>
-        )}
+        {revealedInModal && (() => {
+          const cfg = REVEAL_ANSWER_CONFIG[round.type]
+          if (!cfg) return null
+          return (
+            <div className="buzz-popup-answer">
+              <div className="buzz-popup-answer-label">{cfg.label}</div>
+              <div className="buzz-popup-answer-text">{cfg.getText(question)}</div>
+              {cfg.showExplanation && question.explanation && (
+                <div className="buzz-popup-answer-explanation">{question.explanation}</div>
+              )}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )

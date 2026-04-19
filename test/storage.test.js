@@ -1,13 +1,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  ACTIVE_QUESTION_KEY,
   BUZZER_PLAYER_KEY,
+  GAME_PLAN_KEY,
   HOST_PIN_KEY,
+  PLAN_CONFIG_PENDING_KEY,
   SESSION_CODE_KEY,
   clearBuzzerIdentity,
   clearHostCredentials,
+  getStorageItem,
   loadBuzzerIdentity,
   readHostCredentials,
+  setStorageItem,
   saveBuzzerIdentity,
   writeHostCredentials,
 } from '../src/storage.js'
@@ -84,6 +89,30 @@ test('buzzer identity helpers persist and clear player identity', () => {
     clearBuzzerIdentity()
     assert.equal(loadBuzzerIdentity(), null)
     assert.equal(storageMock.dump().has(BUZZER_PLAYER_KEY), false)
+  } finally {
+    globalThis.localStorage = originalLocalStorage
+  }
+})
+
+test('question cursor and plan flags are scoped per session to avoid cross-session bleed', () => {
+  const originalLocalStorage = globalThis.localStorage
+  const storageMock = createLocalStorageMock()
+  globalThis.localStorage = storageMock
+  try {
+    writeHostCredentials('AAAAAA', '1111')
+    setStorageItem(ACTIVE_QUESTION_KEY, JSON.stringify('q:language:1'))
+    setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(true))
+    setStorageItem(GAME_PLAN_KEY, JSON.stringify(['intro:round-a', 'q:round-a:q1']))
+
+    writeHostCredentials('BBBBBB', '2222')
+    assert.equal(getStorageItem(ACTIVE_QUESTION_KEY), null)
+    assert.equal(getStorageItem(PLAN_CONFIG_PENDING_KEY), null)
+    assert.equal(getStorageItem(GAME_PLAN_KEY), null)
+
+    setStorageItem(ACTIVE_QUESTION_KEY, JSON.stringify('q:slang:2'))
+    writeHostCredentials('AAAAAA', '1111')
+    assert.equal(getStorageItem(ACTIVE_QUESTION_KEY), JSON.stringify('q:language:1'))
+    assert.equal(getStorageItem(PLAN_CONFIG_PENDING_KEY), JSON.stringify(true))
   } finally {
     globalThis.localStorage = originalLocalStorage
   }

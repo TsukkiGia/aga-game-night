@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import rounds from '../rounds'
-import { buildPlanCatalog, defaultPlanIds } from '../gamePlan'
+import { buildPlanCatalog } from '../gamePlan'
 import {
   CUSTOM_ROUND_TYPE,
   normalizeRoundCatalog,
@@ -9,6 +9,8 @@ import {
 import { mediaUrlFeedback } from '../utils/mediaPrompt'
 import { DEFAULT_QUESTION, DEFAULT_SCORING } from './game-config/constants'
 import {
+  buildSnapshotPayloadFromSelection,
+  buildHealthyDefaultSelection,
   buildEditorSnapshot,
   buildInitialSelection,
   cloneJson,
@@ -64,7 +66,7 @@ export default function GameConfig({
   const [creatorMode, setCreatorMode] = useState('create')
   const [editingRoundId, setEditingRoundId] = useState('')
   const [editingTemplateId, setEditingTemplateId] = useState('')
-  const [, setSessionEditedRoundIds] = useState(() => new Set())
+
   const [createError, setCreateError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState({ roundId: '', text: '' })
   const [editorBaseline, setEditorBaseline] = useState(() => buildEditorSnapshot({
@@ -87,6 +89,10 @@ export default function GameConfig({
   const [activeRoundId, setActiveRoundId] = useState('')
   const [viewMode, setViewMode] = useState('grid')
   const [questionSearch, setQuestionSearch] = useState('')
+  const roundListRef = useRef(null)
+  const questionScrollRef = useRef(null)
+  const roundListScrollTopRef = useRef(0)
+  const questionScrollByRoundRef = useRef(new Map())
 
   function nextQuestionId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `cq-${crypto.randomUUID()}`
@@ -149,6 +155,21 @@ export default function GameConfig({
       setActiveRoundId(roundRows[0].round.id)
     }
   }, [roundRows, activeRoundId])
+
+  useEffect(() => {
+    if (!activeRoundId) return undefined
+    const restore = () => {
+      if (roundListRef.current) {
+        roundListRef.current.scrollTop = roundListScrollTopRef.current
+      }
+      if (questionScrollRef.current) {
+        const savedTop = questionScrollByRoundRef.current.get(activeRoundId)
+        questionScrollRef.current.scrollTop = Number.isFinite(savedTop) ? savedTop : 0
+      }
+    }
+    const rafId = requestAnimationFrame(restore)
+    return () => cancelAnimationFrame(rafId)
+  }, [activeRoundId])
 
   const activeRow = useMemo(
     () => roundRows.find((row) => row.round.id === activeRoundId) || roundRows[0] || null,
@@ -327,9 +348,7 @@ export default function GameConfig({
   }
 
   function handleResetDefault() {
-    const defaultCatalog = buildPlanCatalog(builtinRounds)
-    const defaults = defaultPlanIds(defaultCatalog)
-    setSelectedQuestionIds(buildInitialSelection(defaults, builtinRounds))
+    setSelectedQuestionIds(buildHealthyDefaultSelection(builtinRounds))
     setRoundOrder(combinedCatalog.map((round) => round.id))
     setRoundClearConfirmId('')
     setRecentlyClearedRound(null)
@@ -351,37 +370,16 @@ export default function GameConfig({
   }
 
   function handleContinue() {
-    const snapshotRounds = []
-    for (const row of roundRows) {
-      const selectedForRound = row.questionIds.filter((id) => selectedQuestionIds.has(id))
-      if (selectedForRound.length === 0) continue
-      const questions = selectedForRound
-        .map((id) => {
-          const item = PLAN_CATALOG.byId.get(id)
-          if (!item || item.type !== 'question') return null
-          const question = row.round.questions[item.questionIndex]
-          return question ? cloneJson(question) : null
-        })
-        .filter(Boolean)
-      if (questions.length === 0) continue
-      snapshotRounds.push({
-        id: row.round.id,
-        templateId: row.round.templateId || undefined,
-        name: row.round.name,
-        type: row.round.type,
-        intro: row.round.intro || '',
-        rules: cloneJson(row.round.rules || []),
-        scoring: cloneJson(row.round.scoring || []),
-        questions,
-      })
-    }
-    if (snapshotRounds.length === 0) {
+    const payload = buildSnapshotPayloadFromSelection({
+      roundRows,
+      planCatalog: PLAN_CATALOG,
+      selectedQuestionIds,
+    })
+    if (!payload.roundCatalog.length) {
       setError('Select at least one question to continue.')
       return
     }
-    const snapshotPlanCatalog = buildPlanCatalog(snapshotRounds)
-    const nextPlanIds = defaultPlanIds(snapshotPlanCatalog)
-    onConfirm({ planIds: nextPlanIds, roundCatalog: snapshotRounds })
+    onConfirm(payload)
   }
 
   function resetCreator() {
@@ -545,7 +543,6 @@ export default function GameConfig({
       if (index >= 0) return prev.map((round) => (round.id === roundId ? normalized : round))
       return [normalized, ...prev]
     })
-    setSessionEditedRoundIds((prev) => { const next = new Set(prev); next.add(roundId); return next })
     setSaveSuccess({ roundId, text: 'Saved. Preview updated for this session.' })
     closeCreator({ skipConfirm: true })
   }
@@ -591,7 +588,7 @@ export default function GameConfig({
             </div>
           </div>
 
-          <div className="gc2-round-list">
+          <div className="gc2-round-list" ref={roundListRef}>
             {roundRows.map((row, index) => {
               const isActive = activeRow?.round.id === row.round.id
               const pct = row.questionIds.length > 0
@@ -603,7 +600,16 @@ export default function GameConfig({
                   type="button"
                   className={`gc2-round-item${isActive ? ' active' : ''}`}
                   style={{ '--round-color': `var(--gc2-r${(index % 8) + 1})` }}
-                  onClick={() => { setActiveRoundId(row.round.id); setQuestionSearch('') }}
+                  onClick={() => {
+                    if (roundListRef.current) {
+                      roundListScrollTopRef.current = roundListRef.current.scrollTop
+                    }
+                    if (questionScrollRef.current && activeRow?.round?.id) {
+                      questionScrollByRoundRef.current.set(activeRow.round.id, questionScrollRef.current.scrollTop)
+                    }
+                    setActiveRoundId(row.round.id)
+                    setQuestionSearch('')
+                  }}
                 >
                   <div className="gc2-round-item-top">
                     <div className="gc2-round-item-meta">
@@ -715,7 +721,14 @@ export default function GameConfig({
               {error && <p className="gc2-error">{error}</p>}
               {templatesError && <p className="gc2-error">{templatesError}</p>}
 
-              <div className="gc2-question-scroll">
+              <div
+                className="gc2-question-scroll"
+                ref={questionScrollRef}
+                onScroll={() => {
+                  if (!questionScrollRef.current || !activeRow?.round?.id) return
+                  questionScrollByRoundRef.current.set(activeRow.round.id, questionScrollRef.current.scrollTop)
+                }}
+              >
                 {activeQuestions.length === 0 && questionSearch && (
                   <div className="gc2-empty">No matches for "{questionSearch.trim()}".</div>
                 )}
