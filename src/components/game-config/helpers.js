@@ -1,6 +1,66 @@
-import { buildPlanCatalog, normalizePlanIdsWithRoundIntros } from '../../gamePlan'
-import { CUSTOM_ROUND_TYPE } from '../../roundCatalog'
-import { cleanUrl } from '../../utils/mediaPrompt'
+import { buildPlanCatalog, normalizePlanIdsWithRoundIntros } from '../../gamePlan.js'
+import { CUSTOM_ROUND_TYPE } from '../../roundCatalog.js'
+import { cleanUrl } from '../../utils/mediaPrompt.js'
+
+const HEALTHY_DEFAULT_TARGETS = [
+  { roundNames: ['guess the language'], count: 10 },
+  { roundNames: ['slang bee'], count: 8 },
+  { roundIds: ['flags-by-image'], roundNames: ['flags by image'], count: 12 },
+  { roundIds: ['flag-trivia-descriptions'], roundNames: ['flag trivia (verbal clues)', 'flag trivia descriptions'], count: 8 },
+]
+
+function normalizeLookupKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function pickEvenly(questionIds, desiredCount) {
+  const total = Array.isArray(questionIds) ? questionIds.length : 0
+  const count = Number.parseInt(desiredCount, 10)
+  if (total <= 0 || !Number.isInteger(count) || count <= 0) return []
+  if (count >= total) return [...questionIds]
+
+  const picked = []
+  const used = new Set()
+  const denom = Math.max(count - 1, 1)
+  for (let i = 0; i < count; i += 1) {
+    let index = Math.round((i * (total - 1)) / denom)
+    while (used.has(index) && index < total - 1) index += 1
+    if (used.has(index)) {
+      index = 0
+      while (used.has(index) && index < total - 1) index += 1
+    }
+    used.add(index)
+    picked.push(questionIds[index])
+  }
+  return picked
+}
+
+export function buildHealthyDefaultSelection(catalogRounds) {
+  if (!Array.isArray(catalogRounds) || catalogRounds.length === 0) return new Set()
+  const planCatalog = buildPlanCatalog(catalogRounds)
+  const rows = catalogRounds.map((round, roundIndex) => ({
+    round,
+    questionIds: planCatalog.questionIdsByRoundIndex.get(roundIndex) || [],
+  }))
+
+  const selected = new Set()
+  for (const target of HEALTHY_DEFAULT_TARGETS) {
+    const targetIds = new Set((target.roundIds || []).map(normalizeLookupKey))
+    const targetNames = new Set((target.roundNames || []).map(normalizeLookupKey))
+    const row = rows.find(({ round }) => {
+      const roundIdKey = normalizeLookupKey(round?.id)
+      const roundNameKey = normalizeLookupKey(round?.name)
+      return targetIds.has(roundIdKey) || targetNames.has(roundNameKey)
+    })
+    if (!row) continue
+    pickEvenly(row.questionIds, target.count).forEach((id) => selected.add(id))
+  }
+
+  return selected
+}
 
 export function cloneJson(value) {
   return JSON.parse(JSON.stringify(value))
