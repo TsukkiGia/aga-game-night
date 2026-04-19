@@ -22,7 +22,7 @@ export default function QuestionView({
   rounds, roundIndex, questionIndex, doneQuestions,
   teams, streaks, buzzWinner, armed,
   onAdjust, onArm, onDismiss,
-  stealMode, onWrongAndSteal, onManualBuzz,
+  stealMode, onWrongAndSteal,
   onMarkDone, onNavigate, onBack, onNext, onPrev,
   onHalftime, onWinner, onShowReactionLeaderboard, doublePoints, onToggleDouble, timerControlSignal, onTimerExpired,
   buzzerUrl = '',
@@ -142,7 +142,6 @@ export default function QuestionView({
           <div
             key={i}
             className={`qv-team-strip color-${team.color}${buzzWinner?.teamIndex === i ? ' qv-buzzed' : ''}${activePair?.has(i) ? ' qv-active' : ''}`}
-            onClick={() => !buzzWinner && onManualBuzz(i)}
             style={{ cursor: buzzWinner ? 'default' : 'pointer' }}
           >
             <div className="qv-strip-info">

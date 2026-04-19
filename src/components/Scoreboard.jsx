@@ -195,7 +195,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
     roundCatalog,
   }), [normalizedPlanIds, roundCatalog])
 
-  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleManualBuzz, handleRearm, syncHostQuestion, timerControlSignal, invalidateAuth } = useGameSocket(
+  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleRearm, syncHostQuestion, timerControlSignal, invalidateAuth } = useGameSocket(
     initialTeams,
     { onBuzzAttempt: handleBuzzAttemptForLeaderboard, onStateSync: handleRuntimeSync, setupPayload }
   )
@@ -426,7 +426,6 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
           onTimerExpired={() => socket.emit('host:timer:expired')}
           stealMode={stealMode}
           onWrongAndSteal={(allowedTeamIndices) => handleWrongAndSteal(allowedTeamIndices)}
-          onManualBuzz={(i) => handleManualBuzz(i, teams)}
           onMarkDone={() => { clearDoublePoints(); markDone(activeItem.id) }}
           onNavigate={navigateWithReset}
           onBack={goBack}

@@ -246,13 +246,6 @@ export function useGameSocket(initialTeams, options = {}) {
     })
   }
 
-  function handleManualBuzz(teamIndex, teams) {
-    socket.emit('host:reset', () => {
-      setBuzzWinner({ team: teams[teamIndex], teamIndex, memberName: null, manual: true })
-      setStealMode(false)
-    })
-  }
-
   function handleDismiss() {
     socket.emit('host:reset', (result) => {
       if (result?.ok) setStealMode(false)
@@ -317,7 +310,6 @@ export function useGameSocket(initialTeams, options = {}) {
     handleArm,
     handleDismiss,
     handleWrongAndSteal,
-    handleManualBuzz,
     handleRearm,
     syncHostQuestion,
     timerControlSignal,
