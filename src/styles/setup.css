@@ -141,7 +141,20 @@
   box-shadow: 0 8px 24px rgba(201,75,44,0.15);
 }
 
+.count-btn.selected {
+  border-color: var(--terra);
+  background: var(--terra-bg);
+  box-shadow: 0 0 0 3px rgba(201,75,44,0.18);
+}
+
 .count-btn:active { transform: translateY(0); }
+
+.setup-divider {
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 28px 0 24px;
+}
 
 .count-number {
   font-size: 32px;
