@@ -298,5 +298,19 @@ export default {
       countries: ['Nigeria'],
       explanation: 'Ijaw refers to a cluster of related languages spoken by Ijaw communities across the Niger Delta in southern Nigeria. It is central to the linguistic and cultural identity of many riverine communities in Bayelsa, Delta, and Rivers states.',
     },
+    {
+      id: 'gtl-kpelle',
+      video: 'https://www.youtube.com/watch?v=hBj6yg-fCgk',
+      answer: 'Kpelle',
+      countries: ['Liberia', 'Guinea'],
+      explanation: 'Kpelle is a Mande language spoken mainly in central and northern Liberia and neighboring southeastern Guinea. It is one of Liberia\'s largest indigenous languages and a key part of Kpelle cultural identity.',
+    },
+    {
+      id: 'gtl-koloqua',
+      video: 'https://www.youtube.com/watch?v=3Y434an_HmY',
+      answer: 'Koloqua',
+      countries: ['Liberia'],
+      explanation: 'Koloqua (also called Liberian Kolokwa) is an English-lexifier creole widely spoken in Liberia, especially in urban settings like Monrovia. It blends English vocabulary with local linguistic structures and is a major everyday lingua franca.',
+    },
   ],
 }

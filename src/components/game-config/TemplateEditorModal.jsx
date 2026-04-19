@@ -199,7 +199,13 @@ export default function TemplateEditorModal({
                         <select
                           className="team-name-input game-config-field game-config-select"
                           value={row.phase}
-                          onChange={(e) => setNewTemplateScoring((prev) => prev.map((item, i) => i === idx ? { ...item, phase: e.target.value } : item))}
+                          onChange={(e) => setNewTemplateScoring((prev) => {
+                            const newPhase = e.target.value
+                            const moved = { ...prev[idx], phase: newPhase }
+                            const rest = prev.filter((_, i) => i !== idx)
+                            const insertAt = rest.reduce((last, item, i) => item.phase === newPhase ? i + 1 : last, 0)
+                            return [...rest.slice(0, insertAt), moved, ...rest.slice(insertAt)]
+                          })}
                         >
                           <option value="normal">Normal</option>
                           <option value="steal">Steal</option>
@@ -216,7 +222,10 @@ export default function TemplateEditorModal({
                   <button
                     type="button"
                     className="game-config-add-row-btn"
-                    onClick={() => setNewTemplateScoring((prev) => [...prev, { label: '', points: 0, phase: 'normal' }])}
+                    onClick={() => setNewTemplateScoring((prev) => {
+                      const next = [...prev, { label: '', points: 0, phase: 'normal' }]
+                      return next.sort((a, b) => a.phase === b.phase ? 0 : a.phase === 'normal' ? -1 : 1)
+                    })}
                   >
                     + Score Row
                   </button>
