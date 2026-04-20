@@ -169,7 +169,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
     try {
       const auth = await authenticateHostRequest(
         req.header('x-session-code') || req.query?.sessionCode,
-        req.header('x-host-pin') || req.query?.pin
+        req.header('x-host-pin')
       )
       if (!auth.ok) return res.status(401).json({ error: auth.error })
 
@@ -292,6 +292,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
       ALLOWED_SOUND_KEYS,
       getSoundResultTimeoutMs,
       bcrypt,
+      removeFromMembers,
       broadcastMembers: broadcastSessionMembers,
     })
 

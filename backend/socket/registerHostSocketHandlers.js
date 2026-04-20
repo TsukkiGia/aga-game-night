@@ -33,6 +33,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     ALLOWED_SOUND_KEYS,
     getSoundResultTimeoutMs,
     bcrypt,
+    removeFromMembers,
     broadcastMembers,
   } = ctx
 
@@ -45,6 +46,30 @@ export function registerHostSocketHandlers(socket, ctx) {
     targetSocket.data.isHost = false
     targetSocket.data.hostRole = null
     targetSocket.data.sessionCode = undefined
+  }
+
+  function clearMemberIdentity(targetSocket) {
+    const code = String(targetSocket?.data?.sessionCode || '').trim().toUpperCase()
+    if (!code) {
+      targetSocket.data.teamIndex = undefined
+      targetSocket.data.memberName = undefined
+      return
+    }
+
+    const st = sessions.get(code)
+    targetSocket.leave(`${code}:members`)
+    const teamCount = Math.max(Number.parseInt(st?.teams?.length, 10) || 0, 8)
+    for (let i = 0; i < teamCount; i += 1) {
+      targetSocket.leave(`${code}:team-${i}`)
+    }
+
+    if (st) {
+      const changed = removeFromMembers(targetSocket.id, st)
+      if (changed) broadcastMembers(code, st)
+    }
+
+    targetSocket.data.teamIndex = undefined
+    targetSocket.data.memberName = undefined
   }
 
   function emitStateSync(targetSocket, st) {
@@ -120,6 +145,7 @@ export function registerHostSocketHandlers(socket, ctx) {
         return
       }
 
+      clearMemberIdentity(socket)
       clearHostAuthorization(socket)
       socket.data.isHost = true
       socket.data.hostRole = role
@@ -235,7 +261,14 @@ export function registerHostSocketHandlers(socket, ctx) {
     }
 
     const code = socket.data.sessionCode
-    const st = await ensureState(code)
+    let st
+    try {
+      st = await ensureState(code)
+    } catch (err) {
+      console.error('[host:runtime:update]', err)
+      respond({ ok: false, error: 'server-error' })
+      return
+    }
     if (!st) {
       respond({ ok: false, error: 'session-not-found' })
       return
@@ -307,7 +340,14 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     const code = socket.data.sessionCode
-    const st = await ensureState(code)
+    let st
+    try {
+      st = await ensureState(code)
+    } catch (err) {
+      console.error('[host:question:set]', err)
+      respond({ ok: false, error: 'server-error' })
+      return
+    }
     if (!st) {
       respond({ ok: false, error: 'session-not-found' })
       return
@@ -333,7 +373,14 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     const code = socket.data.sessionCode
-    const st = await ensureState(code)
+    let st
+    try {
+      st = await ensureState(code)
+    } catch (err) {
+      console.error('[host:question:get]', err)
+      respond({ ok: false, error: 'server-error' })
+      return
+    }
     if (!st) {
       respond({ ok: false, error: 'session-not-found' })
       return
@@ -382,7 +429,14 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     const code = socket.data.sessionCode
-    const existing = await ensureState(code)
+    let existing
+    try {
+      existing = await ensureState(code)
+    } catch (err) {
+      console.error('[host:new-game]', err)
+      respond({ ok: false, error: 'server-error' })
+      return
+    }
     if (!existing) {
       respond({ ok: false, error: 'session-not-found' })
       return
@@ -415,7 +469,14 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     const code = socket.data.sessionCode
-    const st = await ensureState(code)
+    let st
+    try {
+      st = await ensureState(code)
+    } catch (err) {
+      console.error('[host:streak]', err)
+      respond({ ok: false, error: 'server-error' })
+      return
+    }
     if (!st) {
       respond({ ok: false, error: 'session-not-found' })
       return
@@ -501,7 +562,13 @@ export function registerHostSocketHandlers(socket, ctx) {
   socket.on('host:timer:expired', async () => {
     if (!isHostController(socket)) return
     const code = socket.data.sessionCode
-    const st = await ensureState(code)
+    let st
+    try {
+      st = await ensureState(code)
+    } catch (err) {
+      console.error('[host:timer:expired]', err)
+      return
+    }
     if (!st) return
     if (isHostlessMode(st.gameplayMode)) return
     // Timer expiry should stop countdown flow, but keep current buzz winner
@@ -523,7 +590,14 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     const code = socket.data.sessionCode
-    const st = await ensureState(code)
+    let st
+    try {
+      st = await ensureState(code)
+    } catch (err) {
+      console.error('[host:arm]', err)
+      respond({ ok: false, error: 'server-error' })
+      return
+    }
     if (!st) {
       respond({ ok: false, error: 'session-not-found' })
       return
@@ -561,7 +635,14 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     const code = socket.data.sessionCode
-    const st = await ensureState(code)
+    let st
+    try {
+      st = await ensureState(code)
+    } catch (err) {
+      console.error('[host:reset]', err)
+      respond({ ok: false, error: 'server-error' })
+      return
+    }
     if (!st) {
       respond({ ok: false, error: 'session-not-found' })
       return

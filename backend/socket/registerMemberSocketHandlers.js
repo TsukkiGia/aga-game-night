@@ -65,7 +65,16 @@ export function registerMemberSocketHandlers(socket, ctx) {
       respond({ error: 'session-code-required' })
       return
     }
-    const st = (await ensureState(code)) || sessions.get(code)
+    let st = sessions.get(code)
+    if (!st) {
+      try {
+        st = await ensureState(code)
+      } catch (err) {
+        console.error('[member:get-teams]', err)
+        respond({ error: 'server-error' })
+        return
+      }
+    }
     if (!st) {
       respond({ error: 'session-not-found' })
       return
@@ -89,7 +98,20 @@ export function registerMemberSocketHandlers(socket, ctx) {
       respond({ error: 'name-required' })
       return
     }
-    const st = (await ensureState(code)) || sessions.get(code)
+    if (socket.data?.isHost === true) {
+      respond({ error: 'unauthorized' })
+      return
+    }
+    let st = sessions.get(code)
+    if (!st) {
+      try {
+        st = await ensureState(code)
+      } catch (err) {
+        console.error('[member:join]', err)
+        respond({ error: 'server-error' })
+        return
+      }
+    }
     if (!st) {
       respond({ error: 'session-not-found' })
       return
@@ -140,6 +162,7 @@ export function registerMemberSocketHandlers(socket, ctx) {
   // ── Member: buzz ────────────────────────────────────────────────────
   socket.on('member:buzz', () => {
     const REACTION_CAPTURE_WINDOW_MS = 15_000
+    if (socket.data?.isHost === true) return
     const code = socket.data.sessionCode
     if (!code) return
     const st = sessions.get(code)
@@ -200,12 +223,25 @@ export function registerMemberSocketHandlers(socket, ctx) {
   // ── Member: host-less answer submit ──────────────────────────────────
   socket.on('member:answer:submit', async (payload, callback) => {
     const respond = typeof callback === 'function' ? callback : () => {}
+    if (socket.data?.isHost === true) {
+      respond({ ok: false, error: 'unauthorized' })
+      return
+    }
     const code = socket.data.sessionCode
     if (!code) {
       respond({ ok: false, error: 'unauthorized' })
       return
     }
-    const st = sessions.get(code) || await ensureState(code)
+    let st = sessions.get(code)
+    if (!st) {
+      try {
+        st = await ensureState(code)
+      } catch (err) {
+        console.error('[member:answer:submit]', err)
+        respond({ ok: false, error: 'server-error' })
+        return
+      }
+    }
     if (!st) {
       respond({ ok: false, error: 'unauthorized' })
       return

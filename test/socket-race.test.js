@@ -358,9 +358,9 @@ function connectSocket(baseUrl) {
   return once(socket, 'connect').then(() => socket)
 }
 
-async function createHarness() {
-  const fakeQuery = createFakeQuery()
-  const server = createBuzzServer({ queryFn: fakeQuery })
+async function createHarness({ queryFn } = {}) {
+  const effectiveQueryFn = typeof queryFn === 'function' ? queryFn : createFakeQuery()
+  const server = createBuzzServer({ queryFn: effectiveQueryFn })
   const address = await server.start(0, '127.0.0.1')
   const baseUrl = `http://127.0.0.1:${address.port}`
   const sockets = []
@@ -456,6 +456,11 @@ test('template endpoints require host credentials and return created templates',
     const listed = await listRes.json()
     assert.ok(Array.isArray(listed.templates))
     assert.ok(listed.templates.some((template) => template.id === created.template.id))
+
+    const leakedQueryCreds = await fetch(
+      `${harness.baseUrl}/api/round-templates?sessionCode=${sessionCode}&pin=${pin}`
+    )
+    assert.equal(leakedQueryCreds.status, 401)
 
     const wrongPinRes = await fetch(`${harness.baseUrl}/api/round-templates`, {
       headers: {
@@ -865,6 +870,38 @@ test('member:join requires a non-empty name', async () => {
   }
 })
 
+test('authenticated host socket cannot pivot sessions through member:join', async () => {
+  const harness = await createHarness()
+  try {
+    const hostA = await harness.connect()
+    const hostB = await harness.connect()
+    const sessionA = await harness.createSession('pin-a')
+    const sessionB = await harness.createSession('pin-b')
+
+    await authHost(hostA, sessionA.sessionCode, sessionA.pin)
+    await emitAck(hostA, 'host:setup', TEAMS)
+    await authHost(hostB, sessionB.sessionCode, sessionB.pin)
+    await emitAck(hostB, 'host:setup', [
+      { name: 'Blue', color: 'navy' },
+      { name: 'Green', color: 'lime' },
+    ])
+
+    const joinAttempt = await emitAck(hostA, 'member:join', sessionB.sessionCode, 0, 'Mallory')
+    assert.equal(joinAttempt.error, 'unauthorized')
+
+    const newGame = await emitAck(hostA, 'host:new-game')
+    assert.equal(newGame.ok, true)
+
+    const stateA = harness.getState(sessionA.sessionCode)
+    const stateB = harness.getState(sessionB.sessionCode)
+    assert.deepEqual(stateA.teams, [])
+    assert.equal(stateB.teams.length, 2)
+    assert.equal(stateB.teams[0].name, 'Blue')
+  } finally {
+    await harness.close()
+  }
+})
+
 test('late join sync carries eligibility metadata', async () => {
   const harness = await createHarness()
   try {
@@ -1053,6 +1090,37 @@ test('host question cursor sync requires auth and broadcasts updates', async () 
     const getResult = await emitAck(other, 'host:question:get')
     assert.equal(getResult.ok, true)
     assert.deepEqual(getResult.activeQuestion, [1, 2])
+  } finally {
+    await harness.close()
+  }
+})
+
+test('state hydration errors return server-error acks instead of throwing', async () => {
+  const baseQuery = createFakeQuery()
+  const queryFn = async (text, params = []) => {
+    if (text.includes('FROM sessions s') && text.includes('LEFT JOIN game_state gs')) {
+      throw new Error('db-read-failed')
+    }
+    return baseQuery(text, params)
+  }
+  const harness = await createHarness({ queryFn })
+  try {
+    const host = await harness.connect()
+    const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+
+    const hostGet = await emitAck(host, 'host:question:get')
+    assert.equal(hostGet.ok, false)
+    assert.equal(hostGet.error, 'server-error')
+
+    const hostArm = await emitAck(host, 'host:arm')
+    assert.equal(hostArm.ok, false)
+    assert.equal(hostArm.error, 'server-error')
+
+    const memberTeams = await emitAck(member, 'member:get-teams', sessionCode)
+    assert.equal(memberTeams.error, 'server-error')
   } finally {
     await harness.close()
   }
