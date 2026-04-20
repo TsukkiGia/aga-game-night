@@ -6,6 +6,7 @@ export const SESSION_CODE_KEY    = 'scorekeeping_session_code'
 export const ACTIVE_QUESTION_KEY = 'scorekeeping_active_question'
 export const GAME_PLAN_KEY       = 'scorekeeping_game_plan'
 export const ROUND_CATALOG_KEY   = 'scorekeeping_round_catalog'
+export const GAMEPLAY_MODE_KEY   = 'scorekeeping_gameplay_mode'
 export const PLAN_CONFIG_PENDING_KEY = 'scorekeeping_plan_config_pending'
 export const PLAN_PREVIEW_PENDING_KEY = 'scorekeeping_plan_preview_pending'
 export const COMPANION_SETUP_PENDING_KEY = 'scorekeeping_companion_setup_pending'
@@ -164,6 +165,7 @@ export function clearAll() {
   removeStorageItem(DONE_KEY)
   removeStorageItem(GAME_PLAN_KEY)
   removeStorageItem(ROUND_CATALOG_KEY)
+  removeStorageItem(GAMEPLAY_MODE_KEY)
   removeStorageItem(PLAN_CONFIG_PENDING_KEY)
   removeStorageItem(PLAN_PREVIEW_PENDING_KEY)
   removeStorageItem(COMPANION_SETUP_PENDING_KEY)

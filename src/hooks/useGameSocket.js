@@ -3,11 +3,15 @@ import { socket } from '../socket'
 import { playBuzzIn, playArm, playSoundBiteByKey, unlockAudio } from '../sounds'
 import { mapHostAuthError } from '../auth'
 import { clearHostCredentials, readHostCredentials, writeHostCredentials } from '../storage'
+import { normalizeGameplayMode } from '../gameplayMode'
 
 export function useGameSocket(initialTeams, options = {}) {
   const onBuzzWinner = typeof options.onBuzzWinner === 'function' ? options.onBuzzWinner : null
   const onBuzzAttempt = typeof options.onBuzzAttempt === 'function' ? options.onBuzzAttempt : null
   const onStateSync = typeof options.onStateSync === 'function' ? options.onStateSync : null
+  const onAnswerAttempt = typeof options.onAnswerAttempt === 'function' ? options.onAnswerAttempt : null
+  const onAnswerCorrect = typeof options.onAnswerCorrect === 'function' ? options.onAnswerCorrect : null
+  const onAnswerState = typeof options.onAnswerState === 'function' ? options.onAnswerState : null
   const setupPayload = (options.setupPayload && typeof options.setupPayload === 'object' && !Array.isArray(options.setupPayload))
     ? options.setupPayload
     : null
@@ -15,15 +19,23 @@ export function useGameSocket(initialTeams, options = {}) {
   const onBuzzWinnerRef = useRef(onBuzzWinner)
   const onBuzzAttemptRef = useRef(onBuzzAttempt)
   const onStateSyncRef = useRef(onStateSync)
+  const onAnswerAttemptRef = useRef(onAnswerAttempt)
+  const onAnswerCorrectRef = useRef(onAnswerCorrect)
+  const onAnswerStateRef = useRef(onAnswerState)
 
   useEffect(() => {
     onBuzzWinnerRef.current = onBuzzWinner
     onBuzzAttemptRef.current = onBuzzAttempt
     onStateSyncRef.current = onStateSync
+    onAnswerAttemptRef.current = onAnswerAttempt
+    onAnswerCorrectRef.current = onAnswerCorrect
+    onAnswerStateRef.current = onAnswerState
     setupPayloadRef.current = setupPayload
-  }, [onBuzzWinner, onBuzzAttempt, onStateSync, setupPayload])
+  }, [onBuzzWinner, onBuzzAttempt, onStateSync, setupPayload, onAnswerAttempt, onAnswerCorrect, onAnswerState])
   const [armed, setArmed] = useState(false)
   const [buzzWinner, setBuzzWinner] = useState(null)
+  const [gameplayMode, setGameplayMode] = useState(() => normalizeGameplayMode(setupPayload?.gameplayMode))
+  const [answerState, setAnswerState] = useState(null)
   const [members, setMembers] = useState([])
   const [stealMode, setStealMode] = useState(false)
   const [hostReady, setHostReady] = useState(false)
@@ -85,6 +97,7 @@ export function useGameSocket(initialTeams, options = {}) {
           teams: initialTeams,
           ...(Array.isArray(payload?.gamePlan) ? { gamePlan: payload.gamePlan } : {}),
           ...(Array.isArray(payload?.roundCatalog) ? { roundCatalog: payload.roundCatalog } : {}),
+          ...(payload?.gameplayMode ? { gameplayMode: payload.gameplayMode } : {}),
         }, (setupResult) => {
           if (!setupResult?.ok) {
             setHostReady(false)
@@ -130,6 +143,8 @@ export function useGameSocket(initialTeams, options = {}) {
 
     function syncState(state) {
       setArmed(Boolean(state.armed))
+      setGameplayMode(normalizeGameplayMode(state?.gameplayMode, setupPayloadRef.current?.gameplayMode))
+      setAnswerState(state?.answerState || null)
       setBuzzWinner(
         state.buzzedBy === null
           ? null
@@ -140,6 +155,7 @@ export function useGameSocket(initialTeams, options = {}) {
             }
       )
       onStateSyncRef.current?.(state)
+      if (state?.answerState) onAnswerStateRef.current?.(state.answerState)
     }
 
     function onDisconnect() {
@@ -219,6 +235,22 @@ export function useGameSocket(initialTeams, options = {}) {
       setMembers(data)
     }
 
+    function onAnswerAttemptEvent(payload) {
+      if (!payload || typeof payload !== 'object') return
+      onAnswerAttemptRef.current?.(payload)
+    }
+
+    function onAnswerCorrectEvent(payload) {
+      if (!payload || typeof payload !== 'object') return
+      onAnswerCorrectRef.current?.(payload)
+    }
+
+    function onAnswerStateEvent(payload) {
+      if (!payload || typeof payload !== 'object') return
+      setAnswerState(payload)
+      onAnswerStateRef.current?.(payload)
+    }
+
     socket.on('connect', authenticateAndSetup)
     socket.on('disconnect', onDisconnect)
     if (socket.connected) authenticateAndSetup()
@@ -229,6 +261,9 @@ export function useGameSocket(initialTeams, options = {}) {
     socket.on('buzz:reset', onBuzzReset)
     socket.on('buzz:winner', onBuzzWinnerEvent)
     socket.on('buzz:attempt', onBuzzAttemptEvent)
+    socket.on('answer:attempt', onAnswerAttemptEvent)
+    socket.on('answer:correct', onAnswerCorrectEvent)
+    socket.on('answer:state', onAnswerStateEvent)
     socket.on('host:members', onHostMembers)
     socket.on('host:sfx:play', onRemoteSound)
     socket.on('host:timer:stop', onTimerStop)
@@ -244,6 +279,9 @@ export function useGameSocket(initialTeams, options = {}) {
       socket.off('buzz:reset', onBuzzReset)
       socket.off('buzz:winner', onBuzzWinnerEvent)
       socket.off('buzz:attempt', onBuzzAttemptEvent)
+      socket.off('answer:attempt', onAnswerAttemptEvent)
+      socket.off('answer:correct', onAnswerCorrectEvent)
+      socket.off('answer:state', onAnswerStateEvent)
       socket.off('host:members', onHostMembers)
       socket.off('host:sfx:play', onRemoteSound)
       socket.off('host:timer:stop', onTimerStop)
@@ -318,6 +356,8 @@ export function useGameSocket(initialTeams, options = {}) {
   return {
     armed,
     buzzWinner,
+    gameplayMode,
+    answerState,
     members,
     stealMode,
     hostReady,

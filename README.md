@@ -10,10 +10,16 @@ Tech stack: React 19 + Vite 6 frontend, Express + Socket.IO backend, Postgres pe
 ## Current Capabilities
 
 - Team setup (1-8 teams), live score controls, round/question navigation
+- Gameplay mode selector: `Hosted` (classic buzzer) or `Host-less` (answer submission)
 - Round configuration supports base rounds plus optional community rounds
 - Session + host PIN auth
 - Buzzer join with required player name + team selection
 - First-buzz wins, lockout, steal flow, reaction-time tracking
+- Host-less answer flow:
+  - Players submit guesses instead of buzzing
+  - Wrong guesses broadcast as live toasts
+  - First correct submission locks the question and awards points
+  - `charades` and `thesis` are disabled in host-less game config
 - Runtime state persistence in Postgres (scores, question cursor, buzz state, done questions, streaks, double points)
 - Custom round template library:
   - Create/edit user-defined rounds in the host setup flow
@@ -113,9 +119,9 @@ Railway provides `PORT`; server binds to it automatically.
 ## Persistence Model
 
 Persisted in Postgres:
-- `sessions`: session code + PIN hash + status
+- `sessions`: session code + PIN hash + status + gameplay mode
 - `teams`: team metadata + score
-- `game_state`: cursor + armed flag + streaks + done questions + double points
+- `game_state`: cursor + armed flag + streaks + done questions + double points + host-less answer state
 - `buzz_state`: winner + winner member + steal eligibility indices
 
 Persisted in browser localStorage:

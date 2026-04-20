@@ -10,6 +10,7 @@ export function useRuntimePersist({
   hostReady,
   runtimeHydratedRef,
   teams,
+  gameplayMode,
   doneQuestions,
   streaks,
   doublePoints,
@@ -28,6 +29,7 @@ export function useRuntimePersist({
         score: Number.isFinite(Number(team.score)) ? Number(team.score) : 0,
       })),
       doneQuestions: [...doneQuestions],
+      gameplayMode,
       streaks: [...streaks],
       doublePoints: Boolean(doublePoints),
       gamePlan: normalizedPlanIds,
@@ -64,5 +66,5 @@ export function useRuntimePersist({
       cancelled = true
       if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [hostReady, teams, doneQuestions, streaks, doublePoints, normalizedPlanIds, roundCatalog, reactionStats, invalidateAuth]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hostReady, teams, gameplayMode, doneQuestions, streaks, doublePoints, normalizedPlanIds, roundCatalog, reactionStats, invalidateAuth]) // eslint-disable-line react-hooks/exhaustive-deps
 }

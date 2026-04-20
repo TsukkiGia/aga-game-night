@@ -1,6 +1,7 @@
 import { isCustomTemplateRound } from '../../roundCatalog'
 
 export default function RoundSidebar({
+  gameplayMode,
   activeRoundId,
   activeRoundsCount,
   roundListRef,
@@ -18,17 +19,19 @@ export default function RoundSidebar({
   function renderRoundListItem(row) {
     const isActive = activeRoundId === row.round.id
     const isCommunityCreated = isCustomTemplateRound(row.round)
+    const isSelectable = row.supportedInMode !== false
+    const itemDisabledReason = row.unsupportedReason || 'Unavailable in this gameplay mode.'
     const pct = row.questionIds.length > 0
       ? Math.round((row.selectedCount / row.questionIds.length) * 100)
       : 0
 
-    return (
+    const item = (
       <div
         key={row.round.id}
         role="button"
         tabIndex={0}
         aria-pressed={isActive}
-        className={`gc2-round-item${isActive ? ' active' : ''}`}
+        className={`gc2-round-item${isActive ? ' active' : ''}${!isSelectable ? ' disabled' : ''}`}
         style={{ '--round-color': `var(--gc2-r${(row.orderIndex % 8) + 1})` }}
         onClick={() => onSelectRound(row.round.id)}
         onKeyDown={(e) => {
@@ -46,6 +49,9 @@ export default function RoundSidebar({
           <div className="gc2-round-item-right">
             {isCommunityCreated && (
               <span className="gc2-round-item-badge">Community-created</span>
+            )}
+            {!isSelectable && (
+              <span className="gc2-round-item-badge">Hosted only</span>
             )}
             {!row.noneSelected && (
               <span className="gc2-round-item-count">{row.selectedCount} / {row.questionIds.length}</span>
@@ -86,6 +92,21 @@ export default function RoundSidebar({
         </div>
       </div>
     )
+
+    if (isSelectable) return item
+
+    return (
+      <span
+        key={`${row.round.id}-disabled`}
+        className="game-config-tooltip-trigger gc2-round-tooltip"
+        data-tooltip={itemDisabledReason}
+        role="note"
+        tabIndex={0}
+        aria-label={itemDisabledReason}
+      >
+        {item}
+      </span>
+    )
   }
 
   return (
@@ -93,6 +114,9 @@ export default function RoundSidebar({
       <div className="gc2-sidebar-head">
         <div className="gc2-sidebar-label">Step 2 · Game Plan</div>
         <h2 className="gc2-sidebar-title">Build your run of show</h2>
+        {gameplayMode === 'hostless' && (
+          <div className="gc2-mode-note">Host-less mode: charades and title translator are disabled.</div>
+        )}
         <div className="gc2-stats">
           <div className="gc2-stat">
             <span className="gc2-stat-label">Selected</span>

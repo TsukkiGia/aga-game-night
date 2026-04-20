@@ -8,6 +8,33 @@ const TEAMS = [
   { name: 'Team B', color: 'gold' },
 ]
 const HOST_PIN = 'test-pin'
+const HOSTLESS_CUSTOM_ROUND = {
+  id: 'hostless-custom',
+  type: 'custom-buzz',
+  name: 'Host-less custom',
+  intro: 'Answer by submitting',
+  rules: ['First correct answer scores'],
+  scoring: [{ label: 'Correct', points: 4, phase: 'normal' }],
+  questions: [
+    {
+      id: 'hcq-1',
+      promptType: 'text',
+      promptText: 'Capital of Ghana?',
+      answer: 'Accra',
+      explanation: 'Accra is the capital.',
+    },
+  ],
+}
+
+const HOSTLESS_CHARADES_ROUND = {
+  id: 'hostless-charades',
+  type: 'charades',
+  name: 'Host-less charades',
+  intro: '',
+  rules: ['Act it out'],
+  scoring: [{ label: 'Correct', points: 3, phase: 'normal' }],
+  questions: [{ id: 'hc-charades-1', phrase: 'Test phrase' }],
+}
 
 process.env.SFX_RESULT_TIMEOUT_MS = '300'
 
@@ -20,13 +47,25 @@ function createFakeQuery() {
 
   return async function fakeQuery(text, params = []) {
     if (text.includes('INSERT INTO sessions')) {
-      const [id, pinHash] = params
+      const [id, pinHash, gameplayMode] = params
       if (sessions.has(id)) {
         const err = new Error('duplicate key value violates unique constraint')
         err.code = '23505'
         throw err
       }
-      sessions.set(id, { pin_hash: pinHash, status: 'active' })
+      sessions.set(id, {
+        pin_hash: pinHash,
+        gameplay_mode: String(gameplayMode || 'hosted'),
+        status: 'active',
+      })
+      return { rows: [], rowCount: 1 }
+    }
+
+    if (text.includes('UPDATE sessions') && text.includes('SET gameplay_mode = $2')) {
+      const [id, gameplayMode] = params
+      const session = sessions.get(id)
+      if (!session || session.status !== 'active') return { rows: [], rowCount: 0 }
+      session.gameplay_mode = String(gameplayMode || 'hosted')
       return { rows: [], rowCount: 1 }
     }
 
@@ -75,7 +114,7 @@ function createFakeQuery() {
     }
 
     if (text.includes('INSERT INTO game_state')) {
-      const [sessionId, roundIndex, questionIndex, armed, streaksRaw, doneQuestionsRaw, hostQuestionCursorRaw, doublePoints, gamePlanRaw, roundCatalogRaw, reactionStatsRaw] = params
+      const [sessionId, roundIndex, questionIndex, armed, streaksRaw, doneQuestionsRaw, hostQuestionCursorRaw, doublePoints, gamePlanRaw, roundCatalogRaw, reactionStatsRaw, answerStateRaw] = params
       let hostQuestionCursor = hostQuestionCursorRaw
       if (typeof hostQuestionCursorRaw === 'string') {
         try { hostQuestionCursor = JSON.parse(hostQuestionCursorRaw) } catch { hostQuestionCursor = null }
@@ -88,6 +127,10 @@ function createFakeQuery() {
       if (typeof reactionStatsRaw === 'string') {
         try { reactionStats = JSON.parse(reactionStatsRaw) } catch { reactionStats = {} }
       }
+      let answerState = answerStateRaw
+      if (typeof answerStateRaw === 'string') {
+        try { answerState = JSON.parse(answerStateRaw) } catch { answerState = null }
+      }
       gameStateBySession.set(sessionId, {
         round_index: Number.parseInt(roundIndex, 10) || 0,
         question_index: questionIndex === null ? null : Number.parseInt(questionIndex, 10),
@@ -99,6 +142,9 @@ function createFakeQuery() {
         game_plan: Array.isArray(gamePlanRaw) ? [...gamePlanRaw] : [],
         round_catalog: Array.isArray(roundCatalog) ? [...roundCatalog] : [],
         reaction_stats: reactionStats && typeof reactionStats === 'object' && !Array.isArray(reactionStats) ? { ...reactionStats } : {},
+        answer_state: answerState && typeof answerState === 'object' && !Array.isArray(answerState)
+          ? { ...answerState }
+          : { questionId: null, status: 'locked', winner: null, recentAttempts: [] },
       })
       return { rows: [], rowCount: 1 }
     }
@@ -130,6 +176,7 @@ function createFakeQuery() {
         game_plan: [],
         round_catalog: [],
         reaction_stats: {},
+        answer_state: { questionId: null, status: 'locked', winner: null, recentAttempts: [] },
       }
       const bs = buzzStateBySession.get(sessionId) || {
         winner_team_index: null,
@@ -141,6 +188,7 @@ function createFakeQuery() {
         return {
           rows: [{
             session_id: sessionId,
+            s_gameplay_mode: session.gameplay_mode || 'hosted',
             gs_armed: gs.armed,
             gs_round_index: gs.round_index,
             gs_question_index: gs.question_index,
@@ -151,6 +199,7 @@ function createFakeQuery() {
             gs_round_catalog: gs.round_catalog,
             gs_reaction_stats: gs.reaction_stats,
             gs_host_question_cursor: gs.host_question_cursor,
+            gs_answer_state: gs.answer_state,
             bs_winner_team_index: bs.winner_team_index,
             bs_buzzed_member_name: bs.buzzed_member_name,
             bs_allowed_team_indices: bs.allowed_team_indices,
@@ -166,6 +215,7 @@ function createFakeQuery() {
       return {
         rows: teams.map((team) => ({
           session_id: sessionId,
+          s_gameplay_mode: session.gameplay_mode || 'hosted',
           gs_armed: gs.armed,
           gs_round_index: gs.round_index,
           gs_question_index: gs.question_index,
@@ -176,6 +226,7 @@ function createFakeQuery() {
           gs_round_catalog: gs.round_catalog,
           gs_reaction_stats: gs.reaction_stats,
           gs_host_question_cursor: gs.host_question_cursor,
+          gs_answer_state: gs.answer_state,
           bs_winner_team_index: bs.winner_team_index,
           bs_buzzed_member_name: bs.buzzed_member_name,
           bs_allowed_team_indices: bs.allowed_team_indices,
@@ -1160,6 +1211,150 @@ test('companion receives timeout when controller does not confirm playback', asy
     assert.equal(timedOut.requestId, triggerResult.requestId)
     assert.equal(timedOut.ok, false)
     assert.equal(timedOut.error, 'playback-timeout')
+  } finally {
+    await harness.close()
+  }
+})
+
+test('host-less mode accepts wrong attempts, scores first correct answer, and locks question', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const memberA = await harness.connect()
+    const memberB = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    const setupResult = await emitAck(host, 'host:setup', {
+      teams: TEAMS,
+      gameplayMode: 'hostless',
+      roundCatalog: [HOSTLESS_CUSTOM_ROUND],
+      gamePlan: ['intro:hostless-custom', 'q:hostless-custom:hcq-1'],
+    })
+    assert.equal(setupResult.ok, true)
+    await emitAck(host, 'host:question:set', 'q:hostless-custom:hcq-1')
+
+    const joinA = await emitAck(memberA, 'member:join', sessionCode, 0, 'Alice')
+    const joinB = await emitAck(memberB, 'member:join', sessionCode, 1, 'Bob')
+    assert.equal(joinA.sync.gameplayMode, 'hostless')
+    assert.equal(joinA.sync.answerState.status, 'open')
+    assert.equal(joinB.sync.gameplayMode, 'hostless')
+
+    const wrongAttemptPromise = once(host, 'answer:attempt')
+    const wrongResult = await emitAck(memberA, 'member:answer:submit', { guess: 'Kumasi' })
+    assert.equal(wrongResult.ok, true)
+    assert.equal(wrongResult.correct, false)
+    const wrongAttempt = await wrongAttemptPromise
+    assert.equal(wrongAttempt.teamIndex, 0)
+    assert.equal(wrongAttempt.memberName, 'Alice')
+    assert.equal(wrongAttempt.guess, 'Kumasi')
+
+    await wait(750)
+    const correctPromise = once(host, 'answer:correct')
+    const correctResult = await emitAck(memberA, 'member:answer:submit', { guess: 'Accra' })
+    assert.equal(correctResult.ok, true)
+    assert.equal(correctResult.correct, true)
+    assert.equal(correctResult.points, 4)
+    const correctPayload = await correctPromise
+    assert.equal(correctPayload.teamIndex, 0)
+    assert.equal(correctPayload.memberName, 'Alice')
+    assert.equal(correctPayload.points, 4)
+
+    const stateAfterCorrect = harness.getState(sessionCode)
+    assert.equal(stateAfterCorrect.teams[0].score, 4)
+    assert.equal(stateAfterCorrect.teams[1].score, 0)
+    assert.equal(stateAfterCorrect.answerState.status, 'locked')
+    assert.equal(stateAfterCorrect.answerState.winner.memberName, 'Alice')
+
+    const postLockResult = await emitAck(memberB, 'member:answer:submit', { guess: 'Accra' })
+    assert.equal(postLockResult.ok, false)
+    assert.equal(postLockResult.error, 'question-locked')
+  } finally {
+    await harness.close()
+  }
+})
+
+test('host-less mode rejects answer submissions for unsupported rounds', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    const setupResult = await emitAck(host, 'host:setup', {
+      teams: TEAMS,
+      gameplayMode: 'hostless',
+      roundCatalog: [HOSTLESS_CHARADES_ROUND],
+      gamePlan: ['intro:hostless-charades', 'q:hostless-charades:hc-charades-1'],
+    })
+    assert.equal(setupResult.ok, true)
+    await emitAck(host, 'host:question:set', 'q:hostless-charades:hc-charades-1')
+
+    const join = await emitAck(member, 'member:join', sessionCode, 0, 'Alice')
+    assert.equal(join.sync.gameplayMode, 'hostless')
+
+    const submitResult = await emitAck(member, 'member:answer:submit', { guess: 'Any guess' })
+    assert.equal(submitResult.ok, false)
+    assert.equal(submitResult.error, 'unsupported-round')
+  } finally {
+    await harness.close()
+  }
+})
+
+test('host-less mode rate-limits duplicate spam guesses per question', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    await emitAck(host, 'host:setup', {
+      teams: TEAMS,
+      gameplayMode: 'hostless',
+      roundCatalog: [HOSTLESS_CUSTOM_ROUND],
+      gamePlan: ['intro:hostless-custom', 'q:hostless-custom:hcq-1'],
+    })
+    await emitAck(host, 'host:question:set', 'q:hostless-custom:hcq-1')
+    await emitAck(member, 'member:join', sessionCode, 0, 'Alice')
+
+    const first = await emitAck(member, 'member:answer:submit', { guess: 'Tema' })
+    assert.equal(first.ok, true)
+    assert.equal(first.correct, false)
+
+    const duplicate = await emitAck(member, 'member:answer:submit', { guess: 'Tema' })
+    assert.equal(duplicate.ok, false)
+    assert.equal(duplicate.error, 'rate-limited')
+  } finally {
+    await harness.close()
+  }
+})
+
+test('host-less answer state is included in late-join member sync', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const winner = await harness.connect()
+    const lateJoiner = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    await emitAck(host, 'host:setup', {
+      teams: TEAMS,
+      gameplayMode: 'hostless',
+      roundCatalog: [HOSTLESS_CUSTOM_ROUND],
+      gamePlan: ['intro:hostless-custom', 'q:hostless-custom:hcq-1'],
+    })
+    await emitAck(host, 'host:question:set', 'q:hostless-custom:hcq-1')
+    await emitAck(winner, 'member:join', sessionCode, 0, 'Alice')
+    await emitAck(winner, 'member:answer:submit', { guess: 'Accra' })
+
+    const lateJoin = await emitAck(lateJoiner, 'member:join', sessionCode, 1, 'Bob')
+    assert.equal(lateJoin.sync.gameplayMode, 'hostless')
+    assert.equal(lateJoin.sync.answerState.status, 'locked')
+    assert.equal(lateJoin.sync.answerState.winner.memberName, 'Alice')
+    assert.equal(lateJoin.sync.answerState.winner.teamIndex, 0)
   } finally {
     await harness.close()
   }

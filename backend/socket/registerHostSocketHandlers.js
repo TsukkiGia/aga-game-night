@@ -17,6 +17,12 @@ export function registerHostSocketHandlers(socket, ctx) {
     normalizeGamePlan,
     normalizeRoundCatalog,
     normalizeReactionStats,
+    normalizeGameplayMode,
+    serializeHostSyncState,
+    resetAnswerStateForCursor,
+    resolveHostlessQuestionContext,
+    isHostlessMode,
+    hostlessSubmitGuards,
     serializeEligibilityState,
     isHostAuthorized,
     isHostController,
@@ -39,6 +45,40 @@ export function registerHostSocketHandlers(socket, ctx) {
     targetSocket.data.isHost = false
     targetSocket.data.hostRole = null
     targetSocket.data.sessionCode = undefined
+  }
+
+  function emitStateSync(targetSocket, st) {
+    targetSocket.emit('state:sync', serializeHostSyncState(st))
+  }
+
+  function broadcastAnswerState(code, st) {
+    const answerState = serializeHostSyncState(st).answerState
+    io.to(hostRoom(code)).emit('answer:state', answerState)
+    io.to(`${code}:members`).emit('answer:state', answerState)
+  }
+
+  function lockAnswerStateForHostedMode(st) {
+    const context = resolveHostlessQuestionContext(st)
+    st.answerState = {
+      questionId: context.cursorId,
+      status: 'locked',
+      winner: null,
+      recentAttempts: [],
+    }
+  }
+
+  function ensureAnswerStateForMode(st, { forceReset = false } = {}) {
+    const currentQuestionId = String(st?.answerState?.questionId || '')
+    const context = resolveHostlessQuestionContext(st)
+    const nextQuestionId = String(context.cursorId || '')
+    const questionChanged = currentQuestionId !== nextQuestionId
+    if (isHostlessMode(st?.gameplayMode)) {
+      if (forceReset || questionChanged) resetAnswerStateForCursor(st)
+      return
+    }
+    if (forceReset || questionChanged || st?.answerState?.status !== 'locked') {
+      lockAnswerStateForHostedMode(st)
+    }
   }
 
   // ── Host: authenticate ──────────────────────────────────────────────
@@ -114,11 +154,15 @@ export function registerHostSocketHandlers(socket, ctx) {
     }
     const hasIncomingGamePlan = Boolean(payloadObj && Object.hasOwn(payloadObj, 'gamePlan'))
     const hasIncomingRoundCatalog = Boolean(payloadObj && Object.hasOwn(payloadObj, 'roundCatalog'))
+    const hasIncomingGameplayMode = Boolean(payloadObj && Object.hasOwn(payloadObj, 'gameplayMode'))
     const incomingGamePlan = hasIncomingGamePlan
       ? normalizeGamePlan(payloadObj.gamePlan)
       : null
     const incomingRoundCatalog = hasIncomingRoundCatalog
       ? normalizeRoundCatalog(payloadObj.roundCatalog)
+      : null
+    const incomingGameplayMode = hasIncomingGameplayMode
+      ? normalizeGameplayMode(payloadObj.gameplayMode)
       : null
     try {
       let st = await ensureState(code)
@@ -126,6 +170,7 @@ export function registerHostSocketHandlers(socket, ctx) {
         respond({ ok: false, error: 'session-not-found' })
         return
       }
+      const previousGameplayMode = normalizeGameplayMode(st.gameplayMode)
 
       const isNewGame = JSON.stringify(normalizedTeams.map(t => t.name)) !== JSON.stringify(st.teams.map(t => t.name))
       if (isNewGame) {
@@ -138,6 +183,7 @@ export function registerHostSocketHandlers(socket, ctx) {
           gamePlan: hasIncomingGamePlan ? incomingGamePlan : normalizeGamePlan(st?.gamePlan),
           roundCatalog: hasIncomingRoundCatalog ? incomingRoundCatalog : normalizeRoundCatalog(st?.roundCatalog),
           reactionStats: {},
+          gameplayMode: hasIncomingGameplayMode ? incomingGameplayMode : normalizeGameplayMode(st?.gameplayMode),
         }
         sessions.set(code, st)
         io.to(hostRoom(code)).except(socket.id).emit('game:reset')
@@ -156,14 +202,19 @@ export function registerHostSocketHandlers(socket, ctx) {
         st.gamePlan = hasIncomingGamePlan ? incomingGamePlan : normalizeGamePlan(st.gamePlan)
         st.roundCatalog = hasIncomingRoundCatalog ? incomingRoundCatalog : normalizeRoundCatalog(st.roundCatalog)
         st.reactionStats = normalizeReactionStats(st.reactionStats)
+        st.gameplayMode = normalizeGameplayMode(st.gameplayMode)
       }
+      const gameplayModeChanged = normalizeGameplayMode(st.gameplayMode) !== previousGameplayMode
+      ensureAnswerStateForMode(st, { forceReset: isNewGame || gameplayModeChanged })
+      if (isNewGame || gameplayModeChanged) hostlessSubmitGuards.delete(code)
 
       await persistTeams(code, st.teams)
       await persistRuntimeState(code, st)
 
       debugLog(`[host:setup] ${isNewGame ? 'new game' : 'reconnect'} — teams:`, normalizedTeams.map(t => t.name).join(', '))
-      socket.emit('state:sync', st)
+      emitStateSync(socket, st)
       io.to(hostRoom(code)).emit('host:question', st.hostQuestionCursor)
+      broadcastAnswerState(code, st)
       broadcastMembers(code, st)
       respond({ ok: true })
     } catch (err) {
@@ -216,6 +267,9 @@ export function registerHostSocketHandlers(socket, ctx) {
       ? normalizeRoundCatalog(payload.roundCatalog)
       : normalizeRoundCatalog(st.roundCatalog)
     const normalizedReactionStats = normalizeReactionStats(payload.reactionStats ?? st.reactionStats)
+    const normalizedGameplayMode = Object.hasOwn(payload, 'gameplayMode')
+      ? normalizeGameplayMode(payload.gameplayMode, normalizeGameplayMode(st.gameplayMode))
+      : normalizeGameplayMode(st.gameplayMode)
 
     st.teams = normalizedTeams.map((team, index) => ({
       ...team,
@@ -227,6 +281,8 @@ export function registerHostSocketHandlers(socket, ctx) {
     st.gamePlan = normalizedGamePlan
     st.roundCatalog = normalizedRoundCatalog
     st.reactionStats = normalizedReactionStats
+    st.gameplayMode = normalizedGameplayMode
+    ensureAnswerStateForMode(st)
 
     try {
       await persistTeams(code, st.teams)
@@ -257,9 +313,12 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     st.hostQuestionCursor = cursor
+    ensureAnswerStateForMode(st, { forceReset: true })
+    hostlessSubmitGuards.delete(code)
     try {
       await persistRuntimeState(code, st)
       io.to(hostRoom(code)).emit('host:question', cursor)
+      broadcastAnswerState(code, st)
       respond({ ok: true })
     } catch (err) {
       console.error('[host:question:set]', err)
@@ -284,6 +343,8 @@ export function registerHostSocketHandlers(socket, ctx) {
       activeQuestion: st.hostQuestionCursor,
       gamePlan: normalizeGamePlan(st.gamePlan),
       roundCatalog: normalizeRoundCatalog(st.roundCatalog),
+      gameplayMode: normalizeGameplayMode(st.gameplayMode),
+      answerState: serializeHostSyncState(st).answerState,
     })
   })
 
@@ -301,6 +362,7 @@ export function registerHostSocketHandlers(socket, ctx) {
         respond({ ok: false, error: 'session-not-found' })
         return
       }
+      hostlessSubmitGuards.delete(code)
       sessions.delete(code)
       const hostSockets = await io.in(hostRoom(code)).fetchSockets()
       io.to(hostRoom(code)).emit('game:reset')
@@ -325,7 +387,10 @@ export function registerHostSocketHandlers(socket, ctx) {
       respond({ ok: false, error: 'session-not-found' })
       return
     }
-    sessions.set(code, initialState())
+    const nextState = initialState()
+    nextState.gameplayMode = normalizeGameplayMode(existing.gameplayMode)
+    sessions.set(code, nextState)
+    hostlessSubmitGuards.delete(code)
     const st = sessions.get(code)
     try {
       await persistTeams(code, st.teams)
@@ -334,7 +399,8 @@ export function registerHostSocketHandlers(socket, ctx) {
       io.to(`${code}:members`).emit('game:reset')
       io.to(hostRoom(code)).emit('host:question', st.hostQuestionCursor)
       broadcastMembers(code, st)
-      socket.emit('state:sync', st)
+      emitStateSync(socket, st)
+      broadcastAnswerState(code, st)
       respond({ ok: true })
     } catch (err) {
       console.error('[host:new-game]', err)
@@ -437,6 +503,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     const code = socket.data.sessionCode
     const st = await ensureState(code)
     if (!st) return
+    if (isHostlessMode(st.gameplayMode)) return
     // Timer expiry should stop countdown flow, but keep current buzz winner
     // visible until the host explicitly scores/resets.
     st.armed = false
@@ -459,6 +526,10 @@ export function registerHostSocketHandlers(socket, ctx) {
     const st = await ensureState(code)
     if (!st) {
       respond({ ok: false, error: 'session-not-found' })
+      return
+    }
+    if (isHostlessMode(st.gameplayMode)) {
+      respond({ ok: false, error: 'unsupported-mode' })
       return
     }
     const allowedIndices = normalizeAllowedTeamIndices(options.allowedTeamIndices, st.teams.length)
@@ -496,6 +567,19 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     debugLog('[host:reset]')
+    if (isHostlessMode(st.gameplayMode)) {
+      ensureAnswerStateForMode(st, { forceReset: true })
+      hostlessSubmitGuards.delete(code)
+      broadcastAnswerState(code, st)
+      try {
+        await persistRuntimeState(code, st)
+        respond({ ok: true })
+      } catch (err) {
+        console.error('[host:reset]', err)
+        respond({ ok: false, error: 'server-error' })
+      }
+      return
+    }
     st.armed = false
     st.armedAtMs = null
     st.lastArmAtMs = null

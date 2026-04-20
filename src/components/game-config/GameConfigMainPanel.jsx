@@ -33,8 +33,11 @@ export default function GameConfigMainPanel({
   activeQuestions,
   onToggleQuestion,
   onOpenRoundPreview,
+  activeRoundSelectable = true,
+  activeRoundDisabledReason = '',
 }) {
   const editDisabledReason = 'Only custom Buzz rounds can be edited. Built-in rounds support question selection only.'
+  const selectionDisabledReason = activeRoundDisabledReason || 'Selection is disabled for this round in the active gameplay mode.'
 
   return (
     <main className="gc2-main">
@@ -79,12 +82,37 @@ export default function GameConfigMainPanel({
                 onClick={() => onViewModeChange('list')}
               >List</button>
             </div>
-            <button type="button" className="gc2-toolbar-btn" onClick={onSelectAllActive}>
-              Select all
-            </button>
-            <button type="button" className="gc2-toolbar-btn" onClick={onClearActive}>
-              Clear
-            </button>
+            {activeRoundSelectable ? (
+              <>
+                <button type="button" className="gc2-toolbar-btn" onClick={onSelectAllActive}>
+                  Select all
+                </button>
+                <button type="button" className="gc2-toolbar-btn" onClick={onClearActive}>
+                  Clear
+                </button>
+              </>
+            ) : (
+              <>
+                <span
+                  className="game-config-tooltip-trigger gc2-disabled-tooltip"
+                  data-tooltip={selectionDisabledReason}
+                  tabIndex={0}
+                  role="note"
+                  aria-label={selectionDisabledReason}
+                >
+                  <button type="button" className="gc2-toolbar-btn" disabled>Select all</button>
+                </span>
+                <span
+                  className="game-config-tooltip-trigger gc2-disabled-tooltip"
+                  data-tooltip={selectionDisabledReason}
+                  tabIndex={0}
+                  role="note"
+                  aria-label={selectionDisabledReason}
+                >
+                  <button type="button" className="gc2-toolbar-btn" disabled>Clear</button>
+                </span>
+              </>
+            )}
             {canEditActiveRound ? (
               <button
                 type="button"
@@ -135,8 +163,9 @@ export default function GameConfigMainPanel({
                       key={questionId || `${activeRow.round.id}-q${questionIndex + 1}`}
                       type="button"
                       aria-pressed={selected}
-                      className={`gc2-list-row${selected ? ' selected' : ''}`}
-                      onClick={() => { if (questionId) onToggleQuestion(questionId) }}
+                      aria-disabled={!activeRoundSelectable}
+                      className={`gc2-list-row${selected ? ' selected' : ''}${!activeRoundSelectable ? ' disabled' : ''}`}
+                      onClick={() => { if (questionId && activeRoundSelectable) onToggleQuestion(questionId) }}
                     >
                       <span className={`gc2-list-sel${selected ? ' selected' : ''}`}>
                         {selected ? '✓' : ''}
@@ -170,8 +199,9 @@ export default function GameConfigMainPanel({
                       key={questionId || `${activeRow.round.id}-q${questionIndex + 1}`}
                       type="button"
                       aria-pressed={selected}
-                      className={`gc2-q-card${selected ? ' selected' : ''}`}
-                      onClick={() => { if (questionId) onToggleQuestion(questionId) }}
+                      aria-disabled={!activeRoundSelectable}
+                      className={`gc2-q-card${selected ? ' selected' : ''}${!activeRoundSelectable ? ' disabled' : ''}`}
+                      onClick={() => { if (questionId && activeRoundSelectable) onToggleQuestion(questionId) }}
                     >
                       <div className="gc2-q-label">
                         <span>Q{questionIndex + 1} · {TYPE_LABEL[activeRow.round.type] || 'Q'}</span>

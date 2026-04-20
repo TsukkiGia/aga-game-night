@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { socket } from '../socket'
 import { loadBuzzerIdentity, saveBuzzerIdentity, clearBuzzerIdentity } from '../storage'
+import { normalizeGameplayMode, isHostlessMode } from '../gameplayMode'
+import { playCorrect } from '../sounds'
 
 // status: 'loading' | 'join' | 'waiting' | 'armed' | 'i-buzzed' | 'team-buzzed' | 'locked-out'
 
 const sessionCode = new URLSearchParams(window.location.search).get('s')?.trim().toUpperCase() || ''
+const HOSTLESS_TOAST_TTL_MS = 4500
 
 function isEligibleDuringArmedState(sync, teamIndex) {
   if (!Number.isInteger(teamIndex)) return false
@@ -21,6 +24,62 @@ function deriveStatusFromSync(sync, teamIndex, memberName) {
   return 'waiting'
 }
 
+function mapSubmitError(code) {
+  if (code === 'invalid-guess') return 'Enter an answer before submitting.'
+  if (code === 'question-locked') return 'This question is locked. Wait for the next one.'
+  if (code === 'unsupported-round') return 'This round does not support host-less submissions.'
+  if (code === 'rate-limited') return 'Too fast. Wait a moment and try again.'
+  if (code === 'unauthorized') return 'You need to rejoin your team first.'
+  return 'Could not submit answer right now.'
+}
+
+function normalizeIdentity(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function describeCorrectEvent(payload, currentTeamIndex, currentMemberName) {
+  if (!payload || typeof payload !== 'object') {
+    return {
+      title: 'Correct answer',
+      body: 'A team got it right.',
+      inline: 'A team got it right',
+    }
+  }
+  const winnerName = String(payload.memberName || '').trim()
+  const winnerTeamName = String(payload.team?.name || 'a team').trim()
+  const winnerTeamIndex = Number.parseInt(payload.teamIndex, 10)
+  const myName = normalizeIdentity(currentMemberName)
+  const iAmWinner = winnerName && myName && normalizeIdentity(winnerName) === myName && winnerTeamIndex === currentTeamIndex
+  const sameTeamWinner = winnerTeamIndex === currentTeamIndex
+
+  if (iAmWinner) {
+    return {
+      title: 'Correct! You got it right',
+      body: 'You were first with the correct answer.',
+      inline: 'You got it right',
+    }
+  }
+  if (sameTeamWinner && winnerName) {
+    return {
+      title: `${winnerName} got it right`,
+      body: `${winnerName} answered correctly for ${winnerTeamName}.`,
+      inline: `${winnerName} got it right for ${winnerTeamName}`,
+    }
+  }
+  if (winnerName) {
+    return {
+      title: `${winnerName} got it right`,
+      body: `${winnerName} from ${winnerTeamName} answered correctly.`,
+      inline: `${winnerName} from ${winnerTeamName} got it right`,
+    }
+  }
+  return {
+    title: `${winnerTeamName} got it right`,
+    body: `${winnerTeamName} submitted the first correct answer.`,
+    inline: `${winnerTeamName} got it right`,
+  }
+}
+
 export default function BuzzerPage() {
   const [availableTeams, setAvailableTeams] = useState([])
   const [selectedIndex, setSelectedIndex] = useState(null)
@@ -30,8 +89,20 @@ export default function BuzzerPage() {
   const [teamIndex, setTeamIndex] = useState(null)
   const [status, setStatus] = useState(() => loadBuzzerIdentity(sessionCode) ? 'loading' : 'join')
   const [connected, setConnected] = useState(true)
+  const [gameplayMode, setGameplayMode] = useState('hosted')
+  const [answerState, setAnswerState] = useState(null)
+  const [guess, setGuess] = useState('')
+  const [submitError, setSubmitError] = useState('')
+  const [submittingGuess, setSubmittingGuess] = useState(false)
+  const [attemptToasts, setAttemptToasts] = useState([])
+  const [correctEvent, setCorrectEvent] = useState(null)
   const teamIndexRef = useRef(teamIndex)
   const nameRef = useRef(name)
+  const gameplayModeRef = useRef(gameplayMode)
+  const answerQuestionIdRef = useRef('')
+  const guessInputRef = useRef(null)
+
+  const hostlessModeActive = isHostlessMode(gameplayMode)
 
   useEffect(() => {
     teamIndexRef.current = teamIndex
@@ -40,6 +111,38 @@ export default function BuzzerPage() {
   useEffect(() => {
     nameRef.current = name
   }, [name])
+
+  useEffect(() => {
+    gameplayModeRef.current = gameplayMode
+  }, [gameplayMode])
+
+  useEffect(() => {
+    const pruneTimer = setInterval(() => {
+      const cutoff = Date.now() - HOSTLESS_TOAST_TTL_MS
+      setAttemptToasts((prev) => prev.filter((item) => item.createdAt >= cutoff))
+    }, 500)
+    return () => clearInterval(pruneTimer)
+  }, [])
+
+  function applySync(sync, fallbackTeamIndex, fallbackName) {
+    const nextMode = normalizeGameplayMode(sync?.gameplayMode)
+    setGameplayMode(nextMode)
+    if (sync?.answerState) {
+      const nextQuestionId = String(sync.answerState.questionId || '')
+      if (answerQuestionIdRef.current && answerQuestionIdRef.current !== nextQuestionId) {
+        setAttemptToasts([])
+        setCorrectEvent(null)
+        setSubmitError('')
+        setGuess('')
+      }
+      answerQuestionIdRef.current = nextQuestionId
+      setAnswerState(sync.answerState)
+      if (sync.answerState.status === 'open') setCorrectEvent(null)
+    }
+
+    if (isHostlessMode(nextMode)) return 'waiting'
+    return deriveStatusFromSync(sync, fallbackTeamIndex, fallbackName)
+  }
 
   // Effect 1: socket lifecycle
   useEffect(() => {
@@ -57,11 +160,8 @@ export default function BuzzerPage() {
 
     function onConnect() {
       setConnected(true)
-
-      // Always fetch teams for the join screen
       refreshAvailableTeams()
 
-      // Auto-rejoin from saved data on initial connect
       const saved = loadBuzzerIdentity(sessionCode)
       if (saved && teamIndexRef.current === null) {
         const savedName = String(saved.name || '').trim()
@@ -80,23 +180,35 @@ export default function BuzzerPage() {
           setTeam(res.team)
           setTeamIndex(res.teamIndex)
           setName(savedName)
-          setStatus(deriveStatusFromSync(res.sync, res.teamIndex, savedName))
+          setStatus(applySync(res.sync, res.teamIndex, savedName))
         })
       }
     }
 
-    socket.on('connect', onConnect)
-    socket.on('disconnect', () => setConnected(false))
-    socket.on('game:reset', () => {
+    function onDisconnect() {
+      setConnected(false)
+      setSubmittingGuess(false)
+    }
+
+    function onGameReset() {
       clearBuzzerIdentity(sessionCode)
       setTeam(null)
       setTeamIndex(null)
       setSelectedIndex(null)
       setAvailableTeams([])
       setStatus('join')
+      setGameplayMode('hosted')
+      setAnswerState(null)
+      setGuess('')
+      setSubmitError('')
+      setAttemptToasts([])
+      setCorrectEvent(null)
+      answerQuestionIdRef.current = ''
       refreshAvailableTeams()
-    })
-    socket.on('buzz:armed', (payload) => {
+    }
+
+    function onBuzzArmed(payload) {
+      if (gameplayModeRef.current === 'hostless') return
       const sync = (payload && typeof payload === 'object')
         ? { ...payload, armed: true, buzzedBy: null, buzzedMemberName: null }
         : { armed: true, buzzedBy: null, buzzedMemberName: null }
@@ -104,27 +216,71 @@ export default function BuzzerPage() {
         if (prev === 'join' || prev === 'loading') return prev
         return deriveStatusFromSync(sync, teamIndexRef.current, nameRef.current)
       })
-    })
-    socket.on('buzz:reset', () => setStatus(s => s === 'join' || s === 'loading' ? s : 'waiting'))
-    socket.on('buzz:winner', (data) => {
-      setStatus(prev => {
+    }
+
+    function onBuzzReset() {
+      if (gameplayModeRef.current === 'hostless') return
+      setStatus((prev) => (prev === 'join' || prev === 'loading' ? prev : 'waiting'))
+    }
+
+    function onBuzzWinner(data) {
+      if (gameplayModeRef.current === 'hostless') return
+      setStatus((prev) => {
         if (prev === 'armed' || prev === 'waiting') {
           if (data.teamIndex !== teamIndexRef.current) return 'locked-out'
           return data.memberName === nameRef.current ? 'i-buzzed' : 'team-buzzed'
         }
         return prev
       })
-    })
+    }
+
+    function onAnswerAttempt(payload) {
+      if (!payload || typeof payload !== 'object') return
+      setAttemptToasts((prev) => [...prev, { ...payload, createdAt: Date.now() }].slice(-8))
+    }
+
+    function onAnswerCorrect(payload) {
+      if (!payload || typeof payload !== 'object') return
+      setCorrectEvent(payload)
+      playCorrect()
+    }
+
+    function onAnswerState(payload) {
+      if (!payload || typeof payload !== 'object') return
+      const nextQuestionId = String(payload.questionId || '')
+      if (answerQuestionIdRef.current && answerQuestionIdRef.current !== nextQuestionId) {
+        setAttemptToasts([])
+        setCorrectEvent(null)
+        setSubmitError('')
+        setGuess('')
+      }
+      answerQuestionIdRef.current = nextQuestionId
+      setAnswerState(payload)
+      if (payload.status === 'open') setCorrectEvent(null)
+    }
+
+    socket.on('connect', onConnect)
+    socket.on('disconnect', onDisconnect)
+    socket.on('game:reset', onGameReset)
+    socket.on('buzz:armed', onBuzzArmed)
+    socket.on('buzz:reset', onBuzzReset)
+    socket.on('buzz:winner', onBuzzWinner)
+    socket.on('answer:attempt', onAnswerAttempt)
+    socket.on('answer:correct', onAnswerCorrect)
+    socket.on('answer:state', onAnswerState)
 
     if (socket.connected) onConnect()
 
     return () => {
       socket.off('connect', onConnect)
-      socket.off('disconnect')
-      socket.off('game:reset')
-      socket.off('buzz:armed')
-      socket.off('buzz:reset')
-      socket.off('buzz:winner')
+      socket.off('disconnect', onDisconnect)
+      socket.off('game:reset', onGameReset)
+      socket.off('buzz:armed', onBuzzArmed)
+      socket.off('buzz:reset', onBuzzReset)
+      socket.off('buzz:winner', onBuzzWinner)
+      socket.off('answer:attempt', onAnswerAttempt)
+      socket.off('answer:correct', onAnswerCorrect)
+      socket.off('answer:state', onAnswerState)
       socket.disconnect()
     }
   }, [])
@@ -145,10 +301,14 @@ export default function BuzzerPage() {
         return
       }
       socket.emit('member:join', sessionCode, teamIndex, memberName, (res) => {
-        if (res?.error) { clearBuzzerIdentity(sessionCode); setStatus('join'); return }
+        if (res?.error) {
+          clearBuzzerIdentity(sessionCode)
+          setStatus('join')
+          return
+        }
         if (res?.team) setTeam(res.team)
         if (res?.teamIndex !== undefined) {
-          setStatus(deriveStatusFromSync(res.sync, res.teamIndex, memberName))
+          setStatus(applySync(res.sync, res.teamIndex, memberName))
         }
       })
     }
@@ -186,13 +346,44 @@ export default function BuzzerPage() {
       saveBuzzerIdentity(res.teamIndex, memberName, sessionCode)
       setTeam(res.team)
       setTeamIndex(res.teamIndex)
-      setStatus(deriveStatusFromSync(res.sync, res.teamIndex, memberName))
+      setStatus(applySync(res.sync, res.teamIndex, memberName))
     })
   }
 
   function handleBuzz() {
     if (status !== 'armed' && status !== 'locked-out' && status !== 'team-buzzed') return
     socket.emit('member:buzz')
+  }
+
+  function handleSubmitGuess(e) {
+    e.preventDefault()
+    if (!hostlessModeActive) return
+    const trimmedGuess = guess.trim()
+    if (!trimmedGuess) {
+      setSubmitError('Enter an answer before submitting.')
+      return
+    }
+    if (answerState?.status !== 'open') {
+      setSubmitError('This question is locked. Wait for the next one.')
+      return
+    }
+
+    setSubmittingGuess(true)
+    setSubmitError('')
+    socket.emit('member:answer:submit', { guess: trimmedGuess }, (result) => {
+      setSubmittingGuess(false)
+      if (!result?.ok) {
+        setSubmitError(mapSubmitError(result?.error))
+        if (answerState?.status === 'open') {
+          requestAnimationFrame(() => guessInputRef.current?.focus())
+        }
+        return
+      }
+      setGuess('')
+      if (answerState?.status === 'open') {
+        requestAnimationFrame(() => guessInputRef.current?.focus())
+      }
+    })
   }
 
   function handleSwitchTeam() {
@@ -203,9 +394,15 @@ export default function BuzzerPage() {
     setJoinError('')
     setSelectedIndex(null)
     setStatus('join')
+    setGameplayMode('hosted')
+    setAnswerState(null)
+    setGuess('')
+    setSubmitError('')
+    setAttemptToasts([])
+    setCorrectEvent(null)
+    answerQuestionIdRef.current = ''
   }
 
-  // ── Loading screen (auto-rejoin in progress) ─────────────────
   if (status === 'loading') {
     return (
       <div className="buzzer-page">
@@ -218,7 +415,6 @@ export default function BuzzerPage() {
     )
   }
 
-  // ── Join screen ─────────────────────────────────────────────
   if (status === 'join') {
     return (
       <div className="buzzer-page">
@@ -267,7 +463,6 @@ export default function BuzzerPage() {
     )
   }
 
-  // ── Buzzer screen ────────────────────────────────────────────
   const statusConfig = {
     waiting:      { label: 'Waiting for host…',      sub: 'Hold tight — the host will arm the buzzers', pulse: false },
     armed:        { label: 'BUZZ NOW!',               sub: 'Be the first to buzz in!',                   pulse: true  },
@@ -276,6 +471,81 @@ export default function BuzzerPage() {
     'locked-out': { label: 'Locked Out',              sub: 'Another team buzzed first',                  pulse: false },
   }
   const cfg = statusConfig[status] || statusConfig.waiting
+
+  if (hostlessModeActive) {
+    const isAnswerOpen = answerState?.status === 'open'
+    const correctCopy = describeCorrectEvent(correctEvent, teamIndex, name)
+    return (
+      <div className={`buzzer-page buzzer-active color-${team.color}`}>
+        {!connected && (
+          <div className="buzzer-reconnect-banner">Reconnecting…</div>
+        )}
+        <div className="buzzer-team-header">
+          <div className={`buzzer-team-dot color-${team.color}`} />
+          <div className="buzzer-team-info">
+            <span className="buzzer-team-label">{team.name}</span>
+            {name && <span className="buzzer-member-name">{name}</span>}
+          </div>
+        </div>
+
+        <div className="buzzer-status-label">{isAnswerOpen ? 'Submit Answer' : 'Waiting for Next Question'}</div>
+        <div className="buzzer-status-sub">
+          {isAnswerOpen ? 'First correct answer scores. Wrong guesses are visible to everyone.' : 'Question is currently locked.'}
+        </div>
+
+        <form className="buzzer-hostless-form" onSubmit={handleSubmitGuess}>
+          <input
+            ref={guessInputRef}
+            className="buzzer-answer-input"
+            type="text"
+            value={guess}
+            onChange={(e) => {
+              if (submitError) setSubmitError('')
+              setGuess(e.target.value)
+            }}
+            maxLength={180}
+            placeholder={isAnswerOpen ? 'Type your answer' : 'Wait for the host to advance'}
+            disabled={!isAnswerOpen}
+            autoComplete="off"
+          />
+          <button
+            type="submit"
+            className="buzzer-answer-submit"
+            disabled={!isAnswerOpen || submittingGuess || !guess.trim()}
+          >
+            {submittingGuess ? 'Submitting…' : 'Submit'}
+          </button>
+        </form>
+
+        {submitError && <p className="session-gate-error">{submitError}</p>}
+
+        {correctEvent && (
+          <div className="buzzer-hostless-correct" role="status" aria-live="polite">
+            <strong>{correctCopy.inline}</strong>
+            {Number.isFinite(correctEvent.points) && <span>{` +${correctEvent.points} points`}</span>}
+          </div>
+        )}
+
+        <div className="buzzer-hostless-toast-stack" aria-live="polite">
+          {attemptToasts.slice(-4).map((attempt, index) => (
+            <div key={`${attempt.createdAt || 0}-${index}`} className="buzzer-hostless-toast">
+              <strong>{attempt.team?.name || 'Team'}</strong>
+              {attempt.memberName ? ` · ${attempt.memberName}` : ''}
+              {` guessed "${attempt.guess}"`}
+            </div>
+          ))}
+        </div>
+
+        <button
+          className="buzzer-switch-team-btn"
+          type="button"
+          onClick={handleSwitchTeam}
+        >
+          Switch Team
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className={`buzzer-page buzzer-active color-${team.color}`}>

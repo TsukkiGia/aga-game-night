@@ -63,6 +63,17 @@
   align-items: center;
   gap: 12px;
 }
+.home-hostless-pill {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(0,85,72,0.28);
+  background: var(--teal-bg);
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
 
 .home-start-game-btn {
   padding: 10px 24px;

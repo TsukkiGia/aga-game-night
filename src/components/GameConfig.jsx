@@ -15,6 +15,7 @@ import {
   questionPreviewHeadline,
   questionPreviewTags,
 } from './game-config/helpers'
+import { isRoundSupportedInMode, hostlessUnsupportedRoundReason } from '../gameplayMode'
 import PreviewModal from './game-config/PreviewModal'
 import TemplateEditorModal from './game-config/TemplateEditorModal'
 import BrowseTemplatesModal from './game-config/BrowseTemplatesModal'
@@ -26,6 +27,7 @@ import { useTemplateEditor } from './game-config/useTemplateEditor'
 
 export default function GameConfig({
   session,
+  gameplayMode = 'hosted',
   initialRoundCatalog,
   initialPlanIds,
   onConfirm,
@@ -100,23 +102,38 @@ export default function GameConfig({
     buildInitialSelection(initialPlanIds, initialCatalog)
   )
   const [error, setError] = useState('')
+  const effectiveSelectedQuestionIds = useMemo(() => {
+    if (!(selectedQuestionIds instanceof Set) || selectedQuestionIds.size === 0) return new Set()
+    const next = new Set()
+    selectedQuestionIds.forEach((questionId) => {
+      const item = PLAN_CATALOG.byId.get(questionId)
+      if (!item || item.type !== 'question') return
+      const round = orderedCatalog[item.roundIndex]
+      if (!round) return
+      if (!isRoundSupportedInMode(round.type, gameplayMode)) return
+      next.add(questionId)
+    })
+    return next
+  }, [selectedQuestionIds, PLAN_CATALOG, orderedCatalog, gameplayMode])
 
   const roundRows = useMemo(() => {
     return orderedCatalog.map((round, roundIndex) => {
       const questionIds = PLAN_CATALOG.questionIdsByRoundIndex.get(roundIndex) || []
-      const selectedCount = questionIds.filter((id) => selectedQuestionIds.has(id)).length
+      const selectedCount = questionIds.filter((id) => effectiveSelectedQuestionIds.has(id)).length
       return {
         round,
         roundIndex,
         orderIndex: roundIndex,
         displayIndex: roundIndex + 1,
+        supportedInMode: isRoundSupportedInMode(round.type, gameplayMode),
+        unsupportedReason: hostlessUnsupportedRoundReason(round.name),
         questionIds,
         selectedCount,
         allSelected: selectedCount === questionIds.length,
         noneSelected: selectedCount === 0,
       }
     })
-  }, [orderedCatalog, PLAN_CATALOG, selectedQuestionIds])
+  }, [orderedCatalog, PLAN_CATALOG, effectiveSelectedQuestionIds, gameplayMode])
 
   const resolvedActiveRoundId = useMemo(() => {
     if (roundRows.length === 0) return ''
@@ -202,7 +219,7 @@ export default function GameConfig({
     const search = questionSearch.trim().toLowerCase()
     return activeRow.round.questions.map((question, questionIndex) => {
       const questionId = activeRow.questionIds[questionIndex]
-      const selected = Boolean(questionId) && selectedQuestionIds.has(questionId)
+      const selected = Boolean(questionId) && effectiveSelectedQuestionIds.has(questionId)
       const headline = questionPreviewHeadline(activeRow.round, question, questionIndex)
       const tags = questionPreviewTags(activeRow.round, question)
       const answer = questionPreviewAnswer(activeRow.round, question)
@@ -210,7 +227,7 @@ export default function GameConfig({
       const searchable = [headline, answer, detail, ...tags, `q${questionIndex + 1}`].join(' ').toLowerCase()
       return { question, questionIndex, questionId, selected, headline, tags, answer, detail, searchable }
     }).filter(item => !search || item.searchable.includes(search))
-  }, [activeRow, questionSearch, selectedQuestionIds])
+  }, [activeRow, questionSearch, effectiveSelectedQuestionIds])
 
   const totalQuestions = useMemo(
     () => roundRows.reduce((sum, row) => sum + row.questionIds.length, 0),
@@ -235,7 +252,7 @@ export default function GameConfig({
     return previewRow.round.questions
       .map((question, questionIndex) => {
         const questionId = previewRow.questionIds[questionIndex]
-        const selected = Boolean(questionId) && selectedQuestionIds.has(questionId)
+        const selected = Boolean(questionId) && effectiveSelectedQuestionIds.has(questionId)
         const headline = questionPreviewHeadline(previewRow.round, question, questionIndex)
         const detail = questionPreviewDetail(previewRow.round, question)
         const tags = questionPreviewTags(previewRow.round, question)
@@ -254,7 +271,7 @@ export default function GameConfig({
         }
       })
       .filter((item) => !previewSearchNormalized || item.searchable.includes(previewSearchNormalized))
-  }, [previewRow, previewSearchNormalized, selectedQuestionIds])
+  }, [previewRow, previewSearchNormalized, effectiveSelectedQuestionIds])
 
   const previewMatchesLabel = useMemo(() => {
     if (!previewRow || !previewSearchNormalized) return ''
@@ -336,13 +353,14 @@ export default function GameConfig({
 
   function handleRoundToggle(row) {
     if (!row) return
+    if (!row.supportedInMode) return
     const { round, questionIds, allSelected } = row
     if (allSelected && roundClearConfirmId !== round.id) {
       setRoundClearConfirmId(round.id)
       return
     }
     if (allSelected) {
-      const clearedQuestionIds = questionIds.filter((id) => selectedQuestionIds.has(id))
+      const clearedQuestionIds = questionIds.filter((id) => effectiveSelectedQuestionIds.has(id))
       setSelectedQuestionIds((prev) => {
         const next = new Set(prev)
         questionIds.forEach((id) => next.delete(id))
@@ -375,6 +393,7 @@ export default function GameConfig({
 
   function handleSelectAllActive() {
     if (!activeRow) return
+    if (!activeRow.supportedInMode) return
     setSelectedQuestionIds((prev) => {
       const next = new Set(prev)
       activeRow.questionIds.forEach((id) => next.add(id))
@@ -386,6 +405,7 @@ export default function GameConfig({
 
   function handleClearActive() {
     if (!activeRow) return
+    if (!activeRow.supportedInMode) return
     setSelectedQuestionIds((prev) => {
       const next = new Set(prev)
       activeRow.questionIds.forEach((id) => next.delete(id))
@@ -456,7 +476,7 @@ export default function GameConfig({
     const payload = buildSnapshotPayloadFromSelection({
       roundRows,
       planCatalog: PLAN_CATALOG,
-      selectedQuestionIds,
+      selectedQuestionIds: effectiveSelectedQuestionIds,
     })
     if (!payload.roundCatalog.length) {
       setError('Select at least one question to continue.')
@@ -552,6 +572,7 @@ export default function GameConfig({
     <>
       <div className="gc2-wrap">
         <RoundSidebar
+          gameplayMode={gameplayMode}
           activeRoundId={resolvedActiveRoundId}
           activeRoundsCount={activeRoundsCount}
           roundListRef={roundListRef}
@@ -592,6 +613,8 @@ export default function GameConfig({
           activeQuestions={activeQuestions}
           onToggleQuestion={toggleQuestion}
           onOpenRoundPreview={openRoundPreview}
+          activeRoundSelectable={Boolean(activeRow?.supportedInMode)}
+          activeRoundDisabledReason={activeRow?.unsupportedReason || ''}
         />
       </div>
 

@@ -1127,6 +1127,44 @@
   max-width: 320px;
   margin: 0 auto;
 }
+.session-gate-mode-picker {
+  width: 100%;
+  text-align: left;
+}
+.session-gate-mode-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.session-gate-mode-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.session-gate-mode-btn {
+  border: 1.5px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+.session-gate-mode-btn:hover {
+  border-color: #b9aea0;
+  color: var(--text);
+}
+.session-gate-mode-btn.active {
+  border-color: var(--teal);
+  background: var(--teal-bg);
+  color: var(--teal);
+}
 .session-gate-input {
   width: 100%;
   text-align: center;
@@ -3340,6 +3378,17 @@
   color: var(--text);
   margin: 0 0 10px;
 }
+.gc2-mode-note {
+  margin: 0 0 10px;
+  padding: 6px 9px;
+  border-radius: 9px;
+  border: 1px solid #cddfd7;
+  background: #f1faf6;
+  color: #0f6e5a;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
 
 .gc2-stats {
   display: flex;
@@ -3402,6 +3451,9 @@
   gap: 6px;
   min-height: 0;
 }
+.gc2-round-tooltip {
+  display: block;
+}
 
 .gc2-round-item {
   width: 100%;
@@ -3429,6 +3481,9 @@
   border-color: var(--terra);
   border-width: 2px;
   box-shadow: 0 2px 10px rgba(201,75,44,0.12);
+}
+.gc2-round-item.disabled {
+  opacity: 0.64;
 }
 
 .gc2-round-item-top {
@@ -3884,6 +3939,15 @@
   background: color-mix(in srgb, var(--teal-bg, #e4f1ed) 60%, white);
   box-shadow: 0 0 0 2px rgba(0,85,72,0.12);
 }
+.gc2-q-card.disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.gc2-q-card.disabled:hover {
+  border-color: #e2d8cc;
+  box-shadow: 0 1px 3px rgba(18,14,9,0.05);
+  transform: none;
+}
 
 .gc2-q-label {
   font-size: 10px;
@@ -3969,6 +4033,13 @@
 .gc2-list-row.selected {
   border-color: var(--teal);
   background: color-mix(in srgb, var(--teal-bg, #ebf5f3) 55%, white);
+}
+.gc2-list-row.disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.gc2-list-row.disabled:hover {
+  border-color: #e2d8cc;
 }
 
 .gc2-list-sel {

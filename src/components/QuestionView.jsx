@@ -8,6 +8,8 @@ import ThesisBody from './ThesisBody'
 import CustomBuzzBody from './CustomBuzzBody'
 import JoinQrModal from './JoinQrModal'
 import QuestionSidebar from './QuestionSidebar'
+import ModalShell from './ModalShell'
+import { isHostlessMode } from '../gameplayMode'
 
 export default function QuestionView({
   planCatalog = null,
@@ -17,6 +19,11 @@ export default function QuestionView({
   stealMode, onWrongAndSteal,
   onMarkDone, onNavigate, onBack, onNext, onPrev,
   onHalftime, onWinner, onShowReactionLeaderboard, doublePoints, onToggleDouble, timerControlSignal, onTimerExpired,
+  gameplayMode = 'hosted',
+  answerState = null,
+  hostlessAttemptFeed = [],
+  hostlessCorrectEvent = null,
+  onDismissHostlessCorrect = () => {},
   buzzerUrl = '',
   isRoundIncluded = () => true,
   isQuestionIncluded = () => true,
@@ -32,6 +39,10 @@ export default function QuestionView({
   const displayQuestionNumber = getQuestionDisplayNumber(roundIndex, questionIndex)
   const isCharades = round?.type === 'charades'
   const isThesis   = round?.type === 'thesis'
+  const hostlessModeActive = isHostlessMode(gameplayMode)
+  const hostlessWinner = hostlessCorrectEvent || answerState?.winner || null
+  const showHostlessWinnerModal = Boolean(hostlessCorrectEvent)
+  const shouldPauseMedia = Boolean(buzzWinner || showHostlessWinnerModal)
   const selectedTurnIndex = Math.max(0, (Number(displayQuestionNumber) || (questionIndex + 1)) - 1)
 
   const activePair = isCharades
@@ -102,7 +113,9 @@ export default function QuestionView({
           <span className="qv-counter">Q {displayQuestionNumber} / {total}</span>
           <button className="qv-arrow" onClick={onPrev} disabled={questionIndex === 0}>‹</button>
           <button className="qv-arrow" onClick={() => { onMarkDone(); onNext() }}>›</button>
-          <button className="qv-reaction-btn" onClick={onShowReactionLeaderboard}>⏱ Question Race</button>
+          {!hostlessModeActive && (
+            <button className="qv-reaction-btn" onClick={onShowReactionLeaderboard}>⏱ Question Race</button>
+          )}
           <button className="qv-join-btn" onClick={() => setShowJoinQr(true)}>📱 Join</button>
           <button className="halftime-btn" onClick={onHalftime}>⏸ Halftime</button>
           {confirmFinish
@@ -139,20 +152,22 @@ export default function QuestionView({
       </div>
 
       {/* ── Buzz modal ───────────────────────────────── */}
-      <BuzzModal
-        buzzWinner={buzzWinner}
-        teams={teams}
-        round={round}
-        question={question}
-        stealMode={stealMode}
-        doublePoints={doublePoints}
-        stealAllowedTeamIndices={isCharades ? [...defaultStealSelection()] : null}
-        onAdjust={onAdjust}
-        onDismiss={onDismiss}
-        onWrongAndSteal={onWrongAndSteal}
-        timerControlSignal={timerControlSignal}
-        onTimerExpired={onTimerExpired}
-      />
+      {!hostlessModeActive && (
+        <BuzzModal
+          buzzWinner={buzzWinner}
+          teams={teams}
+          round={round}
+          question={question}
+          stealMode={stealMode}
+          doublePoints={doublePoints}
+          stealAllowedTeamIndices={isCharades ? [...defaultStealSelection()] : null}
+          onAdjust={onAdjust}
+          onDismiss={onDismiss}
+          onWrongAndSteal={onWrongAndSteal}
+          timerControlSignal={timerControlSignal}
+          onTimerExpired={onTimerExpired}
+        />
+      )}
 
       {/* ── Main area: sidebar + body ───────────────── */}
       <div className="qv-main">
@@ -176,9 +191,9 @@ export default function QuestionView({
 
         {/* ── Question body ── */}
         <div className="qv-body">
-          {round.type === 'video'    && <VideoBody    key={question.id} question={question} paused={!!buzzWinner} />}
+          {round.type === 'video'    && <VideoBody    key={question.id} question={question} paused={shouldPauseMedia} />}
           {round.type === 'slang'    && <SlangBody    key={question.id} question={question} />}
-          {round.type === 'custom-buzz' && <CustomBuzzBody key={question.id} question={question} paused={!!buzzWinner} />}
+          {round.type === 'custom-buzz' && <CustomBuzzBody key={question.id} question={question} paused={shouldPauseMedia} />}
           {round.type === 'charades' && (
             <div className="charades-wrap">
               <div className="charades-active-teams">
@@ -227,42 +242,108 @@ export default function QuestionView({
       </div>
 
       {/* ── Arm row ──────────────────────────────────── */}
-      <div className="qv-arm-row arm-row">
-        <button
-          className={`double-pts-btn${doublePoints ? ' active' : ''}`}
-          onClick={() => { if (!doublePoints) playPower(); onToggleDouble() }}
-          title="Double points for this question"
-        >
-          {doublePoints ? '2× ON' : '2×'}
-        </button>
-        <button
-          className={`arm-btn ${armed ? 'armed' : ''}`}
-          onClick={onArm}
-          disabled={armed || buzzWinner !== null}
-        >
-          {armed ? `🔴 Listening…${doublePoints ? ' (2×)' : ''}` : '🎯 Arm Buzzers'}
-        </button>
-        {armed && (
-          <button className="arm-cancel-btn" onClick={onDismiss}>Cancel</button>
-        )}
-        {!armed && !buzzWinner && !correctGiven && isCharades && (
+      {hostlessModeActive ? (
+        <div className="qv-hostless-row">
+          <div className="qv-hostless-state">
+            {answerState?.status === 'open' ? 'Answer submissions are open.' : 'Question locked.'}
+          </div>
+          {hostlessWinner && (
+            <div className="qv-hostless-correct">
+              <div className="qv-hostless-correct-text">
+                {hostlessWinner.memberName
+                  ? `${hostlessWinner.memberName} from ${hostlessWinner.team?.name || 'Team'} got it right`
+                  : `${hostlessWinner.team?.name || 'A team'} answered correctly`}
+                {Number.isFinite(hostlessWinner.points) ? ` • +${hostlessWinner.points}` : ''}
+              </div>
+              {hostlessCorrectEvent && (
+                <button type="button" className="qv-hostless-dismiss" onClick={onDismissHostlessCorrect}>Hide</button>
+              )}
+            </div>
+          )}
+          {hostlessAttemptFeed.length > 0 && (
+            <div className="qv-hostless-feed" aria-live="polite">
+              {hostlessAttemptFeed.slice(-4).map((attempt, index) => (
+                <div key={`${attempt.timestamp || 0}-${index}`} className="qv-hostless-attempt">
+                  <strong>{attempt.team?.name || 'Team'}</strong>
+                  {attempt.memberName ? ` · ${attempt.memberName}` : ''}
+                  {` guessed "${attempt.guess}"`}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="qv-arm-row arm-row">
           <button
-            className={`steal-open-btn${stealPickerOpen ? ' active' : ''}`}
-            onClick={() => setStealPickerOpen((open) => !open)}
+            className={`double-pts-btn${doublePoints ? ' active' : ''}`}
+            onClick={() => { if (!doublePoints) playPower(); onToggleDouble() }}
+            title="Double points for this question"
           >
-            🔀 Open Steal
+            {doublePoints ? '2× ON' : '2×'}
           </button>
-        )}
-      </div>
+          <button
+            className={`arm-btn ${armed ? 'armed' : ''}`}
+            onClick={onArm}
+            disabled={armed || buzzWinner !== null}
+          >
+            {armed ? `🔴 Listening…${doublePoints ? ' (2×)' : ''}` : '🎯 Arm Buzzers'}
+          </button>
+          {armed && (
+            <button className="arm-cancel-btn" onClick={onDismiss}>Cancel</button>
+          )}
+          {!armed && !buzzWinner && !correctGiven && isCharades && (
+            <button
+              className={`steal-open-btn${stealPickerOpen ? ' active' : ''}`}
+              onClick={() => setStealPickerOpen((open) => !open)}
+            >
+              🔀 Open Steal
+            </button>
+          )}
+        </div>
+      )}
 
       <JoinQrModal
         open={showJoinQr}
         buzzerUrl={buzzerUrl}
         onClose={() => setShowJoinQr(false)}
       />
+      {showHostlessWinnerModal && (
+        <ModalShell onClose={onDismissHostlessCorrect} dialogClassName="hostless-correct-modal">
+          <div className="help-popup-tag">Correct Answer</div>
+          <h2 className="hostless-correct-title">
+            {hostlessCorrectEvent.memberName
+              ? `${hostlessCorrectEvent.memberName} got it right`
+              : `${hostlessCorrectEvent.team?.name || 'A team'} got it right`}
+          </h2>
+          <p className="hostless-correct-sub">
+            {hostlessCorrectEvent.memberName && hostlessCorrectEvent.team?.name
+              ? `${hostlessCorrectEvent.memberName} answered correctly for ${hostlessCorrectEvent.team.name}.`
+              : 'A correct answer has been submitted.'}
+          </p>
+          {Number.isFinite(hostlessCorrectEvent.points) && (
+            <div className="hostless-correct-points">{`+${hostlessCorrectEvent.points} points awarded`}</div>
+          )}
+          <div className="hostless-correct-actions">
+            <button type="button" className="back-btn" onClick={onDismissHostlessCorrect}>
+              Close
+            </button>
+            <button
+              type="button"
+              className="start-btn hostless-correct-cta"
+              onClick={() => {
+                onDismissHostlessCorrect()
+                onMarkDone()
+                onNext()
+              }}
+            >
+              Next Question →
+            </button>
+          </div>
+        </ModalShell>
+      )}
 
       {/* ── Steal picker ─────────────────────────────── */}
-      {stealPickerOpen && !armed && !buzzWinner && (
+      {stealPickerOpen && !hostlessModeActive && !armed && !buzzWinner && (
         <div className="steal-picker">
           <div className="steal-picker-label">Teams eligible to steal:</div>
           <div className="steal-picker-teams">

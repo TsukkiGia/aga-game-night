@@ -1,8 +1,15 @@
 import { normalizeRoundCatalog } from './roundCatalog.js'
+import {
+  normalizeGameplayMode,
+  normalizeAnswerState,
+  serializeAnswerState,
+  buildInitialAnswerState,
+} from './hostlessMode.js'
 
 export function initialState() {
   return {
     teams: [],
+    gameplayMode: 'hosted',
     armed: false,
     armedAtMs: null,
     lastArmAtMs: null,
@@ -18,6 +25,7 @@ export function initialState() {
     gamePlan: [],
     roundCatalog: [],
     reactionStats: {},
+    answerState: buildInitialAnswerState(),
   }
 }
 
@@ -27,12 +35,46 @@ export function serializeEligibilityState(st) {
 
 export function serializeMemberSyncState(st) {
   return {
+    gameplayMode: normalizeGameplayMode(st?.gameplayMode),
+    answerState: serializeAnswerState(st?.answerState, st?.teams),
     armed: st.armed,
     buzzedBy: st.buzzedBy,
     buzzedMemberName: st.buzzedMemberName,
     ...serializeEligibilityState(st),
   }
 }
+
+export function serializeHostSyncState(st) {
+  const teams = Array.isArray(st?.teams) ? st.teams : []
+  const streaks = Array.isArray(st?.streaks)
+    ? st.streaks.map((value) => {
+      const parsed = Number.parseInt(value, 10)
+      return Number.isInteger(parsed) && parsed > 0 ? parsed : 0
+    })
+    : []
+  const doneQuestions = Array.isArray(st?.doneQuestions)
+    ? st.doneQuestions.map((value) => String(value || '').trim()).filter(Boolean)
+    : []
+
+  return {
+    teams,
+    gameplayMode: normalizeGameplayMode(st?.gameplayMode),
+    answerState: serializeAnswerState(st?.answerState, teams),
+    armed: Boolean(st?.armed),
+    buzzedBy: Number.isInteger(st?.buzzedBy) ? st.buzzedBy : null,
+    buzzedMemberName: st?.buzzedMemberName ? String(st.buzzedMemberName) : null,
+    ...serializeEligibilityState(st || {}),
+    hostQuestionCursor: normalizeQuestionCursor(st?.hostQuestionCursor),
+    streaks,
+    doneQuestions,
+    doublePoints: Boolean(st?.doublePoints),
+    gamePlan: normalizeGamePlan(st?.gamePlan),
+    roundCatalog: normalizeRoundCatalog(st?.roundCatalog),
+    reactionStats: normalizeReactionStats(st?.reactionStats),
+  }
+}
+
+export { normalizeGameplayMode, normalizeAnswerState, serializeAnswerState }
 
 export function normalizeQuestionCursor(rawCursor) {
   if (rawCursor === null) return null

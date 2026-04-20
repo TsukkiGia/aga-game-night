@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { readHostCredentials, writeHostCredentials, clearHostCredentials, clearAll } from '../storage'
+import { readHostCredentials, writeHostCredentials, clearHostCredentials, clearAll, GAMEPLAY_MODE_KEY, getStorageItem, setStorageItem } from '../storage'
+import { GAMEPLAY_MODE_HOSTED, GAMEPLAY_MODE_HOSTLESS, normalizeGameplayMode } from '../gameplayMode'
 
 // 'create' | 'resume'
 export default function SessionGate({ onSession }) {
   const [mode, setMode] = useState('pick')
+  const [gameplayMode, setGameplayMode] = useState(() => normalizeGameplayMode(getStorageItem(GAMEPLAY_MODE_KEY)))
 
   const [pin, setPin]           = useState('')
   const [resumeCode, setResumeCode] = useState('')
@@ -15,7 +17,7 @@ export default function SessionGate({ onSession }) {
     const saved = readHostCredentials()
     if (!saved) return
     setMode('restoring')
-    onSession(saved.sessionCode, saved.pin)
+    onSession(saved.sessionCode, saved.pin, normalizeGameplayMode(getStorageItem(GAMEPLAY_MODE_KEY)))
   }, [onSession])
 
   async function handleCreate(e) {
@@ -28,7 +30,7 @@ export default function SessionGate({ onSession }) {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: trimmed }),
+        body: JSON.stringify({ pin: trimmed, gameplayMode }),
       })
       const data = await res.json()
       if (!res.ok || !data.sessionCode) {
@@ -36,8 +38,9 @@ export default function SessionGate({ onSession }) {
         return
       }
       clearAll()
+      setStorageItem(GAMEPLAY_MODE_KEY, JSON.stringify(normalizeGameplayMode(data.gameplayMode || gameplayMode)))
       writeHostCredentials(data.sessionCode, trimmed)
-      onSession(data.sessionCode, trimmed)
+      onSession(data.sessionCode, trimmed, normalizeGameplayMode(data.gameplayMode || gameplayMode))
     } catch {
       setError('Network error. Is the server running?')
     } finally {
@@ -52,9 +55,36 @@ export default function SessionGate({ onSession }) {
     if (!code) { setError('Enter a session code'); return }
     if (!p)    { setError('Enter your PIN'); return }
     clearHostCredentials()
+    setStorageItem(GAMEPLAY_MODE_KEY, JSON.stringify(gameplayMode))
     writeHostCredentials(code, p)
     // Actual PIN verification happens in useGameSocket when host:auth fires
-    onSession(code, p)
+    onSession(code, p, gameplayMode)
+  }
+
+  function renderGameplayModeSelector() {
+    return (
+      <div className="session-gate-mode-picker">
+        <div className="session-gate-mode-label">Gameplay mode</div>
+        <div className="session-gate-mode-buttons">
+          <button
+            type="button"
+            className={`session-gate-mode-btn game-config-tooltip-trigger${gameplayMode === GAMEPLAY_MODE_HOSTED ? ' active' : ''}`}
+            onClick={() => setGameplayMode(GAMEPLAY_MODE_HOSTED)}
+            data-tooltip="Classic mode: players buzz in, the host judges answers, and controls scoring flow."
+          >
+            Hosted
+          </button>
+          <button
+            type="button"
+            className={`session-gate-mode-btn game-config-tooltip-trigger${gameplayMode === GAMEPLAY_MODE_HOSTLESS ? ' active' : ''}`}
+            onClick={() => setGameplayMode(GAMEPLAY_MODE_HOSTLESS)}
+            data-tooltip="No buzzing. Players submit answers from devices; first correct answer earns points."
+          >
+            Host-less
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -90,6 +120,7 @@ export default function SessionGate({ onSession }) {
             <h2 className="setup-heading">Create Session</h2>
             <p className="setup-sub">Choose a PIN for this session — you'll need it to reconnect</p>
             <form className="session-gate-form" onSubmit={handleCreate}>
+              {renderGameplayModeSelector()}
               <input
                 className="team-name-input session-gate-input"
                 type="password"
@@ -117,6 +148,7 @@ export default function SessionGate({ onSession }) {
             <h2 className="setup-heading">Resume Session</h2>
             <p className="setup-sub">Enter your session code and PIN</p>
             <form className="session-gate-form" onSubmit={handleResume}>
+              {renderGameplayModeSelector()}
               <input
                 className="team-name-input session-gate-input"
                 type="text"

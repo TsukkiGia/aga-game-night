@@ -14,17 +14,30 @@ import {
   initialState,
   serializeEligibilityState,
   serializeMemberSyncState,
+  serializeHostSyncState,
   normalizeQuestionCursor,
   normalizeTeams,
   normalizeAllowedTeamIndices,
   normalizeGamePlan,
   normalizeRoundCatalog,
   normalizeReactionStats,
+  normalizeGameplayMode,
 } from './backend/state/sessionState.js'
 import { createRuntimeStore } from './backend/state/runtimeStore.js'
 import { hostRoom, ctrlRoom, memberTeamRoom } from './backend/socket/rooms.js'
 import { removeFromMembers, leaveTeamRooms, broadcastMembers } from './backend/socket/memberRegistry.js'
 import { normalizeRoundTemplatePayload, roundFromTemplateRow } from './backend/state/roundCatalog.js'
+import {
+  resetAnswerStateForCursor,
+  resolveHostlessQuestionContext,
+  recordWrongAttempt,
+  lockAnswerState,
+  resolveHostlessPoints,
+  isGuessCorrect,
+  normalizeGuessForMatch,
+  isHostlessMode,
+  isHostlessRoundSupported,
+} from './backend/state/hostlessMode.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DEBUG_BUZZ = /^(1|true|yes)$/i.test(process.env.DEBUG_BUZZ || '')
@@ -67,6 +80,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
   const sessions = new Map()
   const pendingSoundResults = new Map()
   const authAttempts = new Map()
+  const hostlessSubmitGuards = new Map()
 
   async function authenticateHostRequest(sessionCodeRaw, pinRaw) {
     const sessionCode = String(sessionCodeRaw || '').trim().toUpperCase()
@@ -126,6 +140,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
   app.post('/api/sessions', async (req, res) => {
     try {
       const pin = String(req.body?.pin || '').trim()
+      const gameplayMode = normalizeGameplayMode(req.body?.gameplayMode)
       if (!pin || pin.length < 4 || pin.length > 8) {
         return res.status(400).json({ error: 'invalid-pin' })
       }
@@ -133,8 +148,8 @@ export function createBuzzServer({ queryFn = query } = {}) {
       for (let attempt = 0; attempt < 5; attempt++) {
         code = generateSessionCode()
         try {
-          await queryFn('INSERT INTO sessions (id, pin_hash) VALUES ($1, $2)', [
-            code, await bcrypt.hash(pin, 10),
+          await queryFn('INSERT INTO sessions (id, pin_hash, gameplay_mode) VALUES ($1, $2, $3)', [
+            code, await bcrypt.hash(pin, 10), gameplayMode,
           ])
           inserted = true
           break
@@ -143,7 +158,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
         }
       }
       if (!inserted) return res.status(500).json({ error: 'could-not-generate-code' })
-      res.json({ sessionCode: code })
+      res.json({ sessionCode: code, gameplayMode })
     } catch (err) {
       console.error('[POST /api/sessions]', err)
       res.status(500).json({ error: 'server-error' })
@@ -261,6 +276,12 @@ export function createBuzzServer({ queryFn = query } = {}) {
       normalizeGamePlan,
       normalizeRoundCatalog,
       normalizeReactionStats,
+      normalizeGameplayMode,
+      serializeHostSyncState,
+      resetAnswerStateForCursor,
+      resolveHostlessQuestionContext,
+      isHostlessMode,
+      hostlessSubmitGuards,
       serializeEligibilityState,
       isHostAuthorized,
       isHostController,
@@ -278,10 +299,21 @@ export function createBuzzServer({ queryFn = query } = {}) {
       io,
       sessions,
       ensureState,
+      persistTeams,
       hostRoom,
       memberTeamRoom,
+      serializeHostSyncState,
       serializeMemberSyncState,
       serializeEligibilityState,
+      resolveHostlessQuestionContext,
+      recordWrongAttempt,
+      lockAnswerState,
+      resolveHostlessPoints,
+      isGuessCorrect,
+      normalizeGuessForMatch,
+      isHostlessMode,
+      isHostlessRoundSupported,
+      hostlessSubmitGuards,
       removeFromMembers,
       leaveTeamRooms: leaveMemberTeamRooms,
       broadcastMembers: broadcastSessionMembers,

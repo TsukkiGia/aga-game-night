@@ -23,7 +23,8 @@ import { useReactionStats } from '../hooks/useReactionStats'
 import { useRuntimePersist } from '../hooks/useRuntimePersist'
 import { useSessionActions } from '../hooks/useSessionActions'
 import { clearAll } from '../storage'
-import { playGameStart } from '../sounds'
+import { playGameStart, playCorrect } from '../sounds'
+import { normalizeGameplayMode, isHostlessMode } from '../gameplayMode'
 import {
   normalizeDoneQuestionIds,
   resolveEffectivePlanForSync,
@@ -36,7 +37,16 @@ import {
 
 const DEFAULT_ROUND_CATALOG = normalizeRoundCatalog(rounds)
 
-export default function Scoreboard({ teams: initialTeams, initialPlanIds, initialRoundCatalog, onReset, onEndSession }) {
+export default function Scoreboard({
+  teams: initialTeams,
+  gameplayMode: initialGameplayMode = 'hosted',
+  onGameplayModeSync = () => {},
+  initialPlanIds,
+  initialRoundCatalog,
+  onReset,
+  onEndSession,
+}) {
+  const [gameplayMode, setGameplayMode] = useState(() => normalizeGameplayMode(initialGameplayMode))
   const [roundCatalog, setRoundCatalog] = useState(() => {
     const normalized = normalizeRoundCatalog(initialRoundCatalog)
     return normalized.length > 0 ? normalized : DEFAULT_ROUND_CATALOG
@@ -103,10 +113,17 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
   const [tiedTeams, setTiedTeams] = useState([])
   const [showHelp, setShowHelp] = useState(false)
   const [showReactionLeaderboard, setShowReactionLeaderboard] = useState(false)
+  const [hostlessAttemptFeed, setHostlessAttemptFeed] = useState([])
+  const [hostlessCorrectEvent, setHostlessCorrectEvent] = useState(null)
+  const [hostlessAnswerState, setHostlessAnswerState] = useState(null)
   const [authForm, setAuthForm] = useState({ sessionCode: '', pin: '' })
 
   const runtimeHydratedRef = useRef(false)
   const [questionSidebarScrollTop, setQuestionSidebarScrollTop] = useState(0)
+
+  useEffect(() => {
+    setGameplayMode(normalizeGameplayMode(initialGameplayMode))
+  }, [initialGameplayMode])
 
   const rememberQuestionSidebarScroll = useCallback((nextScrollTop) => {
     const parsed = Number(nextScrollTop)
@@ -126,25 +143,51 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
     hydrateStats(serverState?.reactionStats)
     const normalizedDone = normalizeDoneQuestionIds(serverState?.doneQuestions, effectivePlanCatalog)
     hydrateFromServer({ ...serverState, doneQuestions: normalizedDone, roundCatalog: effectiveRoundCatalog })
+    const syncedMode = normalizeGameplayMode(serverState?.gameplayMode, gameplayMode)
+    setGameplayMode(syncedMode)
+    onGameplayModeSync(syncedMode)
     const nextCursor = normalizeCursorId(serverState?.hostQuestionCursor, effectivePlan, effectivePlanCatalog)
     navigate(nextCursor, { silent: true })
     runtimeHydratedRef.current = true
-  }, [hydrateFromServer, hydrateStats, navigate, normalizedPlanIds, roundCatalog])
+  }, [hydrateFromServer, hydrateStats, navigate, normalizedPlanIds, roundCatalog, gameplayMode, onGameplayModeSync])
 
   const setupPayload = useMemo(() => ({
     gamePlan: normalizedPlanIds,
     roundCatalog,
-  }), [normalizedPlanIds, roundCatalog])
+    gameplayMode,
+  }), [normalizedPlanIds, roundCatalog, gameplayMode])
 
-  const { armed, buzzWinner, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleRearm, syncHostQuestion, timerControlSignal, invalidateAuth } = useGameSocket(
+  const { armed, buzzWinner, gameplayMode: socketGameplayMode, answerState, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleRearm, syncHostQuestion, timerControlSignal, invalidateAuth } = useGameSocket(
     initialTeams,
-    { onBuzzAttempt: handleBuzzAttempt, onStateSync: handleRuntimeSync, setupPayload }
+    {
+      onBuzzAttempt: handleBuzzAttempt,
+      onStateSync: handleRuntimeSync,
+      onAnswerAttempt: (payload) => {
+        setHostlessAttemptFeed((prev) => [...prev, payload].slice(-8))
+      },
+      onAnswerCorrect: (payload) => {
+        setHostlessCorrectEvent(payload)
+        playCorrect()
+      },
+      onAnswerState: setHostlessAnswerState,
+      setupPayload,
+    }
   )
+  const effectiveGameplayMode = normalizeGameplayMode(socketGameplayMode, gameplayMode)
+  const hostlessModeActive = isHostlessMode(effectiveGameplayMode)
+
+  useEffect(() => {
+    const questionId = String(answerState?.questionId || hostlessAnswerState?.questionId || '')
+    if (!questionId) return
+    setHostlessAttemptFeed([])
+    setHostlessCorrectEvent(null)
+  }, [answerState?.questionId, hostlessAnswerState?.questionId])
 
   useRuntimePersist({
     hostReady,
     runtimeHydratedRef,
     teams,
+    gameplayMode: effectiveGameplayMode,
     doneQuestions,
     streaks,
     doublePoints,
@@ -195,8 +238,15 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
   }, [showHelp])
 
   useEffect(() => {
+    if (!hostlessModeActive) return
+    setShowReactionLeaderboard(false)
+    setShowStats(false)
+  }, [hostlessModeActive, setShowStats])
+
+  useEffect(() => {
     function onKey(e) {
       if (e.key === 'Escape') { setShowReactionLeaderboard(false); return }
+      if (hostlessModeActive) return
       if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return
       const target = e.target
       const tag = target?.tagName
@@ -208,14 +258,14 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [hostlessModeActive])
 
   const buzzerUrl = `${ENDPOINT || window.location.origin}/buzz${sessionCode ? `?s=${sessionCode}` : ''}`
   const hostCompanionUrl = `${ENDPOINT || window.location.origin}/host-mobile`
 
   function dismissBuzzAndResetMultiplier() {
     clearDoublePoints()
-    handleDismiss()
+    if (!hostlessModeActive) handleDismiss()
   }
 
   function navigateToCursor(nextCursorId, options = {}) {
@@ -224,7 +274,12 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
     const nextItem = nextCursorId ? planCatalog.byId.get(nextCursorId) : null
     const nextQuestionId = nextItem?.type === 'question' ? nextItem.id : null
     if (currentQuestionId !== nextQuestionId) clearQuestionLast()
-    if (clearBuzz) { clearDoublePoints(); handleDismiss() }
+    if (clearBuzz) {
+      clearDoublePoints()
+      if (!hostlessModeActive) handleDismiss()
+    }
+    setHostlessAttemptFeed([])
+    setHostlessCorrectEvent(null)
     navigate(nextCursorId, { transitionRound, silent })
   }
 
@@ -243,6 +298,8 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
 
   function goBack() {
     dismissBuzzAndResetMultiplier()
+    setHostlessAttemptFeed([])
+    setHostlessCorrectEvent(null)
     setLaunching(false)
     navigateToCursor(null, { clearBuzz: false, silent: true })
   }
@@ -319,7 +376,9 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
           />
           {showHalftime && <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />}
           {transition && <RoundTransitionScreen round={transition} roundLabel={transitionRoundLabel} onDone={dismissTransition} />}
-          <ReactionLeaderboardModal open={showReactionLeaderboard} rows={questionRaceRows} onClose={() => setShowReactionLeaderboard(false)} />
+          {!hostlessModeActive && (
+            <ReactionLeaderboardModal open={showReactionLeaderboard} rows={questionRaceRows} onClose={() => setShowReactionLeaderboard(false)} />
+          )}
         </>
       )
     }
@@ -364,9 +423,17 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
           }}
           onHalftime={() => setShowHalftime(true)}
           onWinner={() => setShowWinner(true)}
-          onShowReactionLeaderboard={() => setShowReactionLeaderboard(true)}
+          onShowReactionLeaderboard={() => {
+            if (hostlessModeActive) return
+            setShowReactionLeaderboard(true)
+          }}
           doublePoints={doublePoints}
           onToggleDouble={() => setDoublePoints(d => !d)}
+          gameplayMode={effectiveGameplayMode}
+          answerState={answerState || hostlessAnswerState}
+          hostlessAttemptFeed={hostlessAttemptFeed}
+          hostlessCorrectEvent={hostlessCorrectEvent}
+          onDismissHostlessCorrect={() => setHostlessCorrectEvent(null)}
           isRoundIncluded={isRoundIncluded}
           isQuestionIncluded={isQuestionIncluded}
           getRoundDisplayLabel={getRoundDisplayLabel}
@@ -376,10 +443,20 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
           onRememberSidebarScroll={rememberQuestionSidebarScroll}
         />
         {showHalftime && <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />}
-        {showWinner && <WinnerScreen teams={teams} onDismiss={() => setShowWinner(false)} onClose={() => { setShowWinner(false); clearAll(); onReset() }} onTiebreaker={handleTiebreaker} onViewStats={() => setShowStats(true)} />}
-        {showStats && <StatsModal reactionStats={reactionStats} onClose={() => setShowStats(false)} />}
+        {showWinner && (
+          <WinnerScreen
+            teams={teams}
+            onDismiss={() => setShowWinner(false)}
+            onClose={() => { setShowWinner(false); clearAll(); onReset() }}
+            onTiebreaker={handleTiebreaker}
+            onViewStats={hostlessModeActive ? null : (() => setShowStats(true))}
+          />
+        )}
+        {!hostlessModeActive && showStats && <StatsModal reactionStats={reactionStats} onClose={() => setShowStats(false)} />}
         {suddenDeath && <SuddenDeathOverlay tiedTeams={tiedTeams} buzzWinner={buzzWinner} onAward={handleSuddenDeathAward} onWrong={handleSuddenDeathWrong} onCancel={handleSuddenDeathCancel} />}
-        <ReactionLeaderboardModal open={showReactionLeaderboard} rows={questionRaceRows} onClose={() => setShowReactionLeaderboard(false)} />
+        {!hostlessModeActive && (
+          <ReactionLeaderboardModal open={showReactionLeaderboard} rows={questionRaceRows} onClose={() => setShowReactionLeaderboard(false)} />
+        )}
       </>
     )
   }
@@ -427,7 +504,9 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
           </form>
         </ModalShell>
       )}
-      <ReactionLeaderboardModal open={showReactionLeaderboard} rows={questionRaceRows} onClose={() => setShowReactionLeaderboard(false)} />
+      {!hostlessModeActive && (
+        <ReactionLeaderboardModal open={showReactionLeaderboard} rows={questionRaceRows} onClose={() => setShowReactionLeaderboard(false)} />
+      )}
       {showEndSessionConfirm && (
         <ModalShell
           onClose={() => { if (!endingSession) setShowEndSessionConfirm(false) }}
@@ -463,6 +542,7 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
         buzzWinner={buzzWinner}
         onArm={handleArm}
         onDismiss={handleDismiss}
+        gameplayMode={effectiveGameplayMode}
       />
     </>
   )

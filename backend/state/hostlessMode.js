@@ -1,0 +1,416 @@
+const HOSTED_MODE = 'hosted'
+const HOSTLESS_MODE = 'hostless'
+const SUPPORTED_GAMEPLAY_MODES = new Set([HOSTED_MODE, HOSTLESS_MODE])
+const UNSUPPORTED_HOSTLESS_ROUND_TYPES = new Set(['charades', 'thesis'])
+
+const MAX_ATTEMPTS_IN_STATE = 24
+
+function normalizeText(value) {
+  return String(value || '').trim()
+}
+
+function normalizeRoundType(value) {
+  return normalizeText(value).toLowerCase()
+}
+
+function normalizeQuestionId(value) {
+  const id = normalizeText(value)
+  return id || null
+}
+
+function isQuestionCursorPair(value) {
+  return Array.isArray(value) && value.length === 2
+}
+
+function splitQuestionCursor(cursorId) {
+  const raw = normalizeText(cursorId)
+  if (!raw.startsWith('q:')) return null
+  const first = raw.indexOf(':', 2)
+  if (first < 0 || first >= raw.length - 1) return null
+  const roundId = raw.slice(2, first)
+  const questionId = raw.slice(first + 1)
+  if (!roundId || !questionId) return null
+  return { roundId, questionId }
+}
+
+function buildQuestionCursorId(roundId, questionId) {
+  const safeRoundId = normalizeText(roundId)
+  const safeQuestionId = normalizeText(questionId)
+  if (!safeRoundId || !safeQuestionId) return null
+  return `q:${safeRoundId}:${safeQuestionId}`
+}
+
+function roundAndQuestionFromPair(roundCatalog, pair) {
+  if (!isQuestionCursorPair(pair)) return null
+  const [roundIndex, questionIndex] = pair
+  if (!Number.isInteger(roundIndex) || roundIndex < 0) return null
+  const round = Array.isArray(roundCatalog) ? roundCatalog[roundIndex] : null
+  if (!round || typeof round !== 'object') return null
+
+  if (questionIndex === null) {
+    return {
+      itemType: 'round-intro',
+      round,
+      roundIndex,
+      question: null,
+      questionIndex: null,
+      questionId: null,
+      cursorId: normalizeText(round?.id) ? `intro:${normalizeText(round.id)}` : null,
+    }
+  }
+
+  if (!Number.isInteger(questionIndex) || questionIndex < 0) return null
+  const question = Array.isArray(round.questions) ? round.questions[questionIndex] : null
+  if (!question || typeof question !== 'object') return null
+  const questionId = normalizeQuestionId(question.id) || `q-${questionIndex + 1}`
+  return {
+    itemType: 'question',
+    round,
+    roundIndex,
+    question,
+    questionIndex,
+    questionId,
+    cursorId: buildQuestionCursorId(round.id, questionId),
+  }
+}
+
+function roundAndQuestionFromCursorId(roundCatalog, cursorId) {
+  const raw = normalizeText(cursorId)
+  if (!raw) return null
+
+  if (raw.startsWith('intro:')) {
+    const roundId = normalizeText(raw.slice('intro:'.length))
+    if (!roundId) return null
+    const roundIndex = Array.isArray(roundCatalog)
+      ? roundCatalog.findIndex((round) => normalizeText(round?.id) === roundId)
+      : -1
+    if (roundIndex < 0) return null
+    const round = roundCatalog[roundIndex]
+    return {
+      itemType: 'round-intro',
+      round,
+      roundIndex,
+      question: null,
+      questionIndex: null,
+      questionId: null,
+      cursorId: raw,
+    }
+  }
+
+  const parsed = splitQuestionCursor(raw)
+  if (!parsed) return null
+  const { roundId, questionId } = parsed
+  const roundIndex = Array.isArray(roundCatalog)
+    ? roundCatalog.findIndex((round) => normalizeText(round?.id) === roundId)
+    : -1
+  if (roundIndex < 0) return null
+
+  const round = roundCatalog[roundIndex]
+  const questions = Array.isArray(round?.questions) ? round.questions : []
+  const questionIndex = questions.findIndex((question) => normalizeQuestionId(question?.id) === questionId)
+  if (questionIndex < 0) return null
+
+  return {
+    itemType: 'question',
+    round,
+    roundIndex,
+    question: questions[questionIndex],
+    questionIndex,
+    questionId,
+    cursorId: raw,
+  }
+}
+
+function scoringPhase(entry) {
+  const explicit = normalizeText(entry?.phase).toLowerCase()
+  if (explicit === 'steal') return 'steal'
+  if (explicit === 'normal') return 'normal'
+  const label = normalizeText(entry?.label).toLowerCase()
+  return label.includes('steal') ? 'steal' : 'normal'
+}
+
+function hostlessExpectedAnswerForQuestion(roundType, question) {
+  if (!question || typeof question !== 'object') return ''
+  if (roundType === 'video') return normalizeText(question.answer)
+  if (roundType === 'slang') return normalizeText(question.meaning)
+  if (roundType === 'custom-buzz') return normalizeText(question.answer)
+  return ''
+}
+
+export function normalizeGameplayMode(rawMode, fallback = HOSTED_MODE) {
+  const normalized = normalizeText(rawMode).toLowerCase()
+  if (SUPPORTED_GAMEPLAY_MODES.has(normalized)) return normalized
+  return fallback
+}
+
+export function isHostlessMode(mode) {
+  return normalizeGameplayMode(mode) === HOSTLESS_MODE
+}
+
+export function isHostlessRoundSupported(roundType) {
+  const normalized = normalizeRoundType(roundType)
+  if (!normalized) return false
+  return !UNSUPPORTED_HOSTLESS_ROUND_TYPES.has(normalized)
+}
+
+export function resolveHostlessQuestionContext(st) {
+  const roundCatalog = Array.isArray(st?.roundCatalog) ? st.roundCatalog : []
+  const rawCursor = st?.hostQuestionCursor
+
+  const baseContext = isQuestionCursorPair(rawCursor)
+    ? roundAndQuestionFromPair(roundCatalog, rawCursor)
+    : roundAndQuestionFromCursorId(roundCatalog, rawCursor)
+
+  if (!baseContext) {
+    return {
+      itemType: 'none',
+      round: null,
+      roundIndex: null,
+      question: null,
+      questionIndex: null,
+      questionId: null,
+      cursorId: null,
+      roundType: '',
+      supportedRound: false,
+      expectedAnswer: '',
+      canAcceptAnswers: false,
+      unsupportedReason: 'no-question',
+    }
+  }
+
+  const roundType = normalizeRoundType(baseContext.round?.type)
+  const supportedRound = isHostlessRoundSupported(roundType)
+  const expectedAnswer = baseContext.itemType === 'question'
+    ? hostlessExpectedAnswerForQuestion(roundType, baseContext.question)
+    : ''
+
+  const canAcceptAnswers = baseContext.itemType === 'question' && supportedRound && Boolean(expectedAnswer)
+
+  let unsupportedReason = ''
+  if (baseContext.itemType !== 'question') unsupportedReason = 'no-question'
+  else if (!supportedRound) unsupportedReason = 'unsupported-round'
+  else if (!expectedAnswer) unsupportedReason = 'missing-answer'
+
+  return {
+    ...baseContext,
+    roundType,
+    supportedRound,
+    expectedAnswer,
+    canAcceptAnswers,
+    unsupportedReason,
+  }
+}
+
+function normalizeWinner(rawWinner) {
+  if (!rawWinner || typeof rawWinner !== 'object' || Array.isArray(rawWinner)) return null
+  const teamIndex = Number.parseInt(rawWinner.teamIndex, 10)
+  if (!Number.isInteger(teamIndex) || teamIndex < 0) return null
+  const points = Number.parseInt(rawWinner.points, 10)
+  const timestamp = Number.parseInt(rawWinner.timestamp, 10)
+  return {
+    teamIndex,
+    memberName: normalizeText(rawWinner.memberName).slice(0, 80) || null,
+    guess: normalizeText(rawWinner.guess).slice(0, 240) || null,
+    points: Number.isInteger(points) ? points : 0,
+    questionId: normalizeQuestionId(rawWinner.questionId),
+    timestamp: Number.isInteger(timestamp) && timestamp > 0 ? timestamp : Date.now(),
+  }
+}
+
+function normalizeAttempt(rawAttempt) {
+  if (!rawAttempt || typeof rawAttempt !== 'object' || Array.isArray(rawAttempt)) return null
+  const teamIndex = Number.parseInt(rawAttempt.teamIndex, 10)
+  if (!Number.isInteger(teamIndex) || teamIndex < 0) return null
+  const timestamp = Number.parseInt(rawAttempt.timestamp, 10)
+  return {
+    teamIndex,
+    memberName: normalizeText(rawAttempt.memberName).slice(0, 80) || null,
+    guess: normalizeText(rawAttempt.guess).slice(0, 240),
+    questionId: normalizeQuestionId(rawAttempt.questionId),
+    timestamp: Number.isInteger(timestamp) && timestamp > 0 ? timestamp : Date.now(),
+  }
+}
+
+export function buildInitialAnswerState({ questionId = null, open = false } = {}) {
+  return {
+    questionId: normalizeQuestionId(questionId),
+    status: open ? 'open' : 'locked',
+    winner: null,
+    recentAttempts: [],
+  }
+}
+
+export function normalizeAnswerState(rawState, fallbackQuestionId = null) {
+  if (!rawState || typeof rawState !== 'object' || Array.isArray(rawState)) {
+    return buildInitialAnswerState({ questionId: fallbackQuestionId, open: false })
+  }
+
+  const status = String(rawState.status || '').trim().toLowerCase() === 'open' ? 'open' : 'locked'
+  const questionId = normalizeQuestionId(rawState.questionId) || normalizeQuestionId(fallbackQuestionId)
+  const winner = normalizeWinner(rawState.winner)
+  const recentAttempts = Array.isArray(rawState.recentAttempts)
+    ? rawState.recentAttempts.map((attempt) => normalizeAttempt(attempt)).filter(Boolean).slice(-MAX_ATTEMPTS_IN_STATE)
+    : []
+
+  return {
+    questionId,
+    status,
+    winner,
+    recentAttempts,
+  }
+}
+
+export function serializeAnswerState(answerState, teams = []) {
+  const normalized = normalizeAnswerState(answerState)
+  const withTeam = (teamIndex) => {
+    if (!Number.isInteger(teamIndex) || teamIndex < 0 || !teams[teamIndex]) return null
+    return {
+      name: String(teams[teamIndex].name || ''),
+      color: String(teams[teamIndex].color || ''),
+    }
+  }
+
+  return {
+    questionId: normalized.questionId,
+    status: normalized.status,
+    open: normalized.status === 'open',
+    winner: normalized.winner
+      ? {
+          ...normalized.winner,
+          team: withTeam(normalized.winner.teamIndex),
+        }
+      : null,
+    recentAttempts: normalized.recentAttempts.map((attempt) => ({
+      ...attempt,
+      team: withTeam(attempt.teamIndex),
+    })),
+  }
+}
+
+export function resetAnswerStateForCursor(st) {
+  const context = resolveHostlessQuestionContext(st)
+  st.answerState = buildInitialAnswerState({
+    questionId: context.cursorId,
+    open: Boolean(context.canAcceptAnswers),
+  })
+  return context
+}
+
+export function lockAnswerState(st, winnerPayload) {
+  const winner = normalizeWinner(winnerPayload)
+  if (!winner) return
+  const normalized = normalizeAnswerState(st.answerState, winner.questionId)
+  st.answerState = {
+    ...normalized,
+    status: 'locked',
+    winner,
+  }
+}
+
+export function recordWrongAttempt(st, attemptPayload) {
+  const attempt = normalizeAttempt(attemptPayload)
+  if (!attempt) return
+  const normalized = normalizeAnswerState(st.answerState, attempt.questionId)
+  const recentAttempts = [...normalized.recentAttempts, attempt].slice(-MAX_ATTEMPTS_IN_STATE)
+  st.answerState = {
+    ...normalized,
+    recentAttempts,
+  }
+}
+
+export function resolveHostlessPoints(round) {
+  const scoringRows = Array.isArray(round?.scoring) ? round.scoring : []
+  for (const row of scoringRows) {
+    const points = Number.parseInt(row?.points, 10)
+    if (!Number.isInteger(points) || points <= 0) continue
+    if (scoringPhase(row) === 'steal') continue
+    return points
+  }
+  return 3
+}
+
+function collapseWhitespace(value) {
+  return normalizeText(value).replace(/\s+/g, ' ')
+}
+
+export function normalizeGuessForMatch(value) {
+  return collapseWhitespace(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function levenshteinDistance(a, b, maxAllowed = Number.POSITIVE_INFINITY) {
+  const lenA = a.length
+  const lenB = b.length
+  if (Math.abs(lenA - lenB) > maxAllowed) return maxAllowed + 1
+  const prev = new Array(lenB + 1)
+  const next = new Array(lenB + 1)
+
+  for (let j = 0; j <= lenB; j += 1) prev[j] = j
+
+  for (let i = 1; i <= lenA; i += 1) {
+    next[0] = i
+    let rowBest = next[0]
+    const charA = a.charCodeAt(i - 1)
+    for (let j = 1; j <= lenB; j += 1) {
+      const cost = charA === b.charCodeAt(j - 1) ? 0 : 1
+      const insertion = next[j - 1] + 1
+      const deletion = prev[j] + 1
+      const substitution = prev[j - 1] + cost
+      const value = Math.min(insertion, deletion, substitution)
+      next[j] = value
+      if (value < rowBest) rowBest = value
+    }
+    if (rowBest > maxAllowed) return maxAllowed + 1
+    for (let j = 0; j <= lenB; j += 1) prev[j] = next[j]
+  }
+
+  return prev[lenB]
+}
+
+function allowedEditDistance(expectedLength) {
+  if (expectedLength <= 5) return 1
+  if (expectedLength <= 12) return 2
+  if (expectedLength <= 24) return 3
+  return 4
+}
+
+function maybeSplitCandidateAnswers(expectedAnswer) {
+  const normalized = collapseWhitespace(expectedAnswer)
+  if (!normalized) return []
+  const candidates = [normalized]
+
+  if (normalized.includes(' / ')) {
+    normalized.split(' / ').map((value) => collapseWhitespace(value)).filter(Boolean).forEach((value) => candidates.push(value))
+  }
+  if (normalized.includes(' or ')) {
+    normalized.split(/\s+or\s+/i).map((value) => collapseWhitespace(value)).filter(Boolean).forEach((value) => candidates.push(value))
+  }
+
+  return [...new Set(candidates)]
+}
+
+export function isGuessCorrect(guess, expectedAnswer) {
+  const guessNorm = normalizeGuessForMatch(guess)
+  if (!guessNorm) return false
+
+  const candidates = maybeSplitCandidateAnswers(expectedAnswer)
+  for (const candidate of candidates) {
+    const expectedNorm = normalizeGuessForMatch(candidate)
+    if (!expectedNorm) continue
+    if (guessNorm === expectedNorm) return true
+
+    const maxEdits = allowedEditDistance(expectedNorm.length)
+    const distance = levenshteinDistance(guessNorm, expectedNorm, maxEdits)
+    if (distance > maxEdits) continue
+
+    const similarity = 1 - (distance / Math.max(guessNorm.length, expectedNorm.length, 1))
+    if (similarity >= 0.87) return true
+  }
+
+  return false
+}

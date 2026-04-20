@@ -3,16 +3,43 @@ export function registerMemberSocketHandlers(socket, ctx) {
     io,
     sessions,
     ensureState,
+    persistTeams,
     hostRoom,
     memberTeamRoom,
+    serializeHostSyncState,
     serializeMemberSyncState,
     serializeEligibilityState,
+    resolveHostlessQuestionContext,
+    recordWrongAttempt,
+    lockAnswerState,
+    resolveHostlessPoints,
+    isGuessCorrect,
+    normalizeGuessForMatch,
+    isHostlessMode,
+    isHostlessRoundSupported,
+    hostlessSubmitGuards,
     removeFromMembers,
     leaveTeamRooms,
     broadcastMembers,
     persistRuntimeStateInBackground,
     debugLog,
   } = ctx
+
+  const HOSTLESS_SUBMIT_COOLDOWN_MS = 700
+  const HOSTLESS_MAX_GUESS_LENGTH = 180
+
+  function ensureHostlessSubmitGuard(code, questionId) {
+    const normalizedQuestionId = String(questionId || '').trim()
+    const existing = hostlessSubmitGuards.get(code)
+    if (existing && existing.questionId === normalizedQuestionId) return existing
+    const next = {
+      questionId: normalizedQuestionId,
+      lastSubmitAtBySocket: new Map(),
+      normalizedGuesses: new Set(),
+    }
+    hostlessSubmitGuards.set(code, next)
+    return next
+  }
 
   // ── Member: get teams ───────────────────────────────────────────────
   socket.on('member:get-teams', async (sessionCode, callback) => {
@@ -85,6 +112,7 @@ export function registerMemberSocketHandlers(socket, ctx) {
 
     if (st.armed) socket.emit('buzz:armed', serializeEligibilityState(st))
     if (st.buzzedBy !== null) socket.emit('buzz:winner', { teamIndex: st.buzzedBy, team: st.teams[st.buzzedBy], memberName: st.buzzedMemberName, reactionMs: null })
+    if (isHostlessMode(st.gameplayMode)) socket.emit('answer:state', serializeMemberSyncState(st).answerState)
   })
 
   // ── Member: buzz ────────────────────────────────────────────────────
@@ -94,6 +122,7 @@ export function registerMemberSocketHandlers(socket, ctx) {
     if (!code) return
     const st = sessions.get(code)
     if (!st) return
+    if (isHostlessMode(st.gameplayMode)) return
     debugLog(`[member:buzz] socket=${socket.id} armed=${st.armed} buzzedBy=${st.buzzedBy} teamIndex=${socket.data.teamIndex}`)
     if (!(st.attemptedSocketIds instanceof Set)) st.attemptedSocketIds = new Set()
     if (st.attemptedSocketIds.has(socket.id)) return
@@ -144,5 +173,130 @@ export function registerMemberSocketHandlers(socket, ctx) {
     io.to(hostRoom(code)).emit('buzz:winner', { teamIndex: idx, team: st.teams[idx], memberName, reactionMs })
     io.to(`${code}:members`).emit('buzz:winner', { teamIndex: idx, team: st.teams[idx], memberName, reactionMs })
     persistRuntimeStateInBackground(code, st)
+  })
+
+  // ── Member: host-less answer submit ──────────────────────────────────
+  socket.on('member:answer:submit', async (payload, callback) => {
+    const respond = typeof callback === 'function' ? callback : () => {}
+    const code = socket.data.sessionCode
+    if (!code) {
+      respond({ ok: false, error: 'unauthorized' })
+      return
+    }
+    const st = sessions.get(code) || await ensureState(code)
+    if (!st) {
+      respond({ ok: false, error: 'unauthorized' })
+      return
+    }
+    const idx = socket.data.teamIndex
+    if (!Number.isInteger(idx) || idx < 0 || !st.teams[idx]) {
+      respond({ ok: false, error: 'unauthorized' })
+      return
+    }
+    if (!isHostlessMode(st.gameplayMode)) {
+      respond({ ok: false, error: 'unauthorized' })
+      return
+    }
+
+    const guess = String(payload?.guess || '').trim().slice(0, HOSTLESS_MAX_GUESS_LENGTH)
+    if (!guess) {
+      respond({ ok: false, error: 'invalid-guess' })
+      return
+    }
+
+    const context = resolveHostlessQuestionContext(st)
+    if (context.itemType !== 'question' || !context.cursorId) {
+      respond({ ok: false, error: 'question-locked' })
+      return
+    }
+    if (!isHostlessRoundSupported(context.roundType) || !context.expectedAnswer) {
+      respond({ ok: false, error: 'unsupported-round' })
+      return
+    }
+
+    if (String(st?.answerState?.questionId || '') !== context.cursorId) {
+      st.answerState = {
+        questionId: context.cursorId,
+        status: context.canAcceptAnswers ? 'open' : 'locked',
+        winner: null,
+        recentAttempts: [],
+      }
+    }
+    if (st.answerState?.status !== 'open') {
+      respond({ ok: false, error: 'question-locked' })
+      return
+    }
+
+    const guard = ensureHostlessSubmitGuard(code, context.cursorId)
+    const now = Date.now()
+    const guessNorm = normalizeGuessForMatch(guess)
+    if (!guessNorm) {
+      respond({ ok: false, error: 'invalid-guess' })
+      return
+    }
+    const lastSubmitAt = Number(guard.lastSubmitAtBySocket.get(socket.id) || 0)
+    if (now - lastSubmitAt < HOSTLESS_SUBMIT_COOLDOWN_MS) {
+      respond({ ok: false, error: 'rate-limited' })
+      return
+    }
+    if (guard.normalizedGuesses.has(guessNorm)) {
+      respond({ ok: false, error: 'rate-limited' })
+      return
+    }
+
+    guard.lastSubmitAtBySocket.set(socket.id, now)
+    guard.normalizedGuesses.add(guessNorm)
+
+    const memberName = socket.data.memberName ? String(socket.data.memberName) : null
+    const team = st.teams[idx]
+    const basePayload = {
+      teamIndex: idx,
+      team: { name: String(team.name || ''), color: String(team.color || '') },
+      memberName,
+      guess,
+      timestamp: now,
+      questionId: context.cursorId,
+    }
+
+    if (isGuessCorrect(guess, context.expectedAnswer)) {
+      const points = resolveHostlessPoints(context.round)
+      st.teams[idx].score = Number(st.teams[idx].score || 0) + points
+      lockAnswerState(st, {
+        teamIndex: idx,
+        memberName,
+        guess,
+        points,
+        questionId: context.cursorId,
+        timestamp: now,
+      })
+      const correctPayload = { ...basePayload, points }
+      io.to(hostRoom(code)).emit('state:sync', serializeHostSyncState(st))
+      io.to(hostRoom(code)).emit('answer:correct', correctPayload)
+      io.to(`${code}:members`).emit('answer:correct', correctPayload)
+      const answerState = serializeMemberSyncState(st).answerState
+      io.to(hostRoom(code)).emit('answer:state', answerState)
+      io.to(`${code}:members`).emit('answer:state', answerState)
+      persistTeams(code, st.teams).catch((err) => {
+        console.error('[persistTeams/member:answer:submit]', err)
+      })
+      persistRuntimeStateInBackground(code, st)
+      respond({ ok: true, correct: true, points })
+      return
+    }
+
+    recordWrongAttempt(st, {
+      teamIndex: idx,
+      memberName,
+      guess,
+      questionId: context.cursorId,
+      timestamp: now,
+    })
+    io.to(hostRoom(code)).emit('answer:attempt', basePayload)
+    io.to(`${code}:members`).emit('answer:attempt', basePayload)
+    const answerState = serializeMemberSyncState(st).answerState
+    io.to(hostRoom(code)).emit('answer:state', answerState)
+    io.to(`${code}:members`).emit('answer:state', answerState)
+    persistRuntimeStateInBackground(code, st)
+    respond({ ok: true, correct: false })
   })
 }

@@ -13,6 +13,7 @@ import {
   TEAMS_KEY,
   GAME_PLAN_KEY,
   ROUND_CATALOG_KEY,
+  GAMEPLAY_MODE_KEY,
   ACTIVE_QUESTION_KEY,
   PLAN_CONFIG_PENDING_KEY,
   PLAN_PREVIEW_PENDING_KEY,
@@ -21,6 +22,7 @@ import {
   getStorageItem,
   setStorageItem,
 } from './storage'
+import { normalizeGameplayMode, isHostlessMode } from './gameplayMode'
 import { useWakeLock } from './hooks/useWakeLock'
 import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong, playHelloGetDown, playOhNoNo, playDontProvokeMe, playWhyAreYouRunning } from './sounds'
 import rounds from './rounds'
@@ -98,15 +100,27 @@ function loadNeedsPlanPreview() {
   }
 }
 
+function loadGameplayMode() {
+  const raw = getStorageItem(GAMEPLAY_MODE_KEY)
+  if (raw === null) return normalizeGameplayMode(null)
+  try {
+    return normalizeGameplayMode(JSON.parse(raw))
+  } catch {
+    return normalizeGameplayMode(raw)
+  }
+}
+
 export default function App() {
   const [splashDone, setSplashDone] = useState(false)
   const [session, setSession] = useState(null) // { code, pin } | null
+  const [gameplayMode, setGameplayMode] = useState(() => loadGameplayMode())
   const [teams, setTeams] = useState(() => loadTeams())
   const [roundCatalog, setRoundCatalog] = useState(() => loadRoundCatalog())
   const [gamePlanIds, setGamePlanIds] = useState(() => loadGamePlan(loadRoundCatalog()))
   const [needsPlanConfig, setNeedsPlanConfig] = useState(() => loadNeedsPlanConfig())
   const [needsPlanPreview, setNeedsPlanPreview] = useState(() => loadNeedsPlanPreview())
   const [needsCompanionSetup, setNeedsCompanionSetup] = useState(() => loadNeedsCompanionSetup())
+  const hostlessModeActive = isHostlessMode(gameplayMode)
   useWakeLock(true)
 
   const setupProgressStep = useMemo(() => {
@@ -114,9 +128,9 @@ export default function App() {
     if (!teams) return 1
     if (needsPlanConfig) return 2
     if (needsPlanPreview) return 3
-    if (needsCompanionSetup) return 4
+    if (!hostlessModeActive && needsCompanionSetup) return 4
     return null
-  }, [session, teams, needsPlanConfig, needsPlanPreview, needsCompanionSetup])
+  }, [session, teams, needsPlanConfig, needsPlanPreview, needsCompanionSetup, hostlessModeActive])
 
   function navigateSetupStep(stepNumber) {
     if (!session || !Number.isInteger(stepNumber)) return
@@ -149,13 +163,17 @@ export default function App() {
       setNeedsCompanionSetup(false)
       return
     }
-    if (stepNumber === 4) {
+    if (!hostlessModeActive && stepNumber === 4) {
       setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
       setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
       setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(true))
       setNeedsPlanConfig(false)
       setNeedsPlanPreview(false)
       setNeedsCompanionSetup(true)
+    }
+    if (hostlessModeActive && stepNumber === 4) {
+      setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
+      setNeedsCompanionSetup(false)
     }
   }
 
@@ -223,9 +241,12 @@ export default function App() {
     setNeedsCompanionSetup(false)
   }
 
-  function handleSession(code, pin) {
+  function handleSession(code, pin, incomingGameplayMode = null) {
     const restoredTeams = loadTeams()
+    const normalizedGameplayMode = normalizeGameplayMode(incomingGameplayMode, loadGameplayMode())
     setSession({ code, pin })
+    setGameplayMode(normalizedGameplayMode)
+    setStorageItem(GAMEPLAY_MODE_KEY, JSON.stringify(normalizedGameplayMode))
     setTeams(restoredTeams)
     const storedRoundCatalog = loadRoundCatalog()
     setRoundCatalog(storedRoundCatalog)
@@ -236,7 +257,7 @@ export default function App() {
     const pendingCompanion = loadNeedsCompanionSetup()
     setNeedsPlanConfig(hasTeams && pendingPlan)
     setNeedsPlanPreview(hasTeams && !pendingPlan && pendingPreview)
-    setNeedsCompanionSetup(hasTeams && !pendingPlan && !pendingPreview && pendingCompanion)
+    setNeedsCompanionSetup(hasTeams && !pendingPlan && !pendingPreview && pendingCompanion && !isHostlessMode(normalizedGameplayMode))
   }
 
   if (isBuzzerMode) return <BuzzerPage />
@@ -258,7 +279,7 @@ export default function App() {
       <main className="app-main">
         {setupProgressStep && (
           <SetupProgress
-            steps={['Teams', 'Game Plan', 'Preview', 'Companion']}
+            steps={hostlessModeActive ? ['Teams', 'Game Plan', 'Preview'] : ['Teams', 'Game Plan', 'Preview', 'Companion']}
             current={setupProgressStep}
             onStepClick={navigateSetupStep}
           />
@@ -270,6 +291,7 @@ export default function App() {
         ) : needsPlanConfig ? (
           <GameConfig
             session={session}
+            gameplayMode={gameplayMode}
             initialRoundCatalog={roundCatalog}
             initialPlanIds={gamePlanIds}
             onConfirm={handlePlanConfirm}
@@ -297,9 +319,9 @@ export default function App() {
             }}
             onContinue={() => {
               setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
-              setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(true))
+              setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(!hostlessModeActive))
               setNeedsPlanPreview(false)
-              setNeedsCompanionSetup(true)
+              setNeedsCompanionSetup(!hostlessModeActive)
             }}
             onBack={() => {
               setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(true))
@@ -310,7 +332,7 @@ export default function App() {
               setNeedsCompanionSetup(false)
             }}
           />
-        ) : needsCompanionSetup ? (
+        ) : needsCompanionSetup && !hostlessModeActive ? (
           <CompanionSetup
             sessionCode={session?.code}
             backLabel="← Back"
@@ -330,6 +352,12 @@ export default function App() {
         ) : (
           <Scoreboard
             teams={teams}
+            gameplayMode={gameplayMode}
+            onGameplayModeSync={(nextGameplayMode) => {
+              const normalized = normalizeGameplayMode(nextGameplayMode, gameplayMode)
+              setGameplayMode(normalized)
+              setStorageItem(GAMEPLAY_MODE_KEY, JSON.stringify(normalized))
+            }}
             initialRoundCatalog={roundCatalog}
             initialPlanIds={gamePlanIds}
             onReset={() => {

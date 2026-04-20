@@ -1,4 +1,13 @@
-import { initialState, normalizeAllowedTeamIndices, normalizeQuestionCursor, normalizeGamePlan, normalizeRoundCatalog, normalizeReactionStats } from './sessionState.js'
+import {
+  initialState,
+  normalizeAllowedTeamIndices,
+  normalizeQuestionCursor,
+  normalizeGamePlan,
+  normalizeRoundCatalog,
+  normalizeReactionStats,
+  normalizeGameplayMode,
+  normalizeAnswerState,
+} from './sessionState.js'
 
 export function createRuntimeStore({ queryFn, sessions }) {
   function getState(code) {
@@ -11,6 +20,7 @@ export function createRuntimeStore({ queryFn, sessions }) {
       `
         SELECT
           s.id AS session_id,
+          s.gameplay_mode AS s_gameplay_mode,
           gs.armed AS gs_armed,
           gs.round_index AS gs_round_index,
           gs.question_index AS gs_question_index,
@@ -21,6 +31,7 @@ export function createRuntimeStore({ queryFn, sessions }) {
           gs.round_catalog AS gs_round_catalog,
           gs.reaction_stats AS gs_reaction_stats,
           gs.host_question_cursor AS gs_host_question_cursor,
+          gs.answer_state AS gs_answer_state,
           bs.winner_team_index AS bs_winner_team_index,
           bs.buzzed_member_name AS bs_buzzed_member_name,
           bs.allowed_team_indices AS bs_allowed_team_indices,
@@ -62,6 +73,7 @@ export function createRuntimeStore({ queryFn, sessions }) {
     })
 
     next.doublePoints = Boolean(first.gs_double_points)
+    next.gameplayMode = normalizeGameplayMode(first.s_gameplay_mode)
     next.gamePlan = normalizeGamePlan(first.gs_game_plan)
     next.roundCatalog = normalizeRoundCatalog(first.gs_round_catalog)
     next.reactionStats = normalizeReactionStats(first.gs_reaction_stats)
@@ -97,6 +109,7 @@ export function createRuntimeStore({ queryFn, sessions }) {
       }
     }
     next.hostQuestionCursor = normalizeQuestionCursor(rawCursor)
+    next.answerState = normalizeAnswerState(first.gs_answer_state, typeof next.hostQuestionCursor === 'string' ? next.hostQuestionCursor : null)
 
     return next
   }
@@ -143,6 +156,18 @@ export function createRuntimeStore({ queryFn, sessions }) {
     const gamePlan = normalizeGamePlan(st.gamePlan)
     const roundCatalog = normalizeRoundCatalog(st.roundCatalog)
     const reactionStats = normalizeReactionStats(st.reactionStats)
+    const gameplayMode = normalizeGameplayMode(st.gameplayMode)
+    const answerState = normalizeAnswerState(st.answerState, typeof st.hostQuestionCursor === 'string' ? st.hostQuestionCursor : null)
+    st.gameplayMode = gameplayMode
+    st.answerState = answerState
+    await queryFn(
+      `
+        UPDATE sessions
+        SET gameplay_mode = $2
+        WHERE id = $1 AND status = 'active'
+      `,
+      [code, gameplayMode]
+    )
     await queryFn(
       `
         INSERT INTO game_state (
@@ -156,9 +181,10 @@ export function createRuntimeStore({ queryFn, sessions }) {
           double_points,
           game_plan,
           round_catalog,
-          reaction_stats
+          reaction_stats,
+          answer_state
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb)
         ON CONFLICT (session_id)
         DO UPDATE SET
           round_index = EXCLUDED.round_index,
@@ -170,9 +196,10 @@ export function createRuntimeStore({ queryFn, sessions }) {
           double_points = EXCLUDED.double_points,
           game_plan = EXCLUDED.game_plan,
           round_catalog = EXCLUDED.round_catalog,
-          reaction_stats = EXCLUDED.reaction_stats
+          reaction_stats = EXCLUDED.reaction_stats,
+          answer_state = EXCLUDED.answer_state
       `,
-      [code, roundIndex, questionIndex, st.armed, streaks, doneQuestions, hostQuestionCursor, Boolean(st.doublePoints), gamePlan, JSON.stringify(roundCatalog), JSON.stringify(reactionStats)]
+      [code, roundIndex, questionIndex, st.armed, streaks, doneQuestions, hostQuestionCursor, Boolean(st.doublePoints), gamePlan, JSON.stringify(roundCatalog), JSON.stringify(reactionStats), JSON.stringify(answerState)]
     )
     await queryFn(
       `
