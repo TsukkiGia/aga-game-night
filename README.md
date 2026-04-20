@@ -10,10 +10,15 @@ Tech stack: React 19 + Vite 6 frontend, Express + Socket.IO backend, Postgres pe
 ## Current Capabilities
 
 - Team setup (1-8 teams), live score controls, round/question navigation
+- Round configuration supports base rounds plus optional community rounds
 - Session + host PIN auth
 - Buzzer join with required player name + team selection
 - First-buzz wins, lockout, steal flow, reaction-time tracking
 - Runtime state persistence in Postgres (scores, question cursor, buzz state, done questions, streaks, double points)
+- Custom round template library:
+  - Create/edit user-defined rounds in the host setup flow
+  - Browse/search saved community rounds by name, intro, or question content
+  - Add/remove community rounds from the current run of show without deleting the template
 - Host companion tools (timer stop/restart, SFX trigger, answer view)
 - End session fully kills the session code (cannot be reused)
 
@@ -66,6 +71,13 @@ This runs:
 2. Create session or resume session in Session Gate
 3. Enter teams and start game
 4. Share `/buzz?s=<SESSION_CODE>` URL/QR with players
+
+### Custom round setup flow
+
+1. In game setup, click `+ New Custom Round` to create a template.
+2. Click `Browse Community Rounds` to open the template library modal.
+3. Search templates and choose `Add to Run of Show` for the rounds you want in this game.
+4. Use `Remove` in the library to remove a community round from the current setup (template stays saved).
 
 ## Production / Railway
 
@@ -133,9 +145,15 @@ npm run build
 - `backend/socket/*` - host/member socket handlers and room/member utilities
 - `backend/state/*` - runtime state shape and DB hydration/persistence
 - `src/components/*` - host, companion, buzzer, and gameplay UI
+- `src/components/game-config/*` - round setup UI, template editor/preview, and user round library modal
 - `src/hooks/*` - host socket/game state/navigation hooks
 - `src/rounds/*` - round/question content (Guess the Language now uses YouTube URLs)
 - `migrations/*` - schema and runtime persistence migrations
+
+## Credits
+
+- Country outline map icons by [djaiss/mapsicon](https://github.com/djaiss/mapsicon), served via jsDelivr CDN.
+- Flag images by [flagcdn.com](https://flagcdn.com).
 
 ## Helpful URLs
 

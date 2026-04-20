@@ -194,22 +194,6 @@
   margin-top: 6px;
 }
 
-.help-close-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1.5px solid var(--border);
-  background: white;
-  color: var(--text-muted);
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.help-close-btn:hover {
-  border-color: var(--terra);
-  color: var(--terra);
-}
-
 .help-sections {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -532,19 +516,7 @@
 }
 
 .qv-join-close {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1.5px solid var(--border);
-  background: white;
-  color: var(--text-muted);
-  font-size: 14px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.qv-join-close:hover {
-  border-color: var(--terra);
-  color: var(--terra);
+  flex-shrink: 0;
 }
 
 .qv-join-body {

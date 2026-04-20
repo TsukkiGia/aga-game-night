@@ -1,3 +1,5 @@
+import CloseIconButton from './CloseIconButton'
+
 export default function HostHelpModal({ open, onClose, hostCompanionUrl }) {
   if (!open) return null
 
@@ -9,7 +11,7 @@ export default function HostHelpModal({ open, onClose, hostCompanionUrl }) {
             <div className="help-popup-tag">Host Guide</div>
             <h2 className="help-popup-title">How To Run The Game</h2>
           </div>
-          <button className="help-close-btn" onClick={onClose}>✕</button>
+          <CloseIconButton onClick={onClose} />
         </div>
 
         <div className="help-sections">

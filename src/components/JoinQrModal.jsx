@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import QRImg from './QRImg'
+import CloseIconButton from './CloseIconButton'
 
 export default function JoinQrModal({ open, buzzerUrl, onClose }) {
   const [copyState, setCopyState] = useState('idle')
@@ -35,9 +36,7 @@ export default function JoinQrModal({ open, buzzerUrl, onClose }) {
       <div className="help-popup qv-join-modal" onClick={(e) => e.stopPropagation()}>
         <div className="qv-join-head">
           <div className="qv-join-title">Join This Game</div>
-          <button className="qv-join-close" onClick={onClose} aria-label="Close join QR">
-            ✕
-          </button>
+          <CloseIconButton className="qv-join-close" onClick={onClose} ariaLabel="Close join QR" />
         </div>
         <div className="qv-join-body">
           <div className="qv-join-qr-wrap">

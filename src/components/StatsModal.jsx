@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { normalizeReactionStats } from '../reactionStats'
+import CloseIconButton from './CloseIconButton'
 
 function fmt(ms) {
   if (!Number.isFinite(ms) || ms == null) return '—'
@@ -28,7 +29,7 @@ export default function StatsModal({ reactionStats, onClose }) {
             <h2 className="stats-modal-title">Buzz Leaderboard</h2>
             <p className="stats-modal-sub">Ranked by best reaction time across all questions</p>
           </div>
-          <button className="help-close-btn" onClick={onClose}>✕</button>
+          <CloseIconButton onClick={onClose} />
         </div>
 
         {rows.length === 0 ? (

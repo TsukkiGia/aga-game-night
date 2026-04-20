@@ -707,14 +707,7 @@
   position: absolute;
   top: 24px;
   right: 32px;
-  background: transparent;
-  border: none;
-  color: rgba(255,255,255,0.25);
-  font-size: 24px;
-  cursor: pointer;
-  transition: color 0.15s;
 }
-.winner-sd-close:hover { color: rgba(255,255,255,0.7); }
 
 .winner-sd-but {
   font-size: clamp(36px, 6vw, 72px);

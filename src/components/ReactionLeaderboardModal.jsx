@@ -1,3 +1,5 @@
+import CloseIconButton from './CloseIconButton'
+
 function formatMs(ms) {
   if (!Number.isFinite(ms)) return '—'
   if (ms < 1000) return `${ms} ms`
@@ -15,7 +17,7 @@ export default function ReactionLeaderboardModal({ open, rows, onClose }) {
             <div className="help-popup-tag">Question Race</div>
             <h2 className="help-popup-title">Current Question Times</h2>
           </div>
-          <button className="help-close-btn" onClick={onClose}>✕</button>
+          <CloseIconButton onClick={onClose} />
         </div>
         <div className="reaction-sub">Sorted by fastest current-question buzz • Shortcut: <strong>Shift + T</strong></div>
         {rows.length === 0 ? (

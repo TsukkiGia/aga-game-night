@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { playWinner, playWinnerMusical, playApplause, stopWinnerSounds, playSuspenseSequence, stopSuspense } from '../sounds'
 import { computePlaces } from '../utils/teamRanking'
+import CloseIconButton from './CloseIconButton'
 
 // Reveal sequence timing
 const TIE_STEP_MS        = 800   // interval between podium slots in a tie
@@ -202,7 +203,11 @@ export default function WinnerScreen({ teams, onClose, onDismiss, onTiebreaker, 
 
         {isTie && onTiebreaker && showSuddenDeath && (
           <div className="winner-sd-fullscreen">
-            <button className="winner-sd-close" onClick={() => { setShowSuddenDeath(false); stopSuspense() }}>✕</button>
+            <CloseIconButton
+              className="winner-sd-close"
+              variant="ghost-light"
+              onClick={() => { setShowSuddenDeath(false); stopSuspense() }}
+            />
             <div className="winner-sd-but">...but is it really?</div>
             {showSdButton && (
               <button className="winner-sd-dramatic-btn" onClick={() => { stopSuspense(); onTiebreaker(winners) }}>

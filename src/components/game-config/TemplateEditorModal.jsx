@@ -1,15 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { mediaUrlFeedback } from '../../utils/mediaPrompt'
 import { DEFAULT_QUESTION } from './constants'
 import { cloneJson } from './helpers'
 import { MediaPreview } from './MediaPreviewBlocks'
+import CloseIconButton from '../CloseIconButton'
 
 function PointsInput({ value, onChange }) {
-  const [text, setText] = useState(String(value))
-
-  useEffect(() => {
-    if (Number.parseInt(text, 10) !== value) setText(String(value))
-  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [draft, setDraft] = useState(null)
+  const text = draft ?? String(value)
 
   return (
     <input
@@ -17,9 +15,11 @@ function PointsInput({ value, onChange }) {
       type="text"
       inputMode="numeric"
       value={text}
+      onFocus={() => setDraft(String(value))}
+      onBlur={() => setDraft(null)}
       onChange={(e) => {
         const raw = e.target.value
-        setText(raw)
+        setDraft(raw)
         const parsed = Number.parseInt(raw, 10)
         if (Number.isInteger(parsed)) onChange(parsed)
       }}
@@ -91,7 +91,7 @@ export default function TemplateEditorModal({
           </div>
           <div className="tpl-header-right">
             {isEditorDirty && <div className="game-config-template-dirty dirty">Unsaved changes</div>}
-            <button type="button" className="tpl-close-btn" onClick={() => onCloseCreator()}>✕</button>
+            <CloseIconButton onClick={() => onCloseCreator()} />
           </div>
         </div>
 
