@@ -193,6 +193,9 @@ export default function PreviewModal({
         )}
         {visibleItems.map(({ key, question, questionId, questionIndex, selected, headline, detail, tags, answer }) => {
           const previewMedia = getPreviewMedia(round, question)
+          const fullPromptText = String(question?.promptText || '').trim()
+          const shouldUseFullPrompt = round.type === 'custom-buzz' && Boolean(fullPromptText)
+          const displayHeadline = shouldUseFullPrompt ? fullPromptText : headline
           return (
             <div key={key} className={`gcpv-question${!isCommunityMode && selected ? ' selected' : ''}`}>
               <div className="gcpv-q-head">
@@ -209,7 +212,7 @@ export default function PreviewModal({
                 )}
               </div>
 
-              <div className="gcpv-q-title">{headline}</div>
+              <div className={`gcpv-q-title${shouldUseFullPrompt ? ' full-prompt' : ''}`}>{displayHeadline}</div>
               {detail && <div className="gcpv-q-detail">{detail}</div>}
 
               <LazyPreviewMedia

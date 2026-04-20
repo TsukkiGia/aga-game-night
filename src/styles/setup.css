@@ -4661,6 +4661,10 @@
   margin-bottom: 3px;
 }
 
+.gcpv-q-title.full-prompt {
+  white-space: pre-line;
+}
+
 .gcpv-q-detail {
   font-size: 13px;
   color: var(--text-muted);
