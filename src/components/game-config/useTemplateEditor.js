@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
   CUSTOM_ROUND_TYPE,
-  isCustomTemplateRound,
   normalizeRoundCatalog,
   templateToRound,
 } from '../../roundCatalog'
@@ -12,6 +11,7 @@ import { buildEditorSnapshot, cloneJson } from './helpers'
 export function useTemplateEditor({
   session,
   roundRows,
+  builtinQuestionIdsByRoundId,
   setCustomTemplates,
   onClearRoundConfirm,
   onReturnToPreview,
@@ -35,6 +35,7 @@ export function useTemplateEditor({
   const [newTemplateRules, setNewTemplateRules] = useState([])
   const [newTemplateScoring, setNewTemplateScoring] = useState(() => cloneJson(DEFAULT_SCORING))
   const [newTemplateQuestions, setNewTemplateQuestions] = useState(() => [cloneJson(DEFAULT_QUESTION)])
+  const [protectedQuestionIds, setProtectedQuestionIds] = useState(() => new Set())
 
   const currentEditorSnapshot = useMemo(() => buildEditorSnapshot({
     name: newTemplateName,
@@ -61,6 +62,7 @@ export function useTemplateEditor({
     setNewTemplateRules([])
     setNewTemplateScoring(cloneJson(DEFAULT_SCORING))
     setNewTemplateQuestions(defaultQuestions)
+    setProtectedQuestionIds(new Set())
     setEditorBaseline(buildEditorSnapshot({
       name: '',
       intro: '',
@@ -95,7 +97,7 @@ export function useTemplateEditor({
     const row = roundRows.find((item) => item.round.id === id)
     if (!row) return
     const round = row.round
-    if (!isCustomTemplateRound(round)) return
+    if (String(round?.type || '').trim().toLowerCase() !== CUSTOM_ROUND_TYPE) return
 
     const nextRules = Array.isArray(round.rules) ? cloneJson(round.rules) : []
     const scoringSource = Array.isArray(round.scoring) && round.scoring.length > 0
@@ -117,6 +119,12 @@ export function useTemplateEditor({
         id: String(merged?.id || '').trim() || `${id}-q${index + 1}`,
       }
     })
+    const builtinIds = builtinQuestionIdsByRoundId?.get?.(id) || new Set()
+    const nextProtectedIds = new Set(
+      nextQuestions
+        .map((question) => String(question?.id || '').trim())
+        .filter((questionId) => builtinIds.has(questionId))
+    )
 
     setCreatorMode('session-edit')
     setEditingRoundId(id)
@@ -126,6 +134,7 @@ export function useTemplateEditor({
     setNewTemplateRules(nextRules)
     setNewTemplateScoring(nextScoring)
     setNewTemplateQuestions(nextQuestions)
+    setProtectedQuestionIds(nextProtectedIds)
     setEditorBaseline(buildEditorSnapshot({
       name: String(round.name || '').trim(),
       intro: String(round.intro || '').trim(),
@@ -282,6 +291,7 @@ export function useTemplateEditor({
     setNewTemplateScoring,
     newTemplateQuestions,
     setNewTemplateQuestions,
+    protectedQuestionIds,
     createError,
     createSubmitting,
     saveSuccess,

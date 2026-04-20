@@ -3782,6 +3782,11 @@
   flex-shrink: 0;
 }
 
+.gc2-disabled-tooltip {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
 .gc2-toolbar-btn:hover {
   border-color: var(--text-muted);
   color: var(--text);

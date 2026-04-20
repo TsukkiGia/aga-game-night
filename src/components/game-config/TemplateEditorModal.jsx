@@ -43,6 +43,7 @@ export default function TemplateEditorModal({
   setNewTemplateScoring,
   newTemplateQuestions,
   setNewTemplateQuestions,
+  protectedQuestionIds,
   createError,
   inlineValidationError,
   canSubmitCreator,
@@ -60,6 +61,12 @@ export default function TemplateEditorModal({
   const safeIdx = Math.min(selectedQIdx, newTemplateQuestions.length - 1)
   const selectedQ = newTemplateQuestions[safeIdx] ?? null
 
+  function isQuestionProtected(idx) {
+    const questionId = String(newTemplateQuestions[idx]?.id || '').trim()
+    if (!questionId) return false
+    return Boolean(protectedQuestionIds?.has?.(questionId))
+  }
+
   function updateQuestion(idx, patch) {
     setNewTemplateQuestions((prev) => prev.map((q, i) => i === idx ? { ...q, ...patch } : q))
   }
@@ -72,11 +79,17 @@ export default function TemplateEditorModal({
 
   function removeQuestion(idx) {
     if (newTemplateQuestions.length <= 1) return
+    if (isQuestionProtected(idx)) return
     setNewTemplateQuestions((prev) => prev.filter((_, i) => i !== idx))
     setSelectedQIdx((prev) => Math.min(prev, newTemplateQuestions.length - 2))
   }
 
   const urlFeedback = selectedQ ? mediaUrlFeedback(selectedQ) : null
+  const selectedQuestionProtected = isQuestionProtected(safeIdx)
+  const deleteQuestionDisabled = newTemplateQuestions.length <= 1 || selectedQuestionProtected
+  const deleteQuestionDisabledReason = selectedQuestionProtected
+    ? "Base questions can't be deleted. You can edit them or add your own."
+    : 'At least one question is required.'
 
   return (
     <ModalShell onClose={onCloseCreator} closeOnOverlayClick={false} dialogClassName="tpl-modal">
@@ -279,7 +292,7 @@ export default function TemplateEditorModal({
                       </button>
                     ))}
                   </div>
-                  {deleteConfirmIdx === safeIdx ? (
+                  {deleteConfirmIdx === safeIdx && !selectedQuestionProtected ? (
                     <div className="tpl-delete-confirm">
                       <span>Delete Q{safeIdx + 1}?</span>
                       <button type="button" className="tpl-delete-confirm-yes" onClick={() => { removeQuestion(safeIdx); setDeleteConfirmIdx(null) }}>Delete</button>
@@ -290,8 +303,9 @@ export default function TemplateEditorModal({
                       type="button"
                       className="tpl-delete-q-btn"
                       onClick={() => setDeleteConfirmIdx(safeIdx)}
-                      disabled={newTemplateQuestions.length <= 1}
+                      disabled={deleteQuestionDisabled}
                       aria-label="Delete question"
+                      title={deleteQuestionDisabled ? deleteQuestionDisabledReason : 'Delete question'}
                     >Delete</button>
                   )}
                 </div>

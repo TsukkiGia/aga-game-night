@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import rounds from '../rounds'
 import { buildPlanCatalog } from '../gamePlan'
 import {
+  CUSTOM_ROUND_TYPE,
   isCustomTemplateRound,
   normalizeRoundCatalog,
 } from '../roundCatalog'
@@ -31,6 +32,18 @@ export default function GameConfig({
   onBack,
 }) {
   const builtinRounds = useMemo(() => normalizeRoundCatalog(rounds), [])
+  const builtinQuestionIdsByRoundId = useMemo(() => {
+    const out = new Map()
+    builtinRounds.forEach((round) => {
+      const ids = new Set(
+        (Array.isArray(round?.questions) ? round.questions : [])
+          .map((question) => String(question?.id || '').trim())
+          .filter(Boolean)
+      )
+      out.set(round.id, ids)
+    })
+    return out
+  }, [builtinRounds])
   const initialCatalog = useMemo(() => {
     const normalized = normalizeRoundCatalog(initialRoundCatalog)
     return normalized.length > 0 ? normalized : builtinRounds
@@ -72,7 +85,7 @@ export default function GameConfig({
     const byId = new Map()
     builtinRounds.forEach((round) => byId.set(round.id, round))
     customTemplates
-      .filter((round) => addedCustomRoundIds.has(round.id))
+      .filter((round) => byId.has(round.id) || addedCustomRoundIds.has(round.id))
       .forEach((round) => byId.set(round.id, round))
     return [...byId.values()]
   }, [builtinRounds, customTemplates, addedCustomRoundIds])
@@ -145,6 +158,7 @@ export default function GameConfig({
     setNewTemplateScoring,
     newTemplateQuestions,
     setNewTemplateQuestions,
+    protectedQuestionIds,
     createError,
     createSubmitting,
     saveSuccess,
@@ -161,6 +175,7 @@ export default function GameConfig({
   } = useTemplateEditor({
     session,
     roundRows,
+    builtinQuestionIdsByRoundId,
     setCustomTemplates,
     onClearRoundConfirm: () => setRoundClearConfirmId(''),
     onReturnToPreview: setPreviewRoundId,
@@ -449,7 +464,10 @@ export default function GameConfig({
     }
     onConfirm(payload)
   }
-  const canEditActiveRound = Boolean(activeRow && isCustomTemplateRound(activeRow.round))
+  const canEditActiveRound = Boolean(
+    activeRow
+    && String(activeRow.round?.type || '').trim().toLowerCase() === CUSTOM_ROUND_TYPE
+  )
 
   if (!templatesBootstrapped) {
     return (
@@ -634,6 +652,7 @@ export default function GameConfig({
           setNewTemplateScoring={setNewTemplateScoring}
           newTemplateQuestions={newTemplateQuestions}
           setNewTemplateQuestions={setNewTemplateQuestions}
+          protectedQuestionIds={protectedQuestionIds}
           createError={createError}
           inlineValidationError={inlineValidationError}
           canSubmitCreator={canSubmitCreator}

@@ -34,6 +34,8 @@ export default function GameConfigMainPanel({
   onToggleQuestion,
   onOpenRoundPreview,
 }) {
+  const editDisabledReason = 'Only custom Buzz rounds can be edited. Built-in rounds support question selection only.'
+
   return (
     <main className="gc2-main">
       {activeRow && (
@@ -83,17 +85,32 @@ export default function GameConfigMainPanel({
             <button type="button" className="gc2-toolbar-btn" onClick={onClearActive}>
               Clear
             </button>
-            <button
-              type="button"
-              className="gc2-toolbar-btn"
-              onClick={() => onEditActiveRound(activeRow.round.id)}
-              disabled={!canEditActiveRound}
-              title={canEditActiveRound
-                ? 'Edit this custom round for this session only.'
-                : 'Built-in rounds support question selection only.'}
-            >
-              {canEditActiveRound ? 'Edit session copy' : 'Edit selection'}
-            </button>
+            {canEditActiveRound ? (
+              <button
+                type="button"
+                className="gc2-toolbar-btn"
+                onClick={() => onEditActiveRound(activeRow.round.id)}
+                title="Edit this custom round for this session only."
+              >
+                Edit session copy
+              </button>
+            ) : (
+              <span
+                className="game-config-tooltip-trigger gc2-disabled-tooltip"
+                data-tooltip={editDisabledReason}
+                tabIndex={0}
+                role="note"
+                aria-label={editDisabledReason}
+              >
+                <button
+                  type="button"
+                  className="gc2-toolbar-btn"
+                  disabled
+                >
+                  Edit selection
+                </button>
+              </span>
+            )}
           </div>
 
           {recentlyClearedRound && (
