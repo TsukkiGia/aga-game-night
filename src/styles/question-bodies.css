@@ -88,8 +88,8 @@
 }
 
 .qv-custom-image-shell.dark-backdrop {
-  background: #0f1114;
-  border-color: #2a2520;
+  background: #fff;
+  border-color: var(--border);
 }
 
 .qv-custom-image {
@@ -102,7 +102,7 @@
 }
 
 .qv-custom-image.dark-backdrop {
-  background: #0f1114;
+  background: #fff;
 }
 
 .qv-custom-answer-card {

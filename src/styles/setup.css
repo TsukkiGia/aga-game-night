@@ -3042,8 +3042,8 @@
 
 .game-config-media-preview.dark-backdrop .game-config-media-preview-image,
 .game-config-media-preview-image.dark-backdrop {
-  background: #0f1114;
-  border-color: #2a2520;
+  background: #fff;
+  border-color: #d1c6b6;
 }
 
 .game-config-media-preview-frame {
@@ -4723,13 +4723,13 @@
 }
 
 .gcpv-media-box.dark-backdrop {
-  background: #1a1814;
-  border-color: #2e2a25;
+  background: #fff;
+  border-color: #ddd3c5;
 }
 
 .gcpv-media-image {
   width: 100%;
-  max-height: 320px;
+  max-height: min(62vh, calc(100dvh - 320px));
   object-fit: contain;
   border: none;
   display: block;
@@ -4737,7 +4737,7 @@
 }
 
 .gcpv-media-image.dark-backdrop {
-  background: #1a1814;
+  background: #fff;
 }
 
 .gcpv-media-video {
