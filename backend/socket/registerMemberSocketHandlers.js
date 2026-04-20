@@ -27,6 +27,8 @@ export function registerMemberSocketHandlers(socket, ctx) {
 
   const HOSTLESS_SUBMIT_COOLDOWN_MS = 700
   const HOSTLESS_MAX_GUESS_LENGTH = 180
+  const HOSTLESS_MAX_TRACKED_GUESSES = 400
+  const MAX_TEAMS_PER_SESSION = 8
 
   function ensureHostlessSubmitGuard(code, questionId) {
     const normalizedQuestionId = String(questionId || '').trim()
@@ -36,9 +38,18 @@ export function registerMemberSocketHandlers(socket, ctx) {
       questionId: normalizedQuestionId,
       lastSubmitAtBySocket: new Map(),
       normalizedGuesses: new Set(),
+      guessQueue: [],
     }
     hostlessSubmitGuards.set(code, next)
     return next
+  }
+
+  function trackNormalizedGuess(guard, guessNorm) {
+    guard.normalizedGuesses.add(guessNorm)
+    guard.guessQueue.push(guessNorm)
+    if (guard.guessQueue.length <= HOSTLESS_MAX_TRACKED_GUESSES) return
+    const evicted = guard.guessQueue.shift()
+    if (evicted) guard.normalizedGuesses.delete(evicted)
   }
 
   // ── Member: get teams ───────────────────────────────────────────────
@@ -89,14 +100,25 @@ export function registerMemberSocketHandlers(socket, ctx) {
       return
     }
 
-    // Leave any previous session's team rooms
+    // Leave any previous session's rooms.
     const prevCode = socket.data.sessionCode
-    if (prevCode && prevCode !== code) leaveTeamRooms(socket, prevCode, (sessions.get(prevCode)?.teams.length || 0))
+    if (prevCode && prevCode !== code) {
+      const previousTeamCount = Math.max(
+        Number.parseInt(sessions.get(prevCode)?.teams?.length, 10) || 0,
+        MAX_TEAMS_PER_SESSION
+      )
+      leaveTeamRooms(socket, prevCode, previousTeamCount)
+      socket.leave(`${prevCode}:members`)
+    }
     if (prevCode) {
       const prevState = sessions.get(prevCode)
-      if (prevState) removeFromMembers(socket.id, prevState)
+      if (prevState) {
+        const changed = removeFromMembers(socket.id, prevState)
+        if (changed && prevCode !== code) broadcastMembers(prevCode, prevState)
+      }
     }
     leaveTeamRooms(socket, code, st.teams.length)
+    socket.leave(`${code}:members`)
     removeFromMembers(socket.id, st)
 
     socket.data.teamIndex = idx
@@ -245,7 +267,7 @@ export function registerMemberSocketHandlers(socket, ctx) {
     }
 
     guard.lastSubmitAtBySocket.set(socket.id, now)
-    guard.normalizedGuesses.add(guessNorm)
+    trackNormalizedGuess(guard, guessNorm)
 
     const memberName = socket.data.memberName ? String(socket.data.memberName) : null
     const team = st.teams[idx]
@@ -298,5 +320,13 @@ export function registerMemberSocketHandlers(socket, ctx) {
     io.to(`${code}:members`).emit('answer:state', answerState)
     persistRuntimeStateInBackground(code, st)
     respond({ ok: true, correct: false })
+  })
+
+  socket.on('disconnect', () => {
+    const code = socket.data.sessionCode
+    if (!code) return
+    const guard = hostlessSubmitGuards.get(code)
+    if (!guard) return
+    guard.lastSubmitAtBySocket.delete(socket.id)
   })
 }

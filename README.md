@@ -3,14 +3,14 @@
 Live team game show app for host + players:
 - Host controls gameplay on the main screen (`/`)
 - Optional host companion controls on phone (`/host-mobile`)
-- Players join and buzz from phones (`/buzz?s=<SESSION_CODE>`)
+- Players join from phones (`/buzz?s=<SESSION_CODE>`) to buzz (`Hosted`) or submit answers (`Host-less`)
 
 Tech stack: React 19 + Vite 6 frontend, Express + Socket.IO backend, Postgres persistence.
 
 ## Current Capabilities
 
 - Team setup (1-8 teams), live score controls, round/question navigation
-- Gameplay mode selector: `Hosted` (classic buzzer) or `Host-less` (answer submission)
+- Gameplay mode selector in Session Gate: `Hosted` (classic buzzer) or `Host-less` (answer submission)
 - Round configuration supports base rounds plus optional community rounds
 - Session + host PIN auth
 - Buzzer join with required player name + team selection
@@ -18,13 +18,17 @@ Tech stack: React 19 + Vite 6 frontend, Express + Socket.IO backend, Postgres pe
 - Host-less answer flow:
   - Players submit guesses instead of buzzing
   - Wrong guesses broadcast as live toasts
-  - First correct submission locks the question and awards points
-  - `charades` and `thesis` are disabled in host-less game config
+  - First correct submission auto-locks the question and auto-awards points
+  - Host screen shows a correct-answer modal (with sound + next-question action)
+  - `charades` and `thesis` (Title Translator) are disabled in host-less game config, with tooltips
+  - Buzz race leaderboard/stats UI is hidden in host-less mode
 - Runtime state persistence in Postgres (scores, question cursor, buzz state, done questions, streaks, double points)
 - Custom round template library:
   - Create/edit user-defined rounds in the host setup flow
   - Browse/search saved community rounds by name, intro, or question content
   - Add/remove community rounds from the current run of show without deleting the template
+  - Preview community rounds in a shared preview modal with infinite scroll + lazy media loading
+- Base round content is read-only; question editing/deleting is for custom rounds/templates
 - Host companion tools (timer stop/restart, SFX trigger, answer view)
 - End session fully kills the session code (cannot be reused)
 
@@ -74,9 +78,27 @@ This runs:
 ### First-time host flow
 
 1. Open `http://localhost:5173`
-2. Create session or resume session in Session Gate
-3. Enter teams and start game
-4. Share `/buzz?s=<SESSION_CODE>` URL/QR with players
+2. Choose gameplay mode (`Hosted` or `Host-less`) in Session Gate
+3. Create session or resume session
+4. Enter teams and configure game plan
+5. Preview selected questions/rounds, then start game
+6. (Hosted only) Complete optional Companion setup step
+7. Share `/buzz?s=<SESSION_CODE>` URL/QR with players
+
+### Gameplay modes
+
+- `Hosted`
+  - Classic buzzer race
+  - Host-controlled judging/scoring flow
+  - Includes buzz race leaderboard and companion setup step
+- `Host-less`
+  - Players submit answers directly from `/buzz`
+  - First correct answer wins points and locks that question
+  - Host manually advances questions
+  - Companion setup step is skipped in setup flow
+  - Unsupported rounds (`charades`, `thesis`) are disabled in setup
+
+Mode is persisted with the session and included in reconnect/state sync.
 
 ### Custom round setup flow
 
@@ -84,6 +106,10 @@ This runs:
 2. Click `Browse Community Rounds` to open the template library modal.
 3. Search templates and choose `Add to Run of Show` for the rounds you want in this game.
 4. Use `Remove` in the library to remove a community round from the current setup (template stays saved).
+
+Notes:
+- Rounds bundled in local JSON under `src/rounds/*` are base rounds, not community templates.
+- Community preview uses scrolling auto-pagination and lazy media rendering for faster load on large rounds.
 
 ## Production / Railway
 

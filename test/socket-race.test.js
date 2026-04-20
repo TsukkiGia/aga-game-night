@@ -312,6 +312,23 @@ function once(socket, event, timeoutMs = 1000) {
   })
 }
 
+function waitNoEvent(socket, event, timeoutMs = 250) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      socket.off(event, onEvent)
+      resolve()
+    }, timeoutMs)
+
+    function onEvent(payload) {
+      clearTimeout(timer)
+      socket.off(event, onEvent)
+      reject(new Error(`Unexpected "${event}" event: ${JSON.stringify(payload)}`))
+    }
+
+    socket.on(event, onEvent)
+  })
+}
+
 function emitAck(socket, event, ...args) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`Ack timeout for "${event}"`)), 1000)
@@ -922,6 +939,90 @@ test('member can switch sessions even if previous in-memory state is missing', a
     const secondJoin = await emitAck(member, 'member:join', second.sessionCode, 1, 'Alice')
     assert.equal(secondJoin.teamIndex, 1)
     assert.equal(secondJoin.team?.name, TEAMS[1].name)
+  } finally {
+    await harness.close()
+  }
+})
+
+test('session switch removes old member-room subscription and broadcasts previous roster update', async () => {
+  const harness = await createHarness()
+  try {
+    const hostA = await harness.connect()
+    const hostB = await harness.connect()
+    const switcher = await harness.connect()
+    const memberA = await harness.connect()
+    const first = await harness.createSession('pin-a')
+    const second = await harness.createSession('pin-b')
+
+    await authHost(hostA, first.sessionCode, first.pin)
+    await emitAck(hostA, 'host:setup', {
+      teams: TEAMS,
+      gameplayMode: 'hostless',
+      roundCatalog: [HOSTLESS_CUSTOM_ROUND],
+      gamePlan: ['intro:hostless-custom', 'q:hostless-custom:hcq-1'],
+    })
+    await emitAck(hostA, 'host:question:set', 'q:hostless-custom:hcq-1')
+
+    await authHost(hostB, second.sessionCode, second.pin)
+    await emitAck(hostB, 'host:setup', TEAMS)
+
+    const initialRoster = once(hostA, 'host:members')
+    const joinedFirst = await emitAck(switcher, 'member:join', first.sessionCode, 0, 'Alice')
+    assert.equal(joinedFirst.teamIndex, 0)
+    await initialRoster
+
+    const oldRosterUpdate = once(hostA, 'host:members')
+    const joinedSecond = await emitAck(switcher, 'member:join', second.sessionCode, 1, 'Alice')
+    assert.equal(joinedSecond.teamIndex, 1)
+    const rosterAfterSwitch = await oldRosterUpdate
+    assert.equal(Array.isArray(rosterAfterSwitch), true)
+    const oldSessionNames = rosterAfterSwitch.flat()
+    assert.equal(oldSessionNames.includes('Alice'), false)
+
+    await emitAck(memberA, 'member:join', first.sessionCode, 1, 'Bob')
+    const noLeakPromise = waitNoEvent(switcher, 'answer:attempt', 300)
+    const wrongGuess = await emitAck(memberA, 'member:answer:submit', { guess: 'Tema' })
+    assert.equal(wrongGuess.ok, true)
+    assert.equal(wrongGuess.correct, false)
+    await noLeakPromise
+  } finally {
+    await harness.close()
+  }
+})
+
+test('session switch leaves old member room even when previous session cache is evicted', async () => {
+  const harness = await createHarness()
+  try {
+    const hostA = await harness.connect()
+    const hostB = await harness.connect()
+    const switcher = await harness.connect()
+    const memberA = await harness.connect()
+    const first = await harness.createSession('pin-a')
+    const second = await harness.createSession('pin-b')
+
+    await authHost(hostA, first.sessionCode, first.pin)
+    await emitAck(hostA, 'host:setup', {
+      teams: TEAMS,
+      gameplayMode: 'hostless',
+      roundCatalog: [HOSTLESS_CUSTOM_ROUND],
+      gamePlan: ['intro:hostless-custom', 'q:hostless-custom:hcq-1'],
+    })
+    await emitAck(hostA, 'host:question:set', 'q:hostless-custom:hcq-1')
+    await emitAck(switcher, 'member:join', first.sessionCode, 0, 'Alice')
+
+    harness.getSessions().delete(first.sessionCode)
+
+    await authHost(hostB, second.sessionCode, second.pin)
+    await emitAck(hostB, 'host:setup', TEAMS)
+    const joinedSecond = await emitAck(switcher, 'member:join', second.sessionCode, 1, 'Alice')
+    assert.equal(joinedSecond.teamIndex, 1)
+
+    await emitAck(memberA, 'member:join', first.sessionCode, 1, 'Bob')
+    const noLeakPromise = waitNoEvent(switcher, 'answer:attempt', 300)
+    const wrongGuess = await emitAck(memberA, 'member:answer:submit', { guess: 'Tema' })
+    assert.equal(wrongGuess.ok, true)
+    assert.equal(wrongGuess.correct, false)
+    await noLeakPromise
   } finally {
     await harness.close()
   }
