@@ -92,7 +92,7 @@ export default function GameConfigMainPanel({
                 onClick={() => onEditActiveRound(activeRow.round.id)}
                 title="Edit this custom round for this session only."
               >
-                Edit session copy
+                Edit for session
               </button>
             ) : (
               <span
@@ -107,7 +107,7 @@ export default function GameConfigMainPanel({
                   className="gc2-toolbar-btn"
                   disabled
                 >
-                  Edit selection
+                  Edit for session
                 </button>
               </span>
             )}

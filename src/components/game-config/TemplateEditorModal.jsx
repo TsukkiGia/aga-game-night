@@ -312,7 +312,7 @@ export default function TemplateEditorModal({
 
                 <div className="tpl-editor-fields">
                   <label className="game-config-field-label">
-                    Prompt text <span className="tpl-field-hint">what the host reads · what players see</span>
+                    Prompt text <span className="tpl-field-hint">What players see</span>
                     <textarea
                       className="team-name-input game-config-field tpl-prompt-textarea"
                       value={selectedQ.promptText}
@@ -356,7 +356,7 @@ export default function TemplateEditorModal({
                   </label>
 
                   <label className="game-config-field-label">
-                    Explanation <span className="tpl-field-hint">shown after reveal (optional)</span>
+                    Explanation <span className="tpl-field-hint">Shown after reveal (optional)</span>
                     <textarea
                       className="team-name-input game-config-field game-config-template-textarea"
                       value={selectedQ.explanation}
