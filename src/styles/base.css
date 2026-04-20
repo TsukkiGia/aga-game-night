@@ -81,3 +81,46 @@
   color: var(--text-muted);
   opacity: 0.28;
 }
+
+/* ══════════════════════════════════════════
+   SHARED CLOSE BUTTON
+══════════════════════════════════════════ */
+.close-icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #f5f0e8;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  font-family: system-ui, sans-serif;
+  line-height: 1;
+  padding: 0;
+}
+
+.close-icon-btn > span {
+  display: block;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.close-icon-btn:hover {
+  background: #ece5da;
+  color: var(--text);
+}
+
+.close-icon-btn--ghost-light {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.25);
+}
+
+.close-icon-btn--ghost-light:hover {
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+}

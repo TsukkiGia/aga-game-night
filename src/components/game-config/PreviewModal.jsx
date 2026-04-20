@@ -1,5 +1,6 @@
 import { questionPreviewMedia } from './helpers'
 import { toYouTubeEmbedUrl } from '../../utils/mediaPrompt'
+import CloseIconButton from '../CloseIconButton'
 
 function getPreviewMedia(round, question) {
   const media = questionPreviewMedia(round, question)
@@ -12,16 +13,21 @@ function getPreviewMedia(round, question) {
 
 export default function PreviewModal({
   previewRow,
-  saveSuccess,
+  saveSuccess = { roundId: '', text: '' },
   previewSearch,
   setPreviewSearch,
   previewSearchNormalized,
   previewMatchesLabel,
   previewItems,
   onClose,
-  onToggleRound,
-  onToggleQuestion,
+  onToggleRound = () => {},
+  onToggleQuestion = () => {},
+  mode = 'selection',
+  isRoundAdded = false,
+  onAddRound = () => {},
+  onRemoveRound = () => {},
 }) {
+  const isCommunityMode = mode === 'community'
   const { round, displayIndex, selectedCount, questionIds, allSelected } = previewRow
   const total = questionIds.length
 
@@ -33,17 +39,21 @@ export default function PreviewModal({
         <div className="gcpv-header">
           <div className="gcpv-header-top">
             <span className={`gcpv-round-pill type-${round.type}`}>
-              Round {displayIndex} · {round.name}
+              {isCommunityMode ? `Community Round · ${round.name}` : `Round ${displayIndex} · ${round.name}`}
             </span>
             <div className="gcpv-header-right">
-              <span className="gcpv-selected-count">{selectedCount} / {total} selected</span>
-              <button type="button" className="gcpv-close-btn" onClick={onClose} aria-label="Close">×</button>
+              <span className="gcpv-selected-count">
+                {isCommunityMode
+                  ? `${total} question${total === 1 ? '' : 's'}`
+                  : `${selectedCount} / ${total} selected`}
+              </span>
+              <CloseIconButton onClick={onClose} />
             </div>
           </div>
 
           <h2 className="gcpv-title">{round.name}</h2>
           {round.intro && <p className="gcpv-intro">{round.intro}</p>}
-          {saveSuccess.roundId === round.id && (
+          {!isCommunityMode && saveSuccess.roundId === round.id && (
             <div className="gcpv-success">{saveSuccess.text}</div>
           )}
 
@@ -72,17 +82,19 @@ export default function PreviewModal({
           {previewItems.map(({ key, question, questionId, questionIndex, selected, headline, detail, tags, answer }) => {
             const previewMedia = getPreviewMedia(round, question)
             return (
-            <div key={key} className={`gcpv-question${selected ? ' selected' : ''}`}>
+            <div key={key} className={`gcpv-question${!isCommunityMode && selected ? ' selected' : ''}`}>
               <div className="gcpv-q-head">
                 <span className="gcpv-q-num">Q{questionIndex + 1}</span>
-                <button
-                  type="button"
-                  className={`gcpv-q-check${selected ? ' selected' : ''}`}
-                  aria-pressed={selected}
-                  onClick={() => { if (questionId) onToggleQuestion(questionId) }}
-                >
-                  {selected ? '✓' : ''}
-                </button>
+                {!isCommunityMode && (
+                  <button
+                    type="button"
+                    className={`gcpv-q-check${selected ? ' selected' : ''}`}
+                    aria-pressed={selected}
+                    onClick={() => { if (questionId) onToggleQuestion(questionId) }}
+                  >
+                    {selected ? '✓' : ''}
+                  </button>
+                )}
               </div>
 
               <div className="gcpv-q-title">{headline}</div>
@@ -137,16 +149,30 @@ export default function PreviewModal({
 
         {/* ── Footer ── */}
         <div className="gcpv-footer">
-          <span className="gcpv-footer-count">{selectedCount} selected</span>
+          <span className="gcpv-footer-count">
+            {isCommunityMode
+              ? `${total} question${total === 1 ? '' : 's'}`
+              : `${selectedCount} selected`}
+          </span>
           <div className="gcpv-footer-actions">
             <button type="button" className="gcpv-footer-close" onClick={onClose}>Close</button>
-            <button
-              type="button"
-              className="gcpv-footer-select"
-              onClick={() => onToggleRound(previewRow)}
-            >
-              {allSelected ? 'Clear all' : 'Select all'}
-            </button>
+            {isCommunityMode ? (
+              <button
+                type="button"
+                className="gcpv-footer-select"
+                onClick={isRoundAdded ? onRemoveRound : onAddRound}
+              >
+                {isRoundAdded ? 'Remove from Run of Show' : 'Add to Run of Show'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="gcpv-footer-select"
+                onClick={() => onToggleRound(previewRow)}
+              >
+                {allSelected ? 'Clear all' : 'Select all'}
+              </button>
+            )}
           </div>
         </div>
       </div>

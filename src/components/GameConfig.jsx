@@ -2,18 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import rounds from '../rounds'
 import { buildPlanCatalog } from '../gamePlan'
 import {
-  CUSTOM_ROUND_TYPE,
+  isCustomTemplateRound,
   normalizeRoundCatalog,
-  templateToRound,
 } from '../roundCatalog'
-import { mediaUrlFeedback } from '../utils/mediaPrompt'
-import { DEFAULT_QUESTION, DEFAULT_SCORING } from './game-config/constants'
 import {
   buildSnapshotPayloadFromSelection,
   buildHealthyDefaultSelection,
-  buildEditorSnapshot,
   buildInitialSelection,
-  cloneJson,
   questionPreviewAnswer,
   questionPreviewDetail,
   questionPreviewHeadline,
@@ -21,24 +16,12 @@ import {
 } from './game-config/helpers'
 import PreviewModal from './game-config/PreviewModal'
 import TemplateEditorModal from './game-config/TemplateEditorModal'
+import BrowseTemplatesModal from './game-config/BrowseTemplatesModal'
+import RoundSidebar from './game-config/RoundSidebar'
+import GameConfigMainPanel from './game-config/GameConfigMainPanel'
 import { useRoundOrder } from './game-config/useRoundOrder'
 import { useTemplateLibrary } from './game-config/useTemplateLibrary'
-
-const TYPE_LABEL = {
-  video: 'Video',
-  slang: 'Slang',
-  charades: 'Charades',
-  thesis: 'Thesis',
-  'custom-buzz': 'Buzz',
-}
-
-const TYPE_THUMB = {
-  video: '▶',
-  charades: 'ACT',
-  slang: 'SLG',
-  thesis: 'TXT',
-  'custom-buzz': 'BZZ',
-}
+import { useTemplateEditor } from './game-config/useTemplateEditor'
 
 export default function GameConfig({
   session,
@@ -60,30 +43,21 @@ export default function GameConfig({
     templatesError,
   } = useTemplateLibrary({ session, initialCatalog })
 
-  const [showCreator, setShowCreator] = useState(false)
+  const [showBrowseTemplates, setShowBrowseTemplates] = useState(false)
+  const [browseSearch, setBrowseSearch] = useState('')
   const [previewRoundId, setPreviewRoundId] = useState('')
   const [previewSearch, setPreviewSearch] = useState('')
-  const [creatorMode, setCreatorMode] = useState('create')
-  const [editingRoundId, setEditingRoundId] = useState('')
-  const [editingTemplateId, setEditingTemplateId] = useState('')
-
-  const [createError, setCreateError] = useState('')
-  const [saveSuccess, setSaveSuccess] = useState({ roundId: '', text: '' })
-  const [editorBaseline, setEditorBaseline] = useState(() => buildEditorSnapshot({
-    name: '',
-    intro: '',
-    rules: [],
-    scoring: cloneJson(DEFAULT_SCORING),
-    questions: [cloneJson(DEFAULT_QUESTION)],
-  }))
+  const [communityPreviewRoundId, setCommunityPreviewRoundId] = useState('')
+  const [communityPreviewSearch, setCommunityPreviewSearch] = useState('')
   const [roundClearConfirmId, setRoundClearConfirmId] = useState('')
   const [recentlyClearedRound, setRecentlyClearedRound] = useState(null)
-  const [createSubmitting, setCreateSubmitting] = useState(false)
-  const [newTemplateName, setNewTemplateName] = useState('')
-  const [newTemplateIntro, setNewTemplateIntro] = useState('')
-  const [newTemplateRules, setNewTemplateRules] = useState([])
-  const [newTemplateScoring, setNewTemplateScoring] = useState(() => cloneJson(DEFAULT_SCORING))
-  const [newTemplateQuestions, setNewTemplateQuestions] = useState(() => [cloneJson(DEFAULT_QUESTION)])
+  const [addedCustomRoundIds, setAddedCustomRoundIds] = useState(() => {
+    const initial = new Set()
+    initialCatalog
+      .filter((round) => isCustomTemplateRound(round))
+      .forEach((round) => initial.add(round.id))
+    return initial
+  })
 
   // New split-panel state
   const [activeRoundId, setActiveRoundId] = useState('')
@@ -94,33 +68,14 @@ export default function GameConfig({
   const roundListScrollTopRef = useRef(0)
   const questionScrollByRoundRef = useRef(new Map())
 
-  function nextQuestionId() {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `cq-${crypto.randomUUID()}`
-    return `cq-${Date.now()}-${Math.floor(Math.random() * 100000)}`
-  }
-
-  useEffect(() => {
-    if ((!showCreator && !previewRoundId) || typeof document === 'undefined') return undefined
-    const { style } = document.body
-    const prevOverflow = style.overflow
-    const prevPaddingRight = style.paddingRight
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
-
-    style.overflow = 'hidden'
-    if (scrollbarWidth > 0) style.paddingRight = `${scrollbarWidth}px`
-
-    return () => {
-      style.overflow = prevOverflow
-      style.paddingRight = prevPaddingRight
-    }
-  }, [showCreator, previewRoundId])
-
   const combinedCatalog = useMemo(() => {
     const byId = new Map()
     builtinRounds.forEach((round) => byId.set(round.id, round))
-    customTemplates.forEach((round) => byId.set(round.id, round))
+    customTemplates
+      .filter((round) => addedCustomRoundIds.has(round.id))
+      .forEach((round) => byId.set(round.id, round))
     return [...byId.values()]
-  }, [builtinRounds, customTemplates])
+  }, [builtinRounds, customTemplates, addedCustomRoundIds])
 
   const {
     setRoundOrder,
@@ -140,6 +95,7 @@ export default function GameConfig({
       return {
         round,
         roundIndex,
+        orderIndex: roundIndex,
         displayIndex: roundIndex + 1,
         questionIds,
         selectedCount,
@@ -149,32 +105,82 @@ export default function GameConfig({
     })
   }, [orderedCatalog, PLAN_CATALOG, selectedQuestionIds])
 
-  // Default activeRoundId to first round once available
-  useEffect(() => {
-    if (!activeRoundId && roundRows.length > 0) {
-      setActiveRoundId(roundRows[0].round.id)
-    }
+  const resolvedActiveRoundId = useMemo(() => {
+    if (roundRows.length === 0) return ''
+    const stillExists = roundRows.some((row) => row.round.id === activeRoundId)
+    if (stillExists) return activeRoundId
+    return roundRows[0].round.id
   }, [roundRows, activeRoundId])
 
   useEffect(() => {
-    if (!activeRoundId) return undefined
+    if (!resolvedActiveRoundId) return undefined
     const restore = () => {
       if (roundListRef.current) {
         roundListRef.current.scrollTop = roundListScrollTopRef.current
       }
       if (questionScrollRef.current) {
-        const savedTop = questionScrollByRoundRef.current.get(activeRoundId)
+        const savedTop = questionScrollByRoundRef.current.get(resolvedActiveRoundId)
         questionScrollRef.current.scrollTop = Number.isFinite(savedTop) ? savedTop : 0
       }
     }
     const rafId = requestAnimationFrame(restore)
     return () => cancelAnimationFrame(rafId)
-  }, [activeRoundId])
+  }, [resolvedActiveRoundId])
 
   const activeRow = useMemo(
-    () => roundRows.find((row) => row.round.id === activeRoundId) || roundRows[0] || null,
-    [roundRows, activeRoundId]
+    () => roundRows.find((row) => row.round.id === resolvedActiveRoundId) || roundRows[0] || null,
+    [roundRows, resolvedActiveRoundId]
   )
+
+  const {
+    showCreator,
+    creatorMode,
+    newTemplateName,
+    setNewTemplateName,
+    newTemplateIntro,
+    setNewTemplateIntro,
+    newTemplateRules,
+    setNewTemplateRules,
+    newTemplateScoring,
+    setNewTemplateScoring,
+    newTemplateQuestions,
+    setNewTemplateQuestions,
+    createError,
+    createSubmitting,
+    saveSuccess,
+    isEditorDirty,
+    inlineValidationError,
+    canSubmitCreator,
+    openCreateTemplateModal,
+    openSessionRoundEditor,
+    closeCreator,
+    handleCreateTemplate,
+    handleSaveSessionRoundEdits,
+    clearSaveSuccess,
+    nextQuestionId,
+  } = useTemplateEditor({
+    session,
+    roundRows,
+    setCustomTemplates,
+    onClearRoundConfirm: () => setRoundClearConfirmId(''),
+    onReturnToPreview: setPreviewRoundId,
+  })
+
+  useEffect(() => {
+    if ((!showCreator && !previewRoundId && !showBrowseTemplates && !communityPreviewRoundId) || typeof document === 'undefined') return undefined
+    const { style } = document.body
+    const prevOverflow = style.overflow
+    const prevPaddingRight = style.paddingRight
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+
+    style.overflow = 'hidden'
+    if (scrollbarWidth > 0) style.paddingRight = `${scrollbarWidth}px`
+
+    return () => {
+      style.overflow = prevOverflow
+      style.paddingRight = prevPaddingRight
+    }
+  }, [showCreator, previewRoundId, showBrowseTemplates, communityPreviewRoundId])
 
   const activeQuestions = useMemo(() => {
     if (!activeRow) return []
@@ -242,14 +248,64 @@ export default function GameConfig({
     return `${count} of ${total} match${count === 1 ? '' : 'es'}`
   }, [previewItems.length, previewRow, previewSearchNormalized])
 
-  const currentEditorSnapshot = useMemo(() => buildEditorSnapshot({
-    name: newTemplateName,
-    intro: newTemplateIntro,
-    rules: newTemplateRules,
-    scoring: newTemplateScoring,
-    questions: newTemplateQuestions,
-  }), [newTemplateName, newTemplateIntro, newTemplateRules, newTemplateScoring, newTemplateQuestions])
-  const isEditorDirty = showCreator && currentEditorSnapshot !== editorBaseline
+  const communityPreviewRound = useMemo(
+    () => customTemplates.find((round) => round.id === communityPreviewRoundId) || null,
+    [customTemplates, communityPreviewRoundId]
+  )
+  const communityPreviewRow = useMemo(() => {
+    if (!communityPreviewRound) return null
+    return {
+      round: communityPreviewRound,
+      displayIndex: 0,
+      selectedCount: 0,
+      questionIds: communityPreviewRound.questions.map((question, questionIndex) => (
+        String(question?.id || '').trim() || `${communityPreviewRound.id}-q${questionIndex + 1}`
+      )),
+      allSelected: false,
+    }
+  }, [communityPreviewRound])
+  const communityPreviewSearchNormalized = useMemo(
+    () => String(communityPreviewSearch || '').trim().toLowerCase(),
+    [communityPreviewSearch]
+  )
+  const communityPreviewItems = useMemo(() => {
+    if (!communityPreviewRow) return []
+    return communityPreviewRow.round.questions
+      .map((question, questionIndex) => {
+        const questionId = communityPreviewRow.questionIds[questionIndex]
+        const headline = questionPreviewHeadline(communityPreviewRow.round, question, questionIndex)
+        const detail = questionPreviewDetail(communityPreviewRow.round, question)
+        const tags = questionPreviewTags(communityPreviewRow.round, question)
+        const answer = questionPreviewAnswer(communityPreviewRow.round, question)
+        const searchable = [
+          `q${questionIndex + 1}`, headline, detail, answer, ...tags,
+          question?.promptText, question?.mediaUrl, question?.explanation,
+          question?.answer, question?.term, question?.meaning, question?.sentence,
+          question?.phrase, question?.title,
+          Array.isArray(question?.options) ? question.options.join(' ') : '',
+          Array.isArray(question?.countries) ? question.countries.join(' ') : '',
+        ].map((value) => String(value || '').toLowerCase()).join(' ')
+        return {
+          key: questionId || `${communityPreviewRow.round.id}-q${questionIndex + 1}`,
+          question,
+          questionIndex,
+          questionId,
+          selected: false,
+          headline,
+          detail,
+          tags,
+          answer,
+          searchable,
+        }
+      })
+      .filter((item) => !communityPreviewSearchNormalized || item.searchable.includes(communityPreviewSearchNormalized))
+  }, [communityPreviewRow, communityPreviewSearchNormalized])
+  const communityPreviewMatchesLabel = useMemo(() => {
+    if (!communityPreviewRow || !communityPreviewSearchNormalized) return ''
+    const count = communityPreviewItems.length
+    const total = communityPreviewRow.questionIds.length
+    return `${count} of ${total} match${count === 1 ? '' : 'es'}`
+  }, [communityPreviewItems.length, communityPreviewRow, communityPreviewSearchNormalized])
 
   useEffect(() => {
     if (!roundClearConfirmId) return undefined
@@ -333,7 +389,19 @@ export default function GameConfig({
     setPreviewRoundId('')
     setPreviewSearch('')
     setRoundClearConfirmId('')
-    setSaveSuccess((prev) => (prev.roundId ? { roundId: '', text: '' } : prev))
+    clearSaveSuccess()
+  }
+
+  function openCommunityRoundPreview(roundId) {
+    const id = String(roundId || '').trim()
+    if (!id) return
+    setCommunityPreviewRoundId(id)
+    setCommunityPreviewSearch('')
+  }
+
+  function closeCommunityRoundPreview() {
+    setCommunityPreviewRoundId('')
+    setCommunityPreviewSearch('')
   }
 
   function toggleQuestion(questionId) {
@@ -381,175 +449,7 @@ export default function GameConfig({
     }
     onConfirm(payload)
   }
-
-  function resetCreator() {
-    const defaultQuestions = [cloneJson(DEFAULT_QUESTION)]
-    setCreatorMode('create')
-    setEditingRoundId('')
-    setEditingTemplateId('')
-    setNewTemplateName('')
-    setNewTemplateIntro('')
-    setNewTemplateRules([])
-    setNewTemplateScoring(cloneJson(DEFAULT_SCORING))
-    setNewTemplateQuestions(defaultQuestions)
-    setEditorBaseline(buildEditorSnapshot({
-      name: '', intro: '', rules: [], scoring: cloneJson(DEFAULT_SCORING), questions: defaultQuestions,
-    }))
-    setCreateError('')
-  }
-
-  function closeCreator(options = {}) {
-    if (!options.skipConfirm && isEditorDirty && typeof window !== 'undefined') {
-      const confirmed = window.confirm('Discard unsaved changes?')
-      if (!confirmed) return
-    }
-    const roundIdAtClose = String(editingRoundId || '').trim()
-    const shouldReturnToPreview = options.returnToPreview ?? false
-    setShowCreator(false)
-    resetCreator()
-    if (shouldReturnToPreview && roundIdAtClose) setPreviewRoundId(roundIdAtClose)
-  }
-
-  function openCreateTemplateModal() {
-    resetCreator()
-    setCreatorMode('create')
-    setShowCreator(true)
-  }
-
-  function openSessionRoundEditor(roundId) {
-    const id = String(roundId || '').trim()
-    if (!id) return
-    const row = roundRows.find((item) => item.round.id === id)
-    if (!row) return
-    const round = row.round
-    if (round.type !== CUSTOM_ROUND_TYPE) return
-
-    const nextRules = Array.isArray(round.rules) ? cloneJson(round.rules) : []
-    const scoringSource = Array.isArray(round.scoring) && round.scoring.length > 0
-      ? round.scoring
-      : cloneJson(DEFAULT_SCORING)
-    const nextScoring = scoringSource.map((entry) => ({
-      label: String(entry?.label || '').trim(),
-      points: Number.parseInt(entry?.points, 10) || 0,
-      phase: String(entry?.phase || 'normal').trim().toLowerCase() === 'steal' ? 'steal' : 'normal',
-    }))
-    const questionsSource = Array.isArray(round.questions) && round.questions.length > 0
-      ? round.questions
-      : [cloneJson(DEFAULT_QUESTION)]
-    const nextQuestions = questionsSource.map((question, index) => {
-      const base = cloneJson(DEFAULT_QUESTION)
-      const merged = { ...base, ...(cloneJson(question || {})) }
-      return {
-        ...merged,
-        id: String(merged?.id || '').trim() || `${id}-q${index + 1}`,
-      }
-    })
-
-    setCreatorMode('session-edit')
-    setEditingRoundId(id)
-    setEditingTemplateId(String(round.templateId || '').trim())
-    setNewTemplateName(String(round.name || '').trim())
-    setNewTemplateIntro(String(round.intro || '').trim())
-    setNewTemplateRules(nextRules)
-    setNewTemplateScoring(nextScoring)
-    setNewTemplateQuestions(nextQuestions)
-    setEditorBaseline(buildEditorSnapshot({
-      name: String(round.name || '').trim(),
-      intro: String(round.intro || '').trim(),
-      rules: nextRules,
-      scoring: nextScoring,
-      questions: nextQuestions,
-    }))
-    setCreateError('')
-    setRoundClearConfirmId('')
-    setShowCreator(true)
-  }
-
-  function validateTemplate() {
-    if (!newTemplateName.trim()) return 'Round name is required.'
-    const filledScoring = newTemplateScoring.filter((row) => String(row.label || '').trim())
-    if (filledScoring.length === 0) return 'Add at least one scoring row with a label.'
-    if (newTemplateQuestions.length === 0) return 'Add at least one question.'
-    for (let i = 0; i < newTemplateQuestions.length; i += 1) {
-      const q = newTemplateQuestions[i]
-      if (!String(q.answer || '').trim()) return `Q${i + 1}: answer is required.`
-      if (q.promptType === 'text' && !String(q.promptText || '').trim()) return `Q${i + 1}: prompt text is required.`
-      if ((q.promptType === 'image' || q.promptType === 'video') && !String(q.mediaUrl || '').trim()) return `Q${i + 1}: media URL is required.`
-      const feedback = mediaUrlFeedback(q)
-      if (feedback?.kind === 'error') return `Q${i + 1}: ${feedback.message}`
-    }
-    return null
-  }
-
-  async function handleCreateTemplate() {
-    const validationError = validateTemplate()
-    if (validationError) { setCreateError(validationError); return }
-    if (!session?.code || !session?.pin) { setCreateError('Session credentials are required.'); return }
-    const payload = {
-      name: newTemplateName, intro: newTemplateIntro, type: CUSTOM_ROUND_TYPE,
-      rules: newTemplateRules.map((rule) => String(rule || '').trim()).filter(Boolean),
-      scoring: newTemplateScoring.map((row) => ({ label: row.label, points: Number(row.points), phase: row.phase })),
-      questions: newTemplateQuestions.map((question) => ({
-        id: question.id, promptType: question.promptType, promptText: question.promptText,
-        mediaUrl: question.mediaUrl, answer: question.answer, explanation: question.explanation,
-      })),
-    }
-    setCreateSubmitting(true)
-    setCreateError('')
-    try {
-      const res = await fetch('/api/round-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-session-code': session.code, 'x-host-pin': session.pin },
-        body: JSON.stringify(payload),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok || !data.template) {
-        setCreateError(data.error === 'invalid-template' ? 'Template is incomplete or invalid.' : 'Could not create template.')
-        return
-      }
-      const normalized = templateToRound(data.template)
-      if (!normalized) { setCreateError('Template was saved but could not be loaded.'); return }
-      setCustomTemplates((prev) => {
-        const exists = prev.some((round) => round.id === normalized.id)
-        return exists ? prev : [normalized, ...prev]
-      })
-      closeCreator({ skipConfirm: true })
-    } catch {
-      setCreateError('Could not create template.')
-    } finally {
-      setCreateSubmitting(false)
-    }
-  }
-
-  function handleSaveSessionRoundEdits() {
-    const validationError = validateTemplate()
-    if (validationError) { setCreateError(validationError); return }
-    const roundId = String(editingRoundId || '').trim()
-    if (!roundId) { setCreateError('Could not find the selected round to edit.'); return }
-    const normalized = normalizeRoundCatalog([{
-      id: roundId, templateId: editingTemplateId || undefined,
-      name: newTemplateName, intro: newTemplateIntro, type: CUSTOM_ROUND_TYPE,
-      rules: newTemplateRules.map((rule) => String(rule || '').trim()).filter(Boolean),
-      scoring: newTemplateScoring.map((row) => ({ label: row.label, points: Number(row.points), phase: row.phase })),
-      questions: newTemplateQuestions.map((question, index) => ({
-        id: String(question?.id || '').trim() || `cq-${index + 1}`,
-        promptType: question.promptType, promptText: question.promptText,
-        mediaUrl: question.mediaUrl, answer: question.answer, explanation: question.explanation,
-      })),
-    }])[0]
-    if (!normalized) { setCreateError('Round is incomplete or invalid.'); return }
-    setCustomTemplates((prev) => {
-      const index = prev.findIndex((round) => round.id === roundId)
-      if (index >= 0) return prev.map((round) => (round.id === roundId ? normalized : round))
-      return [normalized, ...prev]
-    })
-    setSaveSuccess({ roundId, text: 'Saved. Preview updated for this session.' })
-    closeCreator({ skipConfirm: true })
-  }
-
-  const inlineValidationError = showCreator ? validateTemplate() : null
-  const canSubmitCreator = !createSubmitting && isEditorDirty && !inlineValidationError
-  const canEditActiveRound = Boolean(activeRow && activeRow.round.type === CUSTOM_ROUND_TYPE)
+  const canEditActiveRound = Boolean(activeRow && isCustomTemplateRound(activeRow.round))
 
   if (!templatesBootstrapped) {
     return (
@@ -565,235 +465,116 @@ export default function GameConfig({
   }
 
   const activeRoundsCount = roundRows.filter((row) => !row.noneSelected).length
+  const browseSearchNormalized = String(browseSearch || '').trim().toLowerCase()
+  const browseTemplateItems = customTemplates
+    .map((round) => {
+      const sampleHeadlines = round.questions.slice(0, 4).map((question) => (
+        [
+          question?.promptText,
+          question?.answer,
+          question?.term,
+          question?.sentence,
+          question?.meaning,
+          question?.title,
+          question?.phrase,
+        ].filter(Boolean).join(' ')
+      )).join(' ')
+      const searchable = [round.name, round.intro, sampleHeadlines]
+        .map((value) => String(value || '').toLowerCase())
+        .join(' ')
+      return {
+        round,
+        added: addedCustomRoundIds.has(round.id),
+        searchable,
+      }
+    })
+    .filter((item) => !browseSearchNormalized || item.searchable.includes(browseSearchNormalized))
+
+  function handleAddCustomRound(roundId) {
+    const id = String(roundId || '').trim()
+    if (!id) return
+    setAddedCustomRoundIds((prev) => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+    setError('')
+  }
+
+  function handleRemoveCustomRound(roundId) {
+    const id = String(roundId || '').trim()
+    if (!id) return
+    const row = roundRows.find((entry) => entry.round.id === id)
+    setAddedCustomRoundIds((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+    if (row?.questionIds?.length) {
+      setSelectedQuestionIds((prev) => {
+        const next = new Set(prev)
+        row.questionIds.forEach((questionId) => next.delete(questionId))
+        return next
+      })
+    }
+  }
+
+  function handleSelectRound(roundId) {
+    if (roundListRef.current) {
+      roundListScrollTopRef.current = roundListRef.current.scrollTop
+    }
+    if (questionScrollRef.current && activeRow?.round?.id) {
+      questionScrollByRoundRef.current.set(activeRow.round.id, questionScrollRef.current.scrollTop)
+    }
+    setActiveRoundId(roundId)
+    setQuestionSearch('')
+  }
 
   return (
     <>
       <div className="gc2-wrap">
-        {/* ── LEFT SIDEBAR ── */}
-        <aside className="gc2-sidebar">
-          <div className="gc2-sidebar-head">
-            <div className="gc2-sidebar-label">Step 2 · Game Plan</div>
-            <h2 className="gc2-sidebar-title">Build your run of show</h2>
-            <div className="gc2-stats">
-              <div className="gc2-stat">
-                <span className="gc2-stat-label">Selected</span>
-                <span className="gc2-stat-value">{selectedQuestions}</span>
-                <span className="gc2-stat-total"> / {totalQuestions}</span>
-              </div>
-              <div className="gc2-stat">
-                <span className="gc2-stat-label">Rounds Active</span>
-                <span className="gc2-stat-value">{activeRoundsCount}</span>
-                <span className="gc2-stat-total"> / {roundRows.length}</span>
-              </div>
-            </div>
-          </div>
+        <RoundSidebar
+          activeRoundId={resolvedActiveRoundId}
+          activeRoundsCount={activeRoundsCount}
+          roundListRef={roundListRef}
+          roundRows={roundRows}
+          selectedQuestions={selectedQuestions}
+          totalQuestions={totalQuestions}
+          onBack={onBack}
+          onContinue={handleContinue}
+          onCreateRound={openCreateTemplateModal}
+          onMoveRound={moveRound}
+          onOpenBrowseTemplates={() => {
+            setShowBrowseTemplates(true)
+            setBrowseSearch('')
+          }}
+          onResetDefault={handleResetDefault}
+          onSelectRound={handleSelectRound}
+        />
 
-          <div className="gc2-round-list" ref={roundListRef}>
-            {roundRows.map((row, index) => {
-              const isActive = activeRow?.round.id === row.round.id
-              const pct = row.questionIds.length > 0
-                ? Math.round((row.selectedCount / row.questionIds.length) * 100)
-                : 0
-              return (
-                <button
-                  key={row.round.id}
-                  type="button"
-                  className={`gc2-round-item${isActive ? ' active' : ''}`}
-                  style={{ '--round-color': `var(--gc2-r${(index % 8) + 1})` }}
-                  onClick={() => {
-                    if (roundListRef.current) {
-                      roundListScrollTopRef.current = roundListRef.current.scrollTop
-                    }
-                    if (questionScrollRef.current && activeRow?.round?.id) {
-                      questionScrollByRoundRef.current.set(activeRow.round.id, questionScrollRef.current.scrollTop)
-                    }
-                    setActiveRoundId(row.round.id)
-                    setQuestionSearch('')
-                  }}
-                >
-                  <div className="gc2-round-item-top">
-                    <div className="gc2-round-item-meta">
-                      <span className="gc2-round-dot" />
-                      <span className="gc2-round-item-number">Round {row.displayIndex}</span>
-                    </div>
-                    <div className="gc2-round-item-right">
-                      {!row.noneSelected && (
-                        <span className="gc2-round-item-count">{row.selectedCount} / {row.questionIds.length}</span>
-                      )}
-                      {isActive && (
-                        <div className="gc2-round-item-controls">
-                          <button type="button" className="gc2-move-btn" onClick={(e) => { e.stopPropagation(); moveRound(row.round.id, -1) }} disabled={index === 0} title="Move up">↑</button>
-                          <button type="button" className="gc2-move-btn" onClick={(e) => { e.stopPropagation(); moveRound(row.round.id, 1) }} disabled={index === roundRows.length - 1} title="Move down">↓</button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="gc2-round-item-name">{row.round.name}</div>
-                  <div className="gc2-round-progress">
-                    <div className="gc2-round-progress-fill" style={{ width: `${pct}%` }} />
-                  </div>
-                </button>
-              )
-            })}
-
-            <button type="button" className="gc2-new-round-btn" onClick={openCreateTemplateModal}>
-              + New Custom Round
-            </button>
-          </div>
-
-          <div className="gc2-sidebar-footer">
-            <button type="button" className="gc2-footer-btn gc2-footer-back" onClick={onBack}>← Back</button>
-            <button type="button" className="gc2-footer-btn gc2-footer-reset" onClick={handleResetDefault}>Default</button>
-            <button type="button" className="gc2-footer-btn gc2-footer-continue" onClick={handleContinue} disabled={selectedQuestions === 0}>
-              Continue →
-            </button>
-          </div>
-        </aside>
-
-        {/* ── RIGHT MAIN ── */}
-        <main className="gc2-main">
-          {activeRow && (
-            <>
-              <div className="gc2-main-header">
-                <div className="gc2-main-header-left">
-                  <span className={`gc2-main-pill type-${activeRow.round.type}`}>
-                    Round {activeRow.displayIndex}
-                  </span>
-                  <h2 className="gc2-main-title">{activeRow.round.name}</h2>
-                  {activeRow.round.intro && (
-                    <p className="gc2-main-intro">{activeRow.round.intro}</p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="gc2-full-preview-btn"
-                  onClick={() => openRoundPreview(activeRow.round.id)}
-                >
-                  Round preview →
-                </button>
-              </div>
-
-              <div className="gc2-toolbar">
-                <input
-                  type="text"
-                  className="gc2-search"
-                  value={questionSearch}
-                  onChange={(e) => setQuestionSearch(e.target.value)}
-                  placeholder={`Search ${activeRow.questionIds.length} questions by prompt, answer, or tag`}
-                />
-                <div className="gc2-view-toggle">
-                  <button
-                    type="button"
-                    className={`gc2-view-btn${viewMode === 'grid' ? ' active' : ''}`}
-                    onClick={() => setViewMode('grid')}
-                  >Grid</button>
-                  <button
-                    type="button"
-                    className={`gc2-view-btn${viewMode === 'list' ? ' active' : ''}`}
-                    onClick={() => setViewMode('list')}
-                  >List</button>
-                </div>
-                <button type="button" className="gc2-toolbar-btn" onClick={handleSelectAllActive}>
-                  Select all
-                </button>
-                <button type="button" className="gc2-toolbar-btn" onClick={handleClearActive}>
-                  Clear
-                </button>
-                <button
-                  type="button"
-                  className="gc2-toolbar-btn"
-                  onClick={() => activeRow && openSessionRoundEditor(activeRow.round.id)}
-                  disabled={!canEditActiveRound}
-                  title={canEditActiveRound
-                    ? 'Edit this custom round for this session only.'
-                    : 'Built-in rounds support question selection only.'}
-                >
-                  {canEditActiveRound ? 'Edit session copy' : 'Edit selection'}
-                </button>
-              </div>
-
-              {recentlyClearedRound && (
-                <div className="gc2-undo-bar">
-                  <span>{recentlyClearedRound.roundName} cleared.</span>
-                  <button type="button" onClick={handleUndoClearRound}>Undo</button>
-                </div>
-              )}
-              {error && <p className="gc2-error">{error}</p>}
-              {templatesError && <p className="gc2-error">{templatesError}</p>}
-
-              <div
-                className="gc2-question-scroll"
-                ref={questionScrollRef}
-                onScroll={() => {
-                  if (!questionScrollRef.current || !activeRow?.round?.id) return
-                  questionScrollByRoundRef.current.set(activeRow.round.id, questionScrollRef.current.scrollTop)
-                }}
-              >
-                {activeQuestions.length === 0 && questionSearch && (
-                  <div className="gc2-empty">No matches for "{questionSearch.trim()}".</div>
-                )}
-                {viewMode === 'list' ? (
-                  <div className="gc2-question-list">
-                    {activeQuestions.map(({ questionIndex, questionId, selected, headline, tags, answer, detail }) => {
-                      const subtitle = [answer || detail, tags[0]].filter(Boolean).join(' · ')
-                      return (
-                        <button
-                          key={questionId || `${activeRow.round.id}-q${questionIndex + 1}`}
-                          type="button"
-                          aria-pressed={selected}
-                          className={`gc2-list-row${selected ? ' selected' : ''}`}
-                          onClick={() => { if (questionId) toggleQuestion(questionId) }}
-                        >
-                          <span className={`gc2-list-sel${selected ? ' selected' : ''}`}>
-                            {selected ? '✓' : ''}
-                          </span>
-                          <div className={`gc2-list-thumb${activeRow.round.type === 'video' ? ' is-video' : ''}`} aria-hidden="true">
-                            {TYPE_THUMB[activeRow.round.type] || 'Q'}
-                          </div>
-                          <div className="gc2-list-content">
-                            <div className="gc2-list-title">
-                              <span className="gc2-list-q-num">Q{questionIndex + 1}</span>
-                              {headline}
-                            </div>
-                            {subtitle && <div className="gc2-list-sub">{subtitle}</div>}
-                          </div>
-                          <div className="gc2-list-tags">
-                            {tags.slice(1).map((tag, i) => (
-                              <span key={i} className="gc2-list-tag">{tag}</span>
-                            ))}
-                            {tags[0] && <span className="gc2-list-tag">{tags[0]}</span>}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="gc2-question-grid">
-                    {activeQuestions.map(({ questionIndex, questionId, selected, headline, answer }) => {
-                      const hasAnswer = answer && activeRow.round.type !== 'charades' && activeRow.round.type !== 'thesis'
-                      return (
-                        <button
-                          key={questionId || `${activeRow.round.id}-q${questionIndex + 1}`}
-                          type="button"
-                          aria-pressed={selected}
-                          className={`gc2-q-card${selected ? ' selected' : ''}`}
-                          onClick={() => { if (questionId) toggleQuestion(questionId) }}
-                        >
-                          <div className="gc2-q-label">
-                            <span>Q{questionIndex + 1} · {TYPE_LABEL[activeRow.round.type] || 'Q'}</span>
-                            <span className="gc2-q-check" aria-hidden="true">{selected ? '✓' : ''}</span>
-                          </div>
-                          <div className="gc2-q-title">{headline}</div>
-                          {hasAnswer && <div className="gc2-q-answer">{answer}</div>}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </main>
+        <GameConfigMainPanel
+          activeRow={activeRow}
+          questionSearch={questionSearch}
+          onQuestionSearchChange={setQuestionSearch}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onSelectAllActive={handleSelectAllActive}
+          onClearActive={handleClearActive}
+          onEditActiveRound={openSessionRoundEditor}
+          canEditActiveRound={canEditActiveRound}
+          recentlyClearedRound={recentlyClearedRound}
+          onUndoClearRound={handleUndoClearRound}
+          error={error}
+          templatesError={templatesError}
+          questionScrollRef={questionScrollRef}
+          onQuestionScroll={() => {
+            if (!questionScrollRef.current || !activeRow?.round?.id) return
+            questionScrollByRoundRef.current.set(activeRow.round.id, questionScrollRef.current.scrollTop)
+          }}
+          activeQuestions={activeQuestions}
+          onToggleQuestion={toggleQuestion}
+          onOpenRoundPreview={openRoundPreview}
+        />
       </div>
 
       {previewRow && (
@@ -808,6 +589,34 @@ export default function GameConfig({
           onClose={closeRoundPreview}
           onToggleRound={handleRoundToggle}
           onToggleQuestion={toggleQuestion}
+        />
+      )}
+
+      {showBrowseTemplates && (
+        <BrowseTemplatesModal
+          items={browseTemplateItems}
+          search={browseSearch}
+          setSearch={setBrowseSearch}
+          onPreview={openCommunityRoundPreview}
+          onAdd={handleAddCustomRound}
+          onRemove={handleRemoveCustomRound}
+          onClose={() => setShowBrowseTemplates(false)}
+        />
+      )}
+
+      {communityPreviewRow && (
+        <PreviewModal
+          mode="community"
+          previewRow={communityPreviewRow}
+          previewSearch={communityPreviewSearch}
+          setPreviewSearch={setCommunityPreviewSearch}
+          previewSearchNormalized={communityPreviewSearchNormalized}
+          previewMatchesLabel={communityPreviewMatchesLabel}
+          previewItems={communityPreviewItems}
+          isRoundAdded={addedCustomRoundIds.has(communityPreviewRow.round.id)}
+          onAddRound={() => handleAddCustomRound(communityPreviewRow.round.id)}
+          onRemoveRound={() => handleRemoveCustomRound(communityPreviewRow.round.id)}
+          onClose={closeCommunityRoundPreview}
         />
       )}
 
