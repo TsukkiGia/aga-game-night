@@ -154,6 +154,7 @@ npm run build
 
 - Country outline map icons by [djaiss/mapsicon](https://github.com/djaiss/mapsicon), served via jsDelivr CDN.
 - Flag images by [flagcdn.com](https://flagcdn.com).
+- Dish and city photos from [Wikimedia Commons](https://commons.wikimedia.org), used under Creative Commons licenses.
 
 ## Helpful URLs
 

@@ -17,7 +17,10 @@ export default function CloseIconButton({
       aria-label={ariaLabel}
       title={title || ariaLabel}
     >
-      <span aria-hidden="true">×</span>
+      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+        <path d="M6 6L18 18" />
+        <path d="M18 6L6 18" />
+      </svg>
     </button>
   )
 }

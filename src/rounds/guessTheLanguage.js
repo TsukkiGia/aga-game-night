@@ -321,7 +321,7 @@ export default {
     },
     {
       id: 'gtl-lozi',
-      video: 'https://www.youtube.com/watch?v=wuP_E0oFZkY',
+      video: 'https://www.youtube.com/watch?v=wuP_E0oFZkY&start=30',
       answer: 'Lozi',
       countries: ['Zambia', 'Namibia', 'Botswana', 'Zimbabwe', 'South Africa'],
       explanation: 'Lozi (Silozi) is spoken primarily in western Zambia and neighboring countries. It is historically linked to the Barotseland kingdom and is linguistically close to Sesotho in several features.',
