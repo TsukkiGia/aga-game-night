@@ -10,6 +10,7 @@ import StatsModal from './StatsModal'
 import HostHelpModal from './HostHelpModal'
 import HomeLobbyView from './HomeLobbyView'
 import HomeBuzzOverlay from './HomeBuzzOverlay'
+import ModalShell from './ModalShell'
 import { ENDPOINT } from '../config'
 import { socket } from '../socket'
 import rounds from '../rounds'
@@ -388,62 +389,62 @@ export default function Scoreboard({ teams: initialTeams, initialPlanIds, initia
       <HomeBuzzOverlay buzzWinner={buzzWinner} onDismiss={handleDismiss} />
       <HostHelpModal open={showHelp} onClose={() => setShowHelp(false)} hostCompanionUrl={hostCompanionUrl} />
       {authState.required && (
-        <div className="help-overlay" role="dialog" aria-modal="true">
-          <div className="host-auth-modal">
-            <div className="help-popup-tag">Host Sign In</div>
-            <h2 className="host-auth-title">Reconnect Host Controller</h2>
-            <p className="host-auth-sub">Enter session code and host PIN to control this game.</p>
-            {authState.error && <div className="host-auth-error">{authState.error}</div>}
-            <form
-              className="host-auth-form"
-              onSubmit={(e) => {
-                e.preventDefault()
-                void submitAuth(authForm.sessionCode || authState.sessionCode, authForm.pin)
-              }}
-            >
-              <input
-                className="team-name-input session-gate-input"
-                type="text"
-                value={authForm.sessionCode || authState.sessionCode}
-                onChange={(e) => setAuthForm((prev) => ({ ...prev, sessionCode: e.target.value.toUpperCase() }))}
-                placeholder="Session code"
-                maxLength={6}
-                autoComplete="off"
-                disabled={authState.authenticating}
-              />
-              <input
-                className="team-name-input session-gate-input"
-                type="password"
-                inputMode="numeric"
-                value={authForm.pin}
-                onChange={(e) => setAuthForm((prev) => ({ ...prev, pin: e.target.value }))}
-                placeholder="Host PIN"
-                maxLength={8}
-                disabled={authState.authenticating}
-              />
-              <button className="start-btn host-auth-submit-btn" type="submit" disabled={authState.authenticating}>
-                {authState.authenticating ? 'Signing in…' : 'Sign in'}
-              </button>
-            </form>
-          </div>
-        </div>
+        <ModalShell onClose={() => {}} closeOnOverlayClick={false} dialogClassName="host-auth-modal">
+          <div className="help-popup-tag">Host Sign In</div>
+          <h2 className="host-auth-title">Reconnect Host Controller</h2>
+          <p className="host-auth-sub">Enter session code and host PIN to control this game.</p>
+          {authState.error && <div className="host-auth-error">{authState.error}</div>}
+          <form
+            className="host-auth-form"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void submitAuth(authForm.sessionCode || authState.sessionCode, authForm.pin)
+            }}
+          >
+            <input
+              className="team-name-input session-gate-input"
+              type="text"
+              value={authForm.sessionCode || authState.sessionCode}
+              onChange={(e) => setAuthForm((prev) => ({ ...prev, sessionCode: e.target.value.toUpperCase() }))}
+              placeholder="Session code"
+              maxLength={6}
+              autoComplete="off"
+              disabled={authState.authenticating}
+            />
+            <input
+              className="team-name-input session-gate-input"
+              type="password"
+              inputMode="numeric"
+              value={authForm.pin}
+              onChange={(e) => setAuthForm((prev) => ({ ...prev, pin: e.target.value }))}
+              placeholder="Host PIN"
+              maxLength={8}
+              disabled={authState.authenticating}
+            />
+            <button className="start-btn host-auth-submit-btn" type="submit" disabled={authState.authenticating}>
+              {authState.authenticating ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+        </ModalShell>
       )}
       <ReactionLeaderboardModal open={showReactionLeaderboard} rows={questionRaceRows} onClose={() => setShowReactionLeaderboard(false)} />
       {showEndSessionConfirm && (
-        <div className="help-overlay" onClick={() => !endingSession && setShowEndSessionConfirm(false)}>
-          <div className="end-session-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="help-popup-tag">Confirm Action</div>
-            <h2 className="end-session-title">End this session?</h2>
-            <p className="end-session-copy">The session code will stop working and all players will disconnect.</p>
-            {endSessionError && <div className="host-auth-error">{endSessionError}</div>}
-            <div className="end-session-actions">
-              <button className="back-btn" type="button" onClick={() => setShowEndSessionConfirm(false)} disabled={endingSession}>Cancel</button>
-              <button className="home-end-session-btn end-session-confirm-btn" type="button" onClick={confirmEndSession} disabled={endingSession}>
-                {endingSession ? 'Ending…' : 'End Session'}
-              </button>
-            </div>
+        <ModalShell
+          onClose={() => { if (!endingSession) setShowEndSessionConfirm(false) }}
+          closeOnOverlayClick={!endingSession}
+          dialogClassName="end-session-modal"
+        >
+          <div className="help-popup-tag">Confirm Action</div>
+          <h2 className="end-session-title">End this session?</h2>
+          <p className="end-session-copy">The session code will stop working and all players will disconnect.</p>
+          {endSessionError && <div className="host-auth-error">{endSessionError}</div>}
+          <div className="end-session-actions">
+            <button className="back-btn" type="button" onClick={() => setShowEndSessionConfirm(false)} disabled={endingSession}>Cancel</button>
+            <button className="home-end-session-btn end-session-confirm-btn" type="button" onClick={confirmEndSession} disabled={endingSession}>
+              {endingSession ? 'Ending…' : 'End Session'}
+            </button>
           </div>
-        </div>
+        </ModalShell>
       )}
       <HomeLobbyView
         teams={teams}

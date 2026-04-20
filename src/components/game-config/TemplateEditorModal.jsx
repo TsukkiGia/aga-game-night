@@ -4,6 +4,9 @@ import { DEFAULT_QUESTION } from './constants'
 import { cloneJson } from './helpers'
 import { MediaPreview } from './MediaPreviewBlocks'
 import CloseIconButton from '../CloseIconButton'
+import ModalShell from '../ModalShell'
+import ModalHeader from '../ModalHeader'
+import IconRemoveButton from '../IconRemoveButton'
 
 function PointsInput({ value, onChange }) {
   const [draft, setDraft] = useState(null)
@@ -76,27 +79,26 @@ export default function TemplateEditorModal({
   const urlFeedback = selectedQ ? mediaUrlFeedback(selectedQ) : null
 
   return (
-    <div className="help-overlay">
-      <div className="tpl-modal" onClick={(e) => e.stopPropagation()}>
+    <ModalShell onClose={onCloseCreator} closeOnOverlayClick={false} dialogClassName="tpl-modal">
 
-        {/* ── Header ── */}
-        <div className="tpl-header">
-          <div className="tpl-header-left">
-            <div className="help-popup-tag">
-              {creatorMode === 'create' ? 'Create Custom Round' : 'Edit For This Game'}
-            </div>
-            <h3 className="tpl-title">
-              {creatorMode === 'create' ? 'Custom Buzz Round' : (newTemplateName || 'Untitled round')}
-            </h3>
-          </div>
+      {/* ── Header ── */}
+      <ModalHeader
+        className="tpl-header"
+        contentClassName="tpl-header-left"
+        kicker={creatorMode === 'create' ? 'Create Custom Round' : 'Edit For This Game'}
+        title={creatorMode === 'create' ? 'Custom Buzz Round' : (newTemplateName || 'Untitled round')}
+        titleTag="h3"
+        titleClassName="tpl-title"
+        right={(
           <div className="tpl-header-right">
             {isEditorDirty && <div className="game-config-template-dirty dirty">Unsaved changes</div>}
             <CloseIconButton onClick={() => onCloseCreator()} />
           </div>
-        </div>
+        )}
+      />
 
-        {/* ── Body: 3 panels ── */}
-        <div className="tpl-body">
+      {/* ── Body: 3 panels ── */}
+      <div className="tpl-body">
 
           {/* Panel 1: Round settings */}
           <div className="tpl-panel-left">
@@ -147,12 +149,10 @@ export default function TemplateEditorModal({
                         onChange={(e) => setNewTemplateRules((prev) => prev.map((item, i) => i === idx ? e.target.value : item))}
                         placeholder={`Rule ${idx + 1}`}
                       />
-                      <button
-                        type="button"
-                        className="game-config-remove-btn game-config-remove-btn-sm"
+                      <IconRemoveButton
                         onClick={() => setNewTemplateRules((prev) => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx))}
-                        aria-label="Remove rule"
-                      >×</button>
+                        ariaLabel="Remove rule"
+                      />
                     </div>
                   ))}
                   <button type="button" className="game-config-add-row-btn" onClick={() => setNewTemplateRules((prev) => [...prev, ''])}>
@@ -210,12 +210,10 @@ export default function TemplateEditorModal({
                           <option value="normal">Normal</option>
                           <option value="steal">Steal</option>
                         </select>
-                        <button
-                          type="button"
-                          className="game-config-remove-btn game-config-remove-btn-sm"
+                        <IconRemoveButton
                           onClick={() => setNewTemplateScoring((prev) => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx))}
-                          aria-label="Remove scoring row"
-                        >×</button>
+                          ariaLabel="Remove scoring row"
+                        />
                       </div>
                     )
                   })}
@@ -374,28 +372,27 @@ export default function TemplateEditorModal({
             )}
 
           </div>
-        </div>
+      </div>
 
         {/* ── Footer ── */}
-        {(createError || (!createError && inlineValidationError && isEditorDirty)) && (
-          <div className="tpl-error-bar">
-            {createError || `Fix before saving: ${inlineValidationError}`}
-          </div>
-        )}
-        <div className="tpl-footer">
-          <button type="button" className="game-config-template-cancel-btn" onClick={() => onCloseCreator()} disabled={createSubmitting}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="game-config-template-save-btn"
-            onClick={() => { if (creatorMode === 'session-edit') onSaveSessionRoundEdits(); else void onCreateTemplate() }}
-            disabled={!canSubmitCreator}
-          >
-            {creatorMode === 'session-edit' ? 'Save Changes' : (createSubmitting ? 'Creating…' : 'Create Round')}
-          </button>
+      {(createError || (!createError && inlineValidationError && isEditorDirty)) && (
+        <div className="tpl-error-bar">
+          {createError || `Fix before saving: ${inlineValidationError}`}
         </div>
+      )}
+      <div className="tpl-footer">
+        <button type="button" className="game-config-template-cancel-btn" onClick={() => onCloseCreator()} disabled={createSubmitting}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="game-config-template-save-btn"
+          onClick={() => { if (creatorMode === 'session-edit') onSaveSessionRoundEdits(); else void onCreateTemplate() }}
+          disabled={!canSubmitCreator}
+        >
+          {creatorMode === 'session-edit' ? 'Save Changes' : (createSubmitting ? 'Creating…' : 'Create Round')}
+        </button>
       </div>
-    </div>
+    </ModalShell>
   )
 }

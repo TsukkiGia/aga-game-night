@@ -1,6 +1,7 @@
 import { questionPreviewMedia } from './helpers'
 import { toYouTubeEmbedUrl } from '../../utils/mediaPrompt'
 import CloseIconButton from '../CloseIconButton'
+import ModalShell from '../ModalShell'
 
 function getPreviewMedia(round, question) {
   const media = questionPreviewMedia(round, question)
@@ -32,56 +33,55 @@ export default function PreviewModal({
   const total = questionIds.length
 
   return (
-    <div className="help-overlay" onClick={onClose}>
-      <div className="gcpv-modal" onClick={(e) => e.stopPropagation()}>
+    <ModalShell onClose={onClose} dialogClassName="gcpv-modal">
 
-        {/* ── Header ── */}
-        <div className="gcpv-header">
-          <div className="gcpv-header-top">
-            <span className={`gcpv-round-pill type-${round.type}`}>
-              {isCommunityMode ? `Community Round · ${round.name}` : `Round ${displayIndex} · ${round.name}`}
+      {/* ── Header ── */}
+      <div className="gcpv-header">
+        <div className="gcpv-header-top">
+          <span className={`gcpv-round-pill type-${round.type}`}>
+            {isCommunityMode ? `Community Round · ${round.name}` : `Round ${displayIndex} · ${round.name}`}
+          </span>
+          <div className="gcpv-header-right">
+            <span className="gcpv-selected-count">
+              {isCommunityMode
+                ? `${total} question${total === 1 ? '' : 's'}`
+                : `${selectedCount} / ${total} selected`}
             </span>
-            <div className="gcpv-header-right">
-              <span className="gcpv-selected-count">
-                {isCommunityMode
-                  ? `${total} question${total === 1 ? '' : 's'}`
-                  : `${selectedCount} / ${total} selected`}
-              </span>
-              <CloseIconButton onClick={onClose} />
-            </div>
-          </div>
-
-          <h2 className="gcpv-title">{round.name}</h2>
-          {round.intro && <p className="gcpv-intro">{round.intro}</p>}
-          {!isCommunityMode && saveSuccess.roundId === round.id && (
-            <div className="gcpv-success">{saveSuccess.text}</div>
-          )}
-
-          <div className="gcpv-search-row">
-            <input
-              type="text"
-              className="gcpv-search"
-              value={previewSearch}
-              onChange={(e) => setPreviewSearch(e.target.value)}
-              placeholder="Search by question, answer, clue, or tag"
-            />
-            {previewSearchNormalized && (
-              <button type="button" className="gcpv-search-clear" onClick={() => setPreviewSearch('')}>Clear</button>
-            )}
-            {previewMatchesLabel && (
-              <span className="gcpv-search-count">{previewMatchesLabel}</span>
-            )}
+            <CloseIconButton onClick={onClose} />
           </div>
         </div>
 
-        {/* ── Question list ── */}
-        <div className="gcpv-list">
-          {previewItems.length === 0 && previewSearchNormalized && (
-            <div className="gcpv-empty">No matches for "{previewSearch.trim()}".</div>
+        <h2 className="gcpv-title">{round.name}</h2>
+        {round.intro && <p className="gcpv-intro">{round.intro}</p>}
+        {!isCommunityMode && saveSuccess.roundId === round.id && (
+          <div className="gcpv-success">{saveSuccess.text}</div>
+        )}
+
+        <div className="gcpv-search-row">
+          <input
+            type="text"
+            className="gcpv-search"
+            value={previewSearch}
+            onChange={(e) => setPreviewSearch(e.target.value)}
+            placeholder="Search by question, answer, clue, or tag"
+          />
+          {previewSearchNormalized && (
+            <button type="button" className="gcpv-search-clear" onClick={() => setPreviewSearch('')}>Clear</button>
           )}
-          {previewItems.map(({ key, question, questionId, questionIndex, selected, headline, detail, tags, answer }) => {
-            const previewMedia = getPreviewMedia(round, question)
-            return (
+          {previewMatchesLabel && (
+            <span className="gcpv-search-count">{previewMatchesLabel}</span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Question list ── */}
+      <div className="gcpv-list">
+        {previewItems.length === 0 && previewSearchNormalized && (
+          <div className="gcpv-empty">No matches for "{previewSearch.trim()}".</div>
+        )}
+        {previewItems.map(({ key, question, questionId, questionIndex, selected, headline, detail, tags, answer }) => {
+          const previewMedia = getPreviewMedia(round, question)
+          return (
             <div key={key} className={`gcpv-question${!isCommunityMode && selected ? ' selected' : ''}`}>
               <div className="gcpv-q-head">
                 <span className="gcpv-q-num">Q{questionIndex + 1}</span>
@@ -144,38 +144,38 @@ export default function PreviewModal({
                 </div>
               )}
             </div>
-          )})}
-        </div>
+          )
+        })}
+      </div>
 
-        {/* ── Footer ── */}
-        <div className="gcpv-footer">
-          <span className="gcpv-footer-count">
-            {isCommunityMode
-              ? `${total} question${total === 1 ? '' : 's'}`
-              : `${selectedCount} selected`}
-          </span>
-          <div className="gcpv-footer-actions">
-            <button type="button" className="gcpv-footer-close" onClick={onClose}>Close</button>
-            {isCommunityMode ? (
-              <button
-                type="button"
-                className="gcpv-footer-select"
-                onClick={isRoundAdded ? onRemoveRound : onAddRound}
-              >
-                {isRoundAdded ? 'Remove from Run of Show' : 'Add to Run of Show'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="gcpv-footer-select"
-                onClick={() => onToggleRound(previewRow)}
-              >
-                {allSelected ? 'Clear all' : 'Select all'}
-              </button>
-            )}
-          </div>
+      {/* ── Footer ── */}
+      <div className="gcpv-footer">
+        <span className="gcpv-footer-count">
+          {isCommunityMode
+            ? `${total} question${total === 1 ? '' : 's'}`
+            : `${selectedCount} selected`}
+        </span>
+        <div className="gcpv-footer-actions">
+          <button type="button" className="gcpv-footer-close" onClick={onClose}>Close</button>
+          {isCommunityMode ? (
+            <button
+              type="button"
+              className="gcpv-footer-select"
+              onClick={isRoundAdded ? onRemoveRound : onAddRound}
+            >
+              {isRoundAdded ? 'Remove from Run of Show' : 'Add to Run of Show'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="gcpv-footer-select"
+              onClick={() => onToggleRound(previewRow)}
+            >
+              {allSelected ? 'Clear all' : 'Select all'}
+            </button>
+          )}
         </div>
       </div>
-    </div>
+    </ModalShell>
   )
 }
