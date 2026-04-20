@@ -4696,6 +4696,62 @@
   display: block;
 }
 
+.gcpv-media-placeholder {
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d8cdc0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%),
+    repeating-linear-gradient(
+      45deg,
+      rgba(255,255,255,0.06) 0px,
+      rgba(255,255,255,0.06) 8px,
+      rgba(0,0,0,0.03) 8px,
+      rgba(0,0,0,0.03) 16px
+    );
+}
+
+.gcpv-infinite-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 0 12px;
+}
+
+.gcpv-infinite-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #d9cec2;
+  border-top-color: #7d7164;
+  opacity: 0.65;
+}
+
+.gcpv-infinite-spinner.spinning {
+  animation: gcpvSpin 0.85s linear infinite;
+  opacity: 1;
+}
+
+@keyframes gcpvSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.gcpv-infinite-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
 .gcpv-answer {
   display: flex;
   align-items: baseline;

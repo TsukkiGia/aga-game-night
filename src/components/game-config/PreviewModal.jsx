@@ -1,7 +1,13 @@
+import { useEffect, useRef, useState } from 'react'
 import { questionPreviewMedia } from './helpers'
 import { toYouTubeEmbedUrl } from '../../utils/mediaPrompt'
 import CloseIconButton from '../CloseIconButton'
 import ModalShell from '../ModalShell'
+
+const PREVIEW_PAGE_SIZE = 8
+const PREVIEW_MEDIA_OBSERVER_MARGIN = '220px'
+const PREVIEW_PAGING_OBSERVER_MARGIN = '140px'
+const PREVIEW_PAGE_LOAD_DELAY_MS = 180
 
 function getPreviewMedia(round, question) {
   const media = questionPreviewMedia(round, question)
@@ -10,6 +16,67 @@ function getPreviewMedia(round, question) {
   const embedUrl = toYouTubeEmbedUrl(media.rawUrl)
   if (embedUrl) return { type: 'video-embed', src: embedUrl }
   return { type: 'video-file', src: media.rawUrl }
+}
+
+function LazyPreviewMedia({ previewMedia, questionIndex }) {
+  const mountRef = useRef(null)
+  const supportsObserver = typeof IntersectionObserver !== 'undefined'
+  const [shouldRenderMedia, setShouldRenderMedia] = useState(() => !supportsObserver)
+
+  useEffect(() => {
+    if (!previewMedia) return undefined
+    if (shouldRenderMedia) return undefined
+    const node = mountRef.current
+    if (!node) return undefined
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.some((entry) => entry.isIntersecting)
+        if (!visible) return
+        setShouldRenderMedia(true)
+        observer.disconnect()
+      },
+      { root: null, rootMargin: PREVIEW_MEDIA_OBSERVER_MARGIN }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [previewMedia, shouldRenderMedia])
+
+  if (!previewMedia) return null
+
+  return (
+    <div ref={mountRef} className="gcpv-media-box">
+      {!shouldRenderMedia ? (
+        <div className="gcpv-media-placeholder">Media preview loads on scroll</div>
+      ) : previewMedia.type === 'image' ? (
+        <img
+          className="gcpv-media-image"
+          src={previewMedia.src}
+          alt={`Question ${questionIndex + 1} prompt`}
+          referrerPolicy="no-referrer"
+          loading="lazy"
+        />
+      ) : previewMedia.type === 'video-embed' ? (
+        <iframe
+          className="gcpv-media-video"
+          src={previewMedia.src}
+          title={`Question ${questionIndex + 1} video`}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          loading="lazy"
+          allowFullScreen
+        />
+      ) : (
+        <video
+          className="gcpv-media-video"
+          src={previewMedia.src}
+          controls
+          preload="metadata"
+          muted
+          playsInline
+        />
+      )}
+    </div>
+  )
 }
 
 export default function PreviewModal({
@@ -31,6 +98,51 @@ export default function PreviewModal({
   const isCommunityMode = mode === 'community'
   const { round, displayIndex, selectedCount, questionIds, allSelected } = previewRow
   const total = questionIds.length
+  const paginationKey = `${round.id}|${mode}|${previewSearchNormalized}`
+  const [paginationState, setPaginationState] = useState(() => ({ key: paginationKey, page: 1 }))
+  const previewPage = paginationState.key === paginationKey ? paginationState.page : 1
+  const loadMoreRef = useRef(null)
+  const loadTimerRef = useRef(null)
+  const [autoPagingState, setAutoPagingState] = useState(() => ({ key: paginationKey, value: false }))
+  const isAutoPaging = autoPagingState.key === paginationKey ? autoPagingState.value : false
+  const visibleCount = previewPage * PREVIEW_PAGE_SIZE
+  const visibleItems = previewItems.slice(0, visibleCount)
+  const remainingCount = Math.max(0, previewItems.length - visibleItems.length)
+  const nextBatchCount = Math.min(PREVIEW_PAGE_SIZE, remainingCount)
+
+  useEffect(() => {
+    return () => {
+      if (loadTimerRef.current) {
+        window.clearTimeout(loadTimerRef.current)
+        loadTimerRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (remainingCount <= 0) return undefined
+    const node = loadMoreRef.current
+    if (!node) return undefined
+    if (typeof IntersectionObserver === 'undefined') return undefined
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const shouldLoad = entries.some((entry) => entry.isIntersecting)
+        if (!shouldLoad || loadTimerRef.current) return
+        setAutoPagingState({ key: paginationKey, value: true })
+        loadTimerRef.current = window.setTimeout(() => {
+          setPaginationState((prev) => {
+            const currentPage = prev.key === paginationKey ? prev.page : 1
+            return { key: paginationKey, page: currentPage + 1 }
+          })
+          loadTimerRef.current = null
+          setAutoPagingState({ key: paginationKey, value: false })
+        }, PREVIEW_PAGE_LOAD_DELAY_MS)
+      },
+      { root: null, rootMargin: PREVIEW_PAGING_OBSERVER_MARGIN }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [remainingCount, paginationKey, visibleItems.length])
 
   return (
     <ModalShell onClose={onClose} dialogClassName="gcpv-modal">
@@ -79,7 +191,7 @@ export default function PreviewModal({
         {previewItems.length === 0 && previewSearchNormalized && (
           <div className="gcpv-empty">No matches for "{previewSearch.trim()}".</div>
         )}
-        {previewItems.map(({ key, question, questionId, questionIndex, selected, headline, detail, tags, answer }) => {
+        {visibleItems.map(({ key, question, questionId, questionIndex, selected, headline, detail, tags, answer }) => {
           const previewMedia = getPreviewMedia(round, question)
           return (
             <div key={key} className={`gcpv-question${!isCommunityMode && selected ? ' selected' : ''}`}>
@@ -100,36 +212,11 @@ export default function PreviewModal({
               <div className="gcpv-q-title">{headline}</div>
               {detail && <div className="gcpv-q-detail">{detail}</div>}
 
-              {previewMedia && (
-                <div className="gcpv-media-box">
-                  {previewMedia.type === 'image' ? (
-                    <img
-                      className="gcpv-media-image"
-                      src={previewMedia.src}
-                      alt={`Question ${questionIndex + 1} prompt`}
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : previewMedia.type === 'video-embed' ? (
-                    <iframe
-                      className="gcpv-media-video"
-                      src={previewMedia.src}
-                      title={`Question ${questionIndex + 1} video`}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      referrerPolicy="strict-origin-when-cross-origin"
-                      allowFullScreen
-                    />
-                  ) : (
-                    <video
-                      className="gcpv-media-video"
-                      src={previewMedia.src}
-                      controls
-                      preload="metadata"
-                      muted
-                      playsInline
-                    />
-                  )}
-                </div>
-              )}
+              <LazyPreviewMedia
+                key={`${String(previewMedia?.type || 'none')}|${String(previewMedia?.src || '')}`}
+                previewMedia={previewMedia}
+                questionIndex={questionIndex}
+              />
 
               {answer && round.type !== 'charades' && round.type !== 'thesis' && (
                 <div className="gcpv-answer">
@@ -146,6 +233,16 @@ export default function PreviewModal({
             </div>
           )
         })}
+        {remainingCount > 0 && (
+          <div ref={loadMoreRef} className="gcpv-infinite-loader" aria-live="polite">
+            <span className={`gcpv-infinite-spinner${isAutoPaging ? ' spinning' : ''}`} aria-hidden="true" />
+            <span className="gcpv-infinite-label">
+              {isAutoPaging
+                ? `Loading ${nextBatchCount} more…`
+                : `${remainingCount} more question${remainingCount === 1 ? '' : 's'} will load as you scroll`}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Footer ── */}
