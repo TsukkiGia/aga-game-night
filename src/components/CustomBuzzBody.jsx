@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
 import VideoBody from './VideoBody'
+import PromptMediaElement from './PromptMediaElement'
+import { cleanUrl, isCountryOutlineImageUrl } from '../utils/mediaPrompt'
 
 export default function CustomBuzzBody({ question, paused = false }) {
   const promptType = String(question?.promptType || '').trim().toLowerCase()
   const promptText = String(question?.promptText || '').trim()
-  const mediaUrl = String(question?.mediaUrl || '').trim()
+  const mediaUrl = cleanUrl(question?.mediaUrl)
   const [revealed, setRevealed] = useState(false)
   const [failedImageUrl, setFailedImageUrl] = useState('')
+  const useDarkBackdrop = promptType === 'image' && isCountryOutlineImageUrl(mediaUrl)
   const imageError = Boolean(mediaUrl) && failedImageUrl === mediaUrl
 
   useEffect(() => {
@@ -34,17 +37,17 @@ export default function CustomBuzzBody({ question, paused = false }) {
     <div className="qv-custom-wrap">
       {promptText && <div className="qv-custom-prompt">{promptText}</div>}
       {promptType === 'image' && mediaUrl && (
-        <div className="qv-custom-image-shell">
+        <div className={`qv-custom-image-shell${useDarkBackdrop ? ' dark-backdrop' : ''}`}>
           {imageError ? (
             <div className="qv-video-error">Could not load image URL. Check the link and try another image.</div>
           ) : (
-            <img
-              className="qv-custom-image"
-              src={mediaUrl}
-              alt="Custom buzz prompt"
-              referrerPolicy="no-referrer"
-              onLoad={() => console.log('[CustomBuzzBody] image loaded:', mediaUrl)}
-              onError={() => {
+            <PromptMediaElement
+              mediaType="image"
+              mediaUrl={mediaUrl}
+              imageClassName={`qv-custom-image${useDarkBackdrop ? ' dark-backdrop' : ''}`}
+              imageAlt="Custom buzz prompt"
+              onImageLoad={() => console.log('[CustomBuzzBody] image loaded:', mediaUrl)}
+              onImageError={() => {
                 console.log('[CustomBuzzBody] image failed to load:', mediaUrl)
                 setFailedImageUrl(mediaUrl)
               }}

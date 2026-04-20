@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { questionPreviewMedia } from './helpers'
-import { toYouTubeEmbedUrl } from '../../utils/mediaPrompt'
+import { isCountryOutlineImageUrl } from '../../utils/mediaPrompt'
+import PromptMediaElement from '../PromptMediaElement'
 import CloseIconButton from '../CloseIconButton'
 import ModalShell from '../ModalShell'
 
@@ -9,16 +10,17 @@ const PREVIEW_MEDIA_OBSERVER_MARGIN = '220px'
 const PREVIEW_PAGING_OBSERVER_MARGIN = '140px'
 const PREVIEW_PAGE_LOAD_DELAY_MS = 180
 
-function getPreviewMedia(round, question) {
-  const media = questionPreviewMedia(round, question)
-  if (!media) return null
-  if (media.type === 'image') return { type: 'image', src: media.rawUrl }
-  const embedUrl = toYouTubeEmbedUrl(media.rawUrl)
-  if (embedUrl) return { type: 'video-embed', src: embedUrl }
-  return { type: 'video-file', src: media.rawUrl }
+function getPreviewMedia(_round, question) {
+  return questionPreviewMedia(_round, question)
 }
 
-function LazyPreviewMedia({ previewMedia, questionIndex }) {
+function shouldUseCountryOutlineBackdrop(round, previewMedia) {
+  const roundId = String(round?.id || '').trim().toLowerCase()
+  if (roundId === 'country-outlines') return true
+  return isCountryOutlineImageUrl(previewMedia?.rawUrl)
+}
+
+function LazyPreviewMedia({ previewMedia, questionIndex, darkBackdrop = false }) {
   const mountRef = useRef(null)
   const supportsObserver = typeof IntersectionObserver !== 'undefined'
   const [shouldRenderMedia, setShouldRenderMedia] = useState(() => !supportsObserver)
@@ -44,33 +46,21 @@ function LazyPreviewMedia({ previewMedia, questionIndex }) {
   if (!previewMedia) return null
 
   return (
-    <div ref={mountRef} className="gcpv-media-box">
+    <div ref={mountRef} className={`gcpv-media-box${darkBackdrop ? ' dark-backdrop' : ''}`}>
       {!shouldRenderMedia ? (
         <div className="gcpv-media-placeholder">Media preview loads on scroll</div>
-      ) : previewMedia.type === 'image' ? (
-        <img
-          className="gcpv-media-image"
-          src={previewMedia.src}
-          alt={`Question ${questionIndex + 1} prompt`}
-          referrerPolicy="no-referrer"
-          loading="lazy"
-        />
-      ) : previewMedia.type === 'video-embed' ? (
-        <iframe
-          className="gcpv-media-video"
-          src={previewMedia.src}
-          title={`Question ${questionIndex + 1} video`}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          referrerPolicy="strict-origin-when-cross-origin"
-          loading="lazy"
-          allowFullScreen
-        />
       ) : (
-        <video
-          className="gcpv-media-video"
-          src={previewMedia.src}
+        <PromptMediaElement
+          mediaType={previewMedia.type}
+          mediaUrl={previewMedia.rawUrl}
+          imageClassName={`gcpv-media-image${darkBackdrop ? ' dark-backdrop' : ''}`}
+          iframeClassName="gcpv-media-video"
+          videoClassName="gcpv-media-video"
+          imageAlt={`Question ${questionIndex + 1} prompt`}
+          iframeTitle={`Question ${questionIndex + 1} video`}
+          loading="lazy"
           controls
-          preload="metadata"
+          videoPreload="metadata"
           muted
           playsInline
         />
@@ -193,6 +183,7 @@ export default function PreviewModal({
         )}
         {visibleItems.map(({ key, question, questionId, questionIndex, selected, headline, detail, tags, answer }) => {
           const previewMedia = getPreviewMedia(round, question)
+          const useDarkBackdrop = shouldUseCountryOutlineBackdrop(round, previewMedia)
           const fullPromptText = String(question?.promptText || '').trim()
           const shouldUseFullPrompt = round.type === 'custom-buzz' && Boolean(fullPromptText)
           const displayHeadline = shouldUseFullPrompt ? fullPromptText : headline
@@ -216,9 +207,10 @@ export default function PreviewModal({
               {detail && <div className="gcpv-q-detail">{detail}</div>}
 
               <LazyPreviewMedia
-                key={`${String(previewMedia?.type || 'none')}|${String(previewMedia?.src || '')}`}
+                key={`${String(previewMedia?.type || 'none')}|${String(previewMedia?.rawUrl || '')}`}
                 previewMedia={previewMedia}
                 questionIndex={questionIndex}
+                darkBackdrop={useDarkBackdrop}
               />
 
               {answer && round.type !== 'charades' && round.type !== 'thesis' && (

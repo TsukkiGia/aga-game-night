@@ -3023,13 +3023,27 @@
   width: 100%;
   max-height: 240px;
   border-radius: 10px;
-  background: #0f1114;
   border: 1px solid #d1c6b6;
 }
 
 .game-config-media-preview-image,
 .game-config-media-preview-video {
   object-fit: contain;
+}
+
+.game-config-media-preview-image {
+  background: #f8f4ec;
+}
+
+.game-config-media-preview-video,
+.game-config-media-preview-frame {
+  background: #0f1114;
+}
+
+.game-config-media-preview.dark-backdrop .game-config-media-preview-image,
+.game-config-media-preview-image.dark-backdrop {
+  background: #0f1114;
+  border-color: #2a2520;
 }
 
 .game-config-media-preview-frame {
@@ -4701,11 +4715,16 @@
 /* Inline media preview */
 .gcpv-media-box {
   width: 100%;
-  background: #1a1814;
+  background: #f4ede2;
   border-radius: 8px;
-  border: 1px solid #2e2a25;
+  border: 1px solid #ddd3c5;
   overflow: hidden;
   margin: 8px 0;
+}
+
+.gcpv-media-box.dark-backdrop {
+  background: #1a1814;
+  border-color: #2e2a25;
 }
 
 .gcpv-media-image {
@@ -4714,6 +4733,10 @@
   object-fit: contain;
   border: none;
   display: block;
+  background: transparent;
+}
+
+.gcpv-media-image.dark-backdrop {
   background: #1a1814;
 }
 

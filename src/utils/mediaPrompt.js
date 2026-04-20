@@ -2,6 +2,12 @@ function cleanUrl(rawUrl) {
   return String(rawUrl || '').trim()
 }
 
+function isCountryOutlineImageUrl(rawUrl) {
+  const normalized = cleanUrl(rawUrl).toLowerCase()
+  if (!normalized) return false
+  return normalized.includes('mapsicon') && normalized.includes('/africa/')
+}
+
 function isHttpUrl(rawUrl) {
   const urlText = cleanUrl(rawUrl)
   if (!urlText) return false
@@ -72,10 +78,16 @@ function toYouTubeEmbedUrl(rawUrl) {
 
     const params = new URLSearchParams({
       controls: '1',
+      disablekb: '1',
+      iv_load_policy: '3',
       rel: '0',
       modestbranding: '1',
       playsinline: '1',
+      enablejsapi: '1',
     })
+    if (typeof window !== 'undefined' && window?.location?.origin) {
+      params.set('origin', window.location.origin)
+    }
     const start = parseTimeToSeconds(url.searchParams.get('start') || url.searchParams.get('t'))
     if (Number.isInteger(start) && start > 0) params.set('start', String(start))
     const end = parseTimeToSeconds(url.searchParams.get('end'))
@@ -84,6 +96,24 @@ function toYouTubeEmbedUrl(rawUrl) {
   } catch {
     return null
   }
+}
+
+function resolveVideoSource(rawUrl, options = {}) {
+  const cleaned = cleanUrl(rawUrl)
+  if (!cleaned) return null
+
+  const youtubeEmbedUrl = toYouTubeEmbedUrl(cleaned)
+  if (youtubeEmbedUrl) {
+    return { kind: 'youtube', src: youtubeEmbedUrl, raw: cleaned, isAbsolute: true }
+  }
+
+  const isAbsolute = /^https?:\/\//i.test(cleaned)
+  if (isAbsolute) return { kind: 'file', src: cleaned, raw: cleaned, isAbsolute: true }
+
+  const basePath = String(options.localVideoBasePath || '').trim().replace(/\/+$/, '')
+  const relativePath = cleaned.replace(/^\/+/, '')
+  const src = basePath ? `${basePath}/${relativePath}` : cleaned
+  return { kind: 'file', src, raw: cleaned, isAbsolute: false }
 }
 
 function mediaUrlFeedback(question) {
@@ -105,6 +135,8 @@ function mediaUrlFeedback(question) {
 
 export {
   cleanUrl,
+  isCountryOutlineImageUrl,
   toYouTubeEmbedUrl,
+  resolveVideoSource,
   mediaUrlFeedback,
 }

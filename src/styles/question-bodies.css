@@ -87,6 +87,11 @@
   justify-content: center;
 }
 
+.qv-custom-image-shell.dark-backdrop {
+  background: #0f1114;
+  border-color: #2a2520;
+}
+
 .qv-custom-image {
   display: block;
   max-height: min(62vh, calc(100dvh - 300px));
@@ -94,6 +99,10 @@
   width: auto;
   height: auto;
   object-fit: contain;
+}
+
+.qv-custom-image.dark-backdrop {
+  background: #0f1114;
 }
 
 .qv-custom-answer-card {
