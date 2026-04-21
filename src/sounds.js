@@ -1,32 +1,14 @@
+import { logTimerDebug } from './utils/timerDebug'
+
 const cache = {}
 let audioUnlocked = false
 let activeTimerStop = null
 let timerMusicSeq = 0
-let timerMusicActive = false
+
 const SOUND_VOLUME = {
   timer: 0.4,
   'tick-tock': 1,
   buzz: 1,
-}
-
-function shouldLogTimerDebug() {
-  if (typeof window === 'undefined') return false
-  let forced = false
-  try {
-    forced = window.localStorage?.getItem('timerDebug') === '1'
-  } catch {
-    forced = false
-  }
-  return forced || Boolean(import.meta?.env?.DEV)
-}
-
-function logTimerDebug(message, details = null) {
-  if (!shouldLogTimerDebug()) return
-  if (details === null) {
-    console.info(`[timer] ${message}`)
-    return
-  }
-  console.info(`[timer] ${message}`, details)
 }
 
 function isPlayerPage() {
@@ -181,7 +163,6 @@ export function playTimerMusic() {
   audio.pause()
   audio.currentTime = 0
   audio.loop = true
-  timerMusicActive = true
   logTimerDebug('timer music start', { seq })
   audio.play().catch(() => {})
   let stopped = false
@@ -189,7 +170,6 @@ export function playTimerMusic() {
     if (stopped) return
     stopped = true
     logTimerDebug('timer music stop', { seq })
-    timerMusicActive = false
     audio.pause()
     audio.currentTime = 0
     if (activeTimerStop === stop) activeTimerStop = null

@@ -1,4 +1,5 @@
 import { normalizeRoundCatalog } from './roundCatalog.js'
+import { normalizeQuestionCursor as normalizeQuestionCursorShared } from '../../shared/questionCursor.js'
 import {
   normalizeGameplayMode,
   normalizeAnswerState,
@@ -77,16 +78,7 @@ export function serializeHostSyncState(st) {
 export { normalizeGameplayMode, normalizeAnswerState, serializeAnswerState }
 
 export function normalizeQuestionCursor(rawCursor) {
-  if (rawCursor === null) return null
-  if (typeof rawCursor === 'string') {
-    const normalized = rawCursor.trim()
-    return normalized || null
-  }
-  if (!Array.isArray(rawCursor) || rawCursor.length !== 2) return null
-  const [roundIndex, questionIndex] = rawCursor
-  if (!Number.isInteger(roundIndex) || roundIndex < 0) return null
-  if (questionIndex !== null && (!Number.isInteger(questionIndex) || questionIndex < 0)) return null
-  return [roundIndex, questionIndex]
+  return normalizeQuestionCursorShared(rawCursor)
 }
 
 export function normalizeGamePlan(rawPlan) {

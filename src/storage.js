@@ -1,3 +1,5 @@
+import { normalizeQuestionCursor as normalizeQuestionCursorShared } from '../shared/questionCursor.js'
+
 export const TEAMS_KEY           = 'scorekeeping_teams'
 export const SCORES_KEY          = 'scorekeeping_scores'
 export const DONE_KEY            = 'scorekeeping_done'
@@ -14,20 +16,7 @@ export const BUZZER_PLAYER_KEY   = 'sankofa_player'
 
 // Validates and normalizes a cursor from storage or socket.
 export function normalizeQuestionCursor(rawCursor) {
-  if (rawCursor === null) return null
-  if (typeof rawCursor === 'string') {
-    const normalized = rawCursor.trim()
-    return normalized || null
-  }
-  if (rawCursor && typeof rawCursor === 'object' && !Array.isArray(rawCursor)) {
-    const normalized = String(rawCursor.itemId || '').trim()
-    return normalized || null
-  }
-  if (!Array.isArray(rawCursor) || rawCursor.length !== 2) return null
-  const [roundIndex, questionIndex] = rawCursor
-  if (!Number.isInteger(roundIndex) || roundIndex < 0) return null
-  if (questionIndex !== null && (!Number.isInteger(questionIndex) || questionIndex < 0)) return null
-  return [roundIndex, questionIndex]
+  return normalizeQuestionCursorShared(rawCursor, { allowObjectItemId: true })
 }
 
 // Validates and normalizes a teams array loaded from localStorage.

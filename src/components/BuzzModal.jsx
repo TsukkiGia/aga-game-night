@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { playTick, stopTick, playTimeUp } from '../sounds'
+import Timer from './Timer'
 import { getRevealOutcome } from '../utils/buzzReveal'
 
 // Round types that support in-modal answer reveal
@@ -21,41 +21,29 @@ export default function BuzzModal({
   const [revealedInModal, setRevealedInModal] = useState(false)
   const [revealedCountry, setRevealedCountry] = useState(false)
   const [buzzCountdown, setBuzzCountdown] = useState(null)
-  const buzzCountdownRef = useRef(null)
+  const [countdownActive, setCountdownActive] = useState(false)
+  const [countdownRunId, setCountdownRunId] = useState(0)
   const lastHandledTimerSignalRef = useRef(0)
-  const onTimerExpiredRef = useRef(onTimerExpired)
-  onTimerExpiredRef.current = onTimerExpired
 
   const stopCountdown = useCallback(() => {
-    clearInterval(buzzCountdownRef.current)
-    stopTick()
+    setCountdownActive(false)
     setBuzzCountdown(null)
   }, [])
 
   const startCountdown = useCallback(() => {
-    clearInterval(buzzCountdownRef.current)
-    stopTick()
+    setCountdownRunId((prev) => prev + 1)
+    setCountdownActive(true)
     setBuzzCountdown(10)
-    let count = 10
-    buzzCountdownRef.current = setInterval(() => {
-      count--
-      setBuzzCountdown(count)
-      if (count > 0) {
-        if (timerSoundEnabled) playTick()
-      } else {
-        stopTick()
-        if (timerSoundEnabled) playTimeUp()
-        clearInterval(buzzCountdownRef.current)
-        onTimerExpiredRef.current?.()
-      }
-    }, 1000)
-  }, [timerSoundEnabled])
+  }, [])
 
   useEffect(() => {
-    if (!buzzWinner || buzzWinner.manual) { setBuzzCountdown(null); return }
-    startCountdown()
-    return () => { clearInterval(buzzCountdownRef.current); stopTick(); setBuzzCountdown(null) }
-  }, [buzzWinner, startCountdown])
+    if (!buzzWinner || buzzWinner.manual) {
+      const id = setTimeout(() => stopCountdown(), 0)
+      return () => clearTimeout(id)
+    }
+    const id = setTimeout(() => startCountdown(), 0)
+    return () => clearTimeout(id)
+  }, [buzzWinner, startCountdown, stopCountdown])
 
   useEffect(() => {
     const sequence = Number(timerControlSignal?.sequence || 0)
@@ -64,15 +52,15 @@ export default function BuzzModal({
     lastHandledTimerSignalRef.current = sequence
 
     if (timerControlSignal.action === 'stop') {
-      stopCountdown()
+      setTimeout(() => stopCountdown(), 0)
       return
     }
 
     if (timerControlSignal.action === 'restart') {
       if (!buzzWinner || buzzWinner.manual) return
-      startCountdown()
+      setTimeout(() => startCountdown(), 0)
     }
-  }, [timerControlSignal, buzzWinner, stopCountdown, startCountdown])
+  }, [timerControlSignal, buzzWinner, startCountdown, stopCountdown])
 
   function handleDismiss() {
     setRevealedInModal(false)
@@ -104,6 +92,25 @@ export default function BuzzModal({
           <div className="buzz-countdown-wrap">
             <div className={`buzz-countdown${buzzCountdown <= 3 ? ' urgent' : ''}`}>{buzzCountdown}</div>
             <div className="buzz-countdown-caption">seconds to answer</div>
+            {countdownActive && (
+              <Timer
+                key={`buzz-countdown-${countdownRunId}`}
+                seconds={10}
+                autoStart
+                showControls={false}
+                showDisplay={false}
+                showBar={false}
+                renderVisual={false}
+                soundEnabled={timerSoundEnabled}
+                playMusic={false}
+                tickThresholdSeconds={10}
+                onTick={(next) => setBuzzCountdown(next)}
+                onExpire={() => {
+                  stopCountdown()
+                  return onTimerExpired?.() ?? true
+                }}
+              />
+            )}
           </div>
         )}
         <div className="buzz-popup-label">{stealMode ? '🔀 STEAL!' : 'BUZZED IN!'}</div>

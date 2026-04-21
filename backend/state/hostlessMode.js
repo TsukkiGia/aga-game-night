@@ -1,3 +1,10 @@
+import {
+  buildQuestionCursorId,
+  buildRoundIntroCursorId,
+  splitQuestionCursor,
+  parseRoundIntroCursor,
+} from '../../shared/questionCursor.js'
+
 const HOSTED_MODE = 'hosted'
 const HOSTLESS_MODE = 'hostless'
 const SUPPORTED_GAMEPLAY_MODES = new Set([HOSTED_MODE, HOSTLESS_MODE])
@@ -33,24 +40,6 @@ function isQuestionCursorPair(value) {
   return Array.isArray(value) && value.length === 2
 }
 
-function splitQuestionCursor(cursorId) {
-  const raw = normalizeText(cursorId)
-  if (!raw.startsWith('q:')) return null
-  const first = raw.indexOf(':', 2)
-  if (first < 0 || first >= raw.length - 1) return null
-  const roundId = raw.slice(2, first)
-  const questionId = raw.slice(first + 1)
-  if (!roundId || !questionId) return null
-  return { roundId, questionId }
-}
-
-function buildQuestionCursorId(roundId, questionId) {
-  const safeRoundId = normalizeText(roundId)
-  const safeQuestionId = normalizeText(questionId)
-  if (!safeRoundId || !safeQuestionId) return null
-  return `q:${safeRoundId}:${safeQuestionId}`
-}
-
 function roundAndQuestionFromPair(roundCatalog, pair) {
   if (!isQuestionCursorPair(pair)) return null
   const [roundIndex, questionIndex] = pair
@@ -66,7 +55,7 @@ function roundAndQuestionFromPair(roundCatalog, pair) {
       question: null,
       questionIndex: null,
       questionId: null,
-      cursorId: normalizeText(round?.id) ? `intro:${normalizeText(round.id)}` : null,
+      cursorId: buildRoundIntroCursorId(round?.id),
     }
   }
 
@@ -89,9 +78,9 @@ function roundAndQuestionFromCursorId(roundCatalog, cursorId) {
   const raw = normalizeText(cursorId)
   if (!raw) return null
 
-  if (raw.startsWith('intro:')) {
-    const roundId = normalizeText(raw.slice('intro:'.length))
-    if (!roundId) return null
+  const introCursor = parseRoundIntroCursor(raw)
+  if (introCursor) {
+    const { roundId, cursorId: normalizedCursorId } = introCursor
     const roundIndex = Array.isArray(roundCatalog)
       ? roundCatalog.findIndex((round) => normalizeText(round?.id) === roundId)
       : -1
@@ -104,7 +93,7 @@ function roundAndQuestionFromCursorId(roundCatalog, cursorId) {
       question: null,
       questionIndex: null,
       questionId: null,
-      cursorId: raw,
+      cursorId: normalizedCursorId,
     }
   }
 

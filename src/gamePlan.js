@@ -1,4 +1,5 @@
 import rounds from './rounds.js'
+import { buildQuestionCursorId, buildRoundIntroCursorId } from '../shared/questionCursor.js'
 
 function roundStableId(round, roundIndex) {
   const raw = String(round?.id || '').trim()
@@ -11,11 +12,11 @@ function questionStableId(question, roundId, questionIndex) {
 }
 
 function questionItemId(roundId, questionId) {
-  return `q:${roundId}:${questionId}`
+  return buildQuestionCursorId(roundId, questionId)
 }
 
 function introItemId(roundId) {
-  return `intro:${roundId}`
+  return buildRoundIntroCursorId(roundId)
 }
 
 export function buildPlanCatalog(roundList = rounds) {

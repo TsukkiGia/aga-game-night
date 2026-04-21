@@ -1,40 +1,28 @@
 import { useState, useEffect, useRef } from 'react'
 import { playTimerMusic, playTick, stopTick, playTimeUp } from '../sounds'
+import { logTimerDebug } from '../utils/timerDebug'
 
 let timerInstanceSeq = 0
-
-function shouldLogTimerDebug() {
-  if (typeof window === 'undefined') return false
-  let forced = false
-  try {
-    forced = window.localStorage?.getItem('timerDebug') === '1'
-  } catch {
-    forced = false
-  }
-  return forced || Boolean(import.meta?.env?.DEV)
-}
-
-function logTimerDebug(instanceId, message, details = null) {
-  if (!shouldLogTimerDebug()) return
-  if (details === null) {
-    console.info(`[timer][instance:${instanceId}] ${message}`)
-    return
-  }
-  console.info(`[timer][instance:${instanceId}] ${message}`, details)
-}
 
 export default function Timer({
   seconds = 60,
   onExpire = null,
+  onTick = null,
   autoStart = false,
   showControls = true,
+  showDisplay = true,
+  showBar = true,
+  renderVisual = true,
   soundEnabled = true,
+  playMusic = true,
+  tickThresholdSeconds = 10,
   forcePaused = false,
 }) {
   const [timeLeft, setTimeLeft] = useState(seconds)
   const [running, setRunning] = useState(Boolean(autoStart))
   const stopMusicRef = useRef(null)
   const onExpireRef = useRef(onExpire)
+  const onTickRef = useRef(onTick)
   const runningRef = useRef(Boolean(autoStart))
   const pauseAppliedRef = useRef(false)
   const resumeAfterPauseRef = useRef(false)
@@ -47,11 +35,19 @@ export default function Timer({
   }, [onExpire])
 
   useEffect(() => {
+    onTickRef.current = onTick
+  }, [onTick])
+
+  useEffect(() => {
+    if (typeof onTickRef.current === 'function') onTickRef.current(timeLeft)
+  }, [timeLeft])
+
+  useEffect(() => {
     runningRef.current = running
   }, [running])
 
   useEffect(() => {
-    logTimerDebug(instanceId, 'reset from props', { seconds, autoStart })
+    logTimerDebug('reset from props', { seconds, autoStart }, { instanceId })
     setTimeLeft(seconds)
     setRunning(Boolean(autoStart))
     runningRef.current = Boolean(autoStart)
@@ -63,7 +59,7 @@ export default function Timer({
       pauseAppliedRef.current = true
       const shouldResume = runningRef.current && timeLeft > 0
       resumeAfterPauseRef.current = shouldResume
-      logTimerDebug(instanceId, 'force pause applied', { shouldResume, timeLeft })
+      logTimerDebug('force pause applied', { shouldResume, timeLeft }, { instanceId })
       if (shouldResume) {
         runningRef.current = false
         setRunning(false)
@@ -79,11 +75,11 @@ export default function Timer({
     const shouldResume = resumeAfterPauseRef.current && timeLeft > 0
     resumeAfterPauseRef.current = false
     if (shouldResume) {
-      logTimerDebug(instanceId, 'force pause released, resuming', { timeLeft })
+      logTimerDebug('force pause released, resuming', { timeLeft }, { instanceId })
       runningRef.current = true
       setRunning(true)
     } else {
-      logTimerDebug(instanceId, 'force pause released, staying paused', { timeLeft })
+      logTimerDebug('force pause released, staying paused', { timeLeft }, { instanceId })
     }
   }, [forcePaused, timeLeft, instanceId])
 
@@ -93,7 +89,7 @@ export default function Timer({
       if (!runningRef.current) return
       const next = Math.max(0, timeLeft - 1)
       if (next <= 0) {
-        logTimerDebug(instanceId, 'expired, invoking onExpire')
+        logTimerDebug('expired, invoking onExpire', null, { instanceId })
         setTimeLeft(0)
         setRunning(false)
         runningRef.current = false
@@ -105,14 +101,17 @@ export default function Timer({
             const accepted = result === undefined
               ? true
               : (result === true || (typeof result === 'object' && result?.accepted !== false))
-            logTimerDebug(instanceId, 'expire callback result', { accepted, result })
+            logTimerDebug('expire callback result', { accepted, result }, { instanceId })
             if (soundEnabled && accepted) playTimeUp()
           })
           .catch(() => {})
         return
       }
-      if (next <= 10) logTimerDebug(instanceId, 'countdown tick', { next, soundEnabled })
-      if (soundEnabled && next <= 10) playTick()
+      const shouldPlayTick = Number.isFinite(Number(tickThresholdSeconds))
+        ? (Number(tickThresholdSeconds) > 0 && next <= Number(tickThresholdSeconds))
+        : (next <= 10)
+      if (shouldPlayTick) logTimerDebug('countdown tick', { next, soundEnabled }, { instanceId })
+      if (soundEnabled && shouldPlayTick) playTick()
       setTimeLeft((current) => {
         if (!runningRef.current) return current
         if (current <= 1) {
@@ -122,26 +121,26 @@ export default function Timer({
       })
     }, 1000)
     return () => clearTimeout(id)
-  }, [running, timeLeft, soundEnabled, instanceId])
+  }, [running, timeLeft, soundEnabled, instanceId, tickThresholdSeconds])
 
-  const shouldPlayMusic = running && soundEnabled
+  const shouldPlayMusic = running && soundEnabled && playMusic
 
   // Start/stop looped timer music for the full countdown.
   useEffect(() => {
     if (!shouldPlayMusic) {
-      logTimerDebug(instanceId, 'music effect stop branch', { running, soundEnabled, shouldPlayMusic })
+      logTimerDebug('music effect stop branch', { running, soundEnabled, shouldPlayMusic }, { instanceId })
       stopMusicRef.current?.()
       stopMusicRef.current = null
       stopTick()
       return
     }
 
-    logTimerDebug(instanceId, 'music effect start branch', { running, soundEnabled, shouldPlayMusic })
+    logTimerDebug('music effect start branch', { running, soundEnabled, shouldPlayMusic }, { instanceId })
     const stopMusic = playTimerMusic()
     stopMusicRef.current = stopMusic
 
     return () => {
-      logTimerDebug(instanceId, 'music effect cleanup')
+      logTimerDebug('music effect cleanup', null, { instanceId })
       stopMusic()
       if (stopMusicRef.current === stopMusic) stopMusicRef.current = null
       stopTick()
@@ -150,16 +149,16 @@ export default function Timer({
 
   // Stop music if component unmounts while running
   useEffect(() => {
-    logTimerDebug(instanceId, 'mounted')
+    logTimerDebug('mounted', null, { instanceId })
     return () => {
-      logTimerDebug(instanceId, 'unmounted')
+      logTimerDebug('unmounted', null, { instanceId })
       stopMusicRef.current?.()
       stopTick()
     }
   }, [instanceId])
 
   function reset() {
-    logTimerDebug(instanceId, 'manual reset', { seconds, autoStart })
+    logTimerDebug('manual reset', { seconds, autoStart }, { instanceId })
     setTimeLeft(seconds)
     const nextRunning = Boolean(autoStart)
     runningRef.current = nextRunning
@@ -169,14 +168,20 @@ export default function Timer({
   const pct = (timeLeft / seconds) * 100
   const urgent = timeLeft <= 10
 
+  if (!renderVisual) return null
+
   return (
     <div className="qv-timer">
-      <div className={`qv-timer-display${urgent ? ' urgent' : ''}${timeLeft === 0 ? ' done' : ''}`}>
-        {timeLeft === 0 ? "Time's up!" : `${timeLeft}s`}
-      </div>
-      <div className="qv-timer-bar-track">
-        <div className="qv-timer-bar-fill" style={{ width: `${pct}%`, background: urgent ? 'var(--terra)' : 'var(--teal)' }} />
-      </div>
+      {showDisplay && (
+        <div className={`qv-timer-display${urgent ? ' urgent' : ''}${timeLeft === 0 ? ' done' : ''}`}>
+          {timeLeft === 0 ? "Time's up!" : `${timeLeft}s`}
+        </div>
+      )}
+      {showBar && (
+        <div className="qv-timer-bar-track">
+          <div className="qv-timer-bar-fill" style={{ width: `${pct}%`, background: urgent ? 'var(--terra)' : 'var(--teal)' }} />
+        </div>
+      )}
       {showControls && (
         <div className="qv-timer-btns">
           {!running && timeLeft === seconds && (
