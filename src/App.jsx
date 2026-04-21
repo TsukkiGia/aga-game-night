@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import Setup from './components/setup-flow/Setup'
 import Scoreboard from './components/pages/Scoreboard'
 import BuzzerPage from './components/pages/BuzzerPage'
@@ -110,6 +110,22 @@ function loadGameplayMode() {
   }
 }
 
+const SETUP_STAGE = {
+  TEAMS: 'teams',
+  PLAN_CONFIG: 'plan-config',
+  PLAN_PREVIEW: 'plan-preview',
+  COMPANION: 'companion',
+  READY: 'ready',
+}
+
+function resolveSetupStage({ hasTeams, pendingPlan, pendingPreview, pendingCompanion, hostlessMode }) {
+  if (!hasTeams) return SETUP_STAGE.TEAMS
+  if (pendingPlan) return SETUP_STAGE.PLAN_CONFIG
+  if (pendingPreview) return SETUP_STAGE.PLAN_PREVIEW
+  if (pendingCompanion && !hostlessMode) return SETUP_STAGE.COMPANION
+  return SETUP_STAGE.READY
+}
+
 export default function App() {
   const [splashDone, setSplashDone] = useState(false)
   const [session, setSession] = useState(null) // { code, pin } | null
@@ -117,63 +133,63 @@ export default function App() {
   const [teams, setTeams] = useState(() => loadTeams())
   const [roundCatalog, setRoundCatalog] = useState(() => loadRoundCatalog())
   const [gamePlanIds, setGamePlanIds] = useState(() => loadGamePlan(loadRoundCatalog()))
-  const [needsPlanConfig, setNeedsPlanConfig] = useState(() => loadNeedsPlanConfig())
-  const [needsPlanPreview, setNeedsPlanPreview] = useState(() => loadNeedsPlanPreview())
-  const [needsCompanionSetup, setNeedsCompanionSetup] = useState(() => loadNeedsCompanionSetup())
+  const [setupStage, setSetupStage] = useState(SETUP_STAGE.TEAMS)
   const hostlessModeActive = isHostlessMode(gameplayMode)
   useWakeLock(true)
 
-  const setupProgressStep = useMemo(() => {
-    if (!session) return null
-    if (!teams) return 1
-    if (needsPlanConfig) return 2
-    if (needsPlanPreview) return 3
-    if (!hostlessModeActive && needsCompanionSetup) return 4
-    return null
-  }, [session, teams, needsPlanConfig, needsPlanPreview, needsCompanionSetup, hostlessModeActive])
+  function setSetupStageAndPersist(nextStage, hostlessOverride = hostlessModeActive) {
+    const normalizedStage = hostlessOverride && nextStage === SETUP_STAGE.COMPANION ? SETUP_STAGE.READY : nextStage
+    setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(normalizedStage === SETUP_STAGE.PLAN_CONFIG))
+    setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(normalizedStage === SETUP_STAGE.PLAN_PREVIEW))
+    setStorageItem(
+      COMPANION_SETUP_PENDING_KEY,
+      JSON.stringify(normalizedStage === SETUP_STAGE.COMPANION && !hostlessOverride)
+    )
+    setSetupStage(normalizedStage)
+  }
+
+  let setupProgressStep = null
+  if (session) {
+    switch (setupStage) {
+      case SETUP_STAGE.TEAMS:
+        setupProgressStep = 1
+        break
+      case SETUP_STAGE.PLAN_CONFIG:
+        setupProgressStep = 2
+        break
+      case SETUP_STAGE.PLAN_PREVIEW:
+        setupProgressStep = 3
+        break
+      case SETUP_STAGE.COMPANION:
+        setupProgressStep = hostlessModeActive ? null : 4
+        break
+      default:
+        setupProgressStep = null
+        break
+    }
+  }
 
   function navigateSetupStep(stepNumber) {
     if (!session || !Number.isInteger(stepNumber)) return
-    if (stepNumber === 1) {
-      setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
-      setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
-      setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-      setNeedsPlanConfig(false)
-      setNeedsPlanPreview(false)
-      setNeedsCompanionSetup(false)
-      setTeams(null)
-      return
-    }
-    if (!teams) return
-    if (stepNumber === 2) {
-      setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(true))
-      setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
-      setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-      setNeedsPlanConfig(true)
-      setNeedsPlanPreview(false)
-      setNeedsCompanionSetup(false)
-      return
-    }
-    if (stepNumber === 3) {
-      setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
-      setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(true))
-      setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-      setNeedsPlanConfig(false)
-      setNeedsPlanPreview(true)
-      setNeedsCompanionSetup(false)
-      return
-    }
-    if (!hostlessModeActive && stepNumber === 4) {
-      setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
-      setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
-      setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(true))
-      setNeedsPlanConfig(false)
-      setNeedsPlanPreview(false)
-      setNeedsCompanionSetup(true)
-    }
-    if (hostlessModeActive && stepNumber === 4) {
-      setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-      setNeedsCompanionSetup(false)
+    switch (stepNumber) {
+      case 1:
+        setTeams(null)
+        setSetupStageAndPersist(SETUP_STAGE.TEAMS)
+        return
+      case 2:
+        if (!teams) return
+        setSetupStageAndPersist(SETUP_STAGE.PLAN_CONFIG)
+        return
+      case 3:
+        if (!teams) return
+        setSetupStageAndPersist(SETUP_STAGE.PLAN_PREVIEW)
+        return
+      case 4:
+        if (!teams) return
+        setSetupStageAndPersist(SETUP_STAGE.COMPANION)
+        return
+      default:
+        return
     }
   }
 
@@ -215,12 +231,7 @@ export default function App() {
     setRoundCatalog(storedRoundCatalog)
     setStorageItem(GAME_PLAN_KEY, JSON.stringify([]))
     setGamePlanIds([])
-    setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(true))
-    setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
-    setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-    setNeedsPlanConfig(true)
-    setNeedsPlanPreview(false)
-    setNeedsCompanionSetup(false)
+    setSetupStageAndPersist(SETUP_STAGE.PLAN_CONFIG)
   }
 
   function handlePlanConfirm(payload) {
@@ -233,12 +244,7 @@ export default function App() {
     setStorageItem(ACTIVE_QUESTION_KEY, JSON.stringify(null))
     setGamePlanIds(nextPlanIds)
     setRoundCatalog(effectiveRoundCatalog)
-    setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
-    setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(true))
-    setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-    setNeedsPlanConfig(false)
-    setNeedsPlanPreview(true)
-    setNeedsCompanionSetup(false)
+    setSetupStageAndPersist(SETUP_STAGE.PLAN_PREVIEW)
   }
 
   function handleSession(code, pin, incomingGameplayMode = null) {
@@ -255,14 +261,88 @@ export default function App() {
     const pendingPlan = loadNeedsPlanConfig()
     const pendingPreview = loadNeedsPlanPreview()
     const pendingCompanion = loadNeedsCompanionSetup()
-    setNeedsPlanConfig(hasTeams && pendingPlan)
-    setNeedsPlanPreview(hasTeams && !pendingPlan && pendingPreview)
-    setNeedsCompanionSetup(hasTeams && !pendingPlan && !pendingPreview && pendingCompanion && !isHostlessMode(normalizedGameplayMode))
+    setSetupStage(
+      resolveSetupStage({
+        hasTeams,
+        pendingPlan,
+        pendingPreview,
+        pendingCompanion,
+        hostlessMode: isHostlessMode(normalizedGameplayMode),
+      })
+    )
   }
 
   if (isBuzzerMode) return <BuzzerPage />
   if (isHostMobileMode) return <HostMobilePage />
   if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />
+
+  function renderMainContent() {
+    if (!session) {
+      return <SessionGate onSession={handleSession} />
+    }
+    switch (setupStage) {
+      case SETUP_STAGE.TEAMS:
+        return <Setup onStart={handleStart} />
+      case SETUP_STAGE.PLAN_CONFIG:
+        return (
+          <GameConfig
+            session={session}
+            gameplayMode={gameplayMode}
+            initialRoundCatalog={roundCatalog}
+            initialPlanIds={gamePlanIds}
+            onConfirm={handlePlanConfirm}
+            onBack={() => {
+              setTeams(null)
+              setSetupStageAndPersist(SETUP_STAGE.TEAMS)
+            }}
+          />
+        )
+      case SETUP_STAGE.PLAN_PREVIEW:
+        return (
+          <GamePlanPreview
+            roundCatalog={roundCatalog}
+            teams={teams}
+            onEditRound={() => setSetupStageAndPersist(SETUP_STAGE.PLAN_CONFIG)}
+            onContinue={() => setSetupStageAndPersist(hostlessModeActive ? SETUP_STAGE.READY : SETUP_STAGE.COMPANION)}
+            onBack={() => setSetupStageAndPersist(SETUP_STAGE.PLAN_CONFIG)}
+          />
+        )
+      case SETUP_STAGE.COMPANION:
+        if (hostlessModeActive) return null
+        return (
+          <CompanionSetup
+            sessionCode={session?.code}
+            backLabel="← Back"
+            onContinue={() => setSetupStageAndPersist(SETUP_STAGE.READY)}
+            onBack={() => setSetupStageAndPersist(SETUP_STAGE.PLAN_PREVIEW)}
+          />
+        )
+      case SETUP_STAGE.READY:
+      default:
+        return (
+          <Scoreboard
+            teams={teams}
+            gameplayMode={gameplayMode}
+            onGameplayModeSync={(nextGameplayMode) => {
+              const normalized = normalizeGameplayMode(nextGameplayMode, gameplayMode)
+              setGameplayMode(normalized)
+              setStorageItem(GAMEPLAY_MODE_KEY, JSON.stringify(normalized))
+            }}
+            initialRoundCatalog={roundCatalog}
+            initialPlanIds={gamePlanIds}
+            onReset={() => {
+              setTeams(null)
+              setSetupStageAndPersist(SETUP_STAGE.TEAMS)
+            }}
+            onEndSession={() => {
+              setTeams(null)
+              setSession(null)
+              setSetupStageAndPersist(SETUP_STAGE.TEAMS)
+            }}
+          />
+        )
+    }
+  }
 
   return (
     <div className="app">
@@ -284,107 +364,7 @@ export default function App() {
             onStepClick={navigateSetupStep}
           />
         )}
-        {!session ? (
-          <SessionGate onSession={handleSession} />
-        ) : !teams ? (
-          <Setup onStart={handleStart} />
-        ) : needsPlanConfig ? (
-          <GameConfig
-            session={session}
-            gameplayMode={gameplayMode}
-            initialRoundCatalog={roundCatalog}
-            initialPlanIds={gamePlanIds}
-            onConfirm={handlePlanConfirm}
-            onBack={() => {
-              setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
-              setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
-              setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-              setNeedsPlanConfig(false)
-              setNeedsPlanPreview(false)
-              setNeedsCompanionSetup(false)
-              setTeams(null)
-            }}
-          />
-        ) : needsPlanPreview ? (
-          <GamePlanPreview
-            roundCatalog={roundCatalog}
-            teams={teams}
-            onEditRound={() => {
-              setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(true))
-              setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
-              setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-              setNeedsPlanConfig(true)
-              setNeedsPlanPreview(false)
-              setNeedsCompanionSetup(false)
-            }}
-            onContinue={() => {
-              setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
-              setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(!hostlessModeActive))
-              setNeedsPlanPreview(false)
-              setNeedsCompanionSetup(!hostlessModeActive)
-            }}
-            onBack={() => {
-              setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(true))
-              setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
-              setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-              setNeedsPlanConfig(true)
-              setNeedsPlanPreview(false)
-              setNeedsCompanionSetup(false)
-            }}
-          />
-        ) : needsCompanionSetup && !hostlessModeActive ? (
-          <CompanionSetup
-            sessionCode={session?.code}
-            backLabel="← Back"
-            onContinue={() => {
-              setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-              setNeedsCompanionSetup(false)
-            }}
-            onBack={() => {
-              setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
-              setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(true))
-              setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-              setNeedsPlanConfig(false)
-              setNeedsPlanPreview(true)
-              setNeedsCompanionSetup(false)
-            }}
-          />
-        ) : (
-          <Scoreboard
-            teams={teams}
-            gameplayMode={gameplayMode}
-            onGameplayModeSync={(nextGameplayMode) => {
-              const normalized = normalizeGameplayMode(nextGameplayMode, gameplayMode)
-              setGameplayMode(normalized)
-              setStorageItem(GAMEPLAY_MODE_KEY, JSON.stringify(normalized))
-            }}
-            initialRoundCatalog={roundCatalog}
-            initialPlanIds={gamePlanIds}
-            onReset={() => {
-              setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
-              setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
-              setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-              setTeams(null)
-              const storedRoundCatalog = loadRoundCatalog()
-              setRoundCatalog(storedRoundCatalog)
-              setGamePlanIds(loadGamePlan(storedRoundCatalog))
-              setNeedsPlanPreview(false)
-              setNeedsCompanionSetup(false)
-            }}
-            onEndSession={() => {
-              setStorageItem(PLAN_CONFIG_PENDING_KEY, JSON.stringify(false))
-              setStorageItem(PLAN_PREVIEW_PENDING_KEY, JSON.stringify(false))
-              setStorageItem(COMPANION_SETUP_PENDING_KEY, JSON.stringify(false))
-              setTeams(null)
-              setSession(null)
-              const storedRoundCatalog = loadRoundCatalog()
-              setRoundCatalog(storedRoundCatalog)
-              setGamePlanIds(loadGamePlan(storedRoundCatalog))
-              setNeedsPlanPreview(false)
-              setNeedsCompanionSetup(false)
-            }}
-          />
-        )}
+        {renderMainContent()}
       </main>
 
       <footer className="app-footer">

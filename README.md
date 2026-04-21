@@ -19,9 +19,13 @@ Tech stack: React 19 + Vite 6 frontend, Express + Socket.IO backend, Postgres pe
   - Players submit guesses instead of buzzing
   - Wrong guesses broadcast as live toasts
   - First correct submission auto-locks the question and auto-awards points
-  - Host screen shows a correct-answer modal (with sound + next-question action)
+  - 30s per-question timer with timeout reveal when nobody is correct
+  - Timeout and correct-answer results are broadcast to all participants
+  - Player devices do not play timer/question audio cues
+  - No steal flow in host-less question handling
   - `charades` and `thesis` (Title Translator) are disabled in host-less game config, with tooltips
   - Buzz race leaderboard/stats UI is hidden in host-less mode
+- Lobby roster updates are de-duped by display name to reduce reconnect flicker in host view
 - Runtime state persistence in Postgres (scores, question cursor, buzz state, done questions, streaks, double points)
 - Custom round template library:
   - Create/edit user-defined rounds in the host setup flow
@@ -94,6 +98,7 @@ This runs:
 - `Host-less`
   - Players submit answers directly from `/buzz`
   - First correct answer wins points and locks that question
+  - 30-second timer, auto-timeout reveal, and no steal actions
   - Host manually advances questions
   - Companion setup step is skipped in setup flow
   - Unsupported rounds (`charades`, `thesis`) are disabled in setup
@@ -174,10 +179,17 @@ npm run build
 ## Project Structure
 
 - `server.js` - server bootstrap, routes, socket wiring
+- `backend/db.js` - Postgres pool, queries, transactions, migrations
 - `backend/socket/*` - host/member socket handlers and room/member utilities
 - `backend/state/*` - runtime state shape and DB hydration/persistence
-- `src/components/*` - host, companion, buzzer, and gameplay UI
+- `src/components/pages/*` - route-level pages (`Scoreboard`, `BuzzerPage`, `HostMobilePage`)
+- `src/components/setup-flow/*` - setup/session/game-plan flow screens
+- `src/components/home/*` - home lobby UI (`HomeLobbyView`, `CodesPanel`, host help/overlay)
+- `src/components/gameplay/*` - gameplay views/modals/sidebar/timer/winner flows
+- `src/components/question-bodies/*` - per-round body renderers and media element
+- `src/components/ui/*` - shared UI primitives (modal shell/header, buttons, QR)
 - `src/components/game-config/*` - round setup UI, template editor/preview, and user round library modal
+- `src/core/*` - shared frontend game/runtime modules (`storage`, `sounds`, `socket`, `gamePlan`, etc.)
 - `src/hooks/*` - host socket/game state/navigation hooks
 - `src/rounds/*` - round/question content (Guess the Language now uses YouTube URLs)
 - `migrations/*` - schema and runtime persistence migrations
