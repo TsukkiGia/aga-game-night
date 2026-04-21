@@ -100,14 +100,9 @@ export function useTemplateEditor({
     if (String(round?.type || '').trim().toLowerCase() !== CUSTOM_ROUND_TYPE) return
 
     const nextRules = Array.isArray(round.rules) ? cloneJson(round.rules) : []
-    const scoringSource = Array.isArray(round.scoring) && round.scoring.length > 0
-      ? round.scoring
+    const nextScoring = (round.scoring && typeof round.scoring === 'object' && !Array.isArray(round.scoring))
+      ? cloneJson(round.scoring)
       : cloneJson(DEFAULT_SCORING)
-    const nextScoring = scoringSource.map((entry) => ({
-      label: String(entry?.label || '').trim(),
-      points: Number.parseInt(entry?.points, 10) || 0,
-      phase: String(entry?.phase || 'normal').trim().toLowerCase() === 'steal' ? 'steal' : 'normal',
-    }))
     const questionsSource = Array.isArray(round.questions) && round.questions.length > 0
       ? round.questions
       : [cloneJson(DEFAULT_QUESTION)]
@@ -149,8 +144,6 @@ export function useTemplateEditor({
 
   function validateTemplate() {
     if (!newTemplateName.trim()) return 'Round name is required.'
-    const filledScoring = newTemplateScoring.filter((row) => String(row.label || '').trim())
-    if (filledScoring.length === 0) return 'Add at least one scoring row with a label.'
     if (newTemplateQuestions.length === 0) return 'Add at least one question.'
     for (let i = 0; i < newTemplateQuestions.length; i += 1) {
       const q = newTemplateQuestions[i]
@@ -178,11 +171,7 @@ export function useTemplateEditor({
       intro: newTemplateIntro,
       type: CUSTOM_ROUND_TYPE,
       rules: newTemplateRules.map((rule) => String(rule || '').trim()).filter(Boolean),
-      scoring: newTemplateScoring.map((row) => ({
-        label: row.label,
-        points: Number(row.points),
-        phase: row.phase,
-      })),
+      scoring: newTemplateScoring,
       questions: newTemplateQuestions.map((question) => ({
         id: question.id,
         promptType: question.promptType,
@@ -244,11 +233,7 @@ export function useTemplateEditor({
       intro: newTemplateIntro,
       type: CUSTOM_ROUND_TYPE,
       rules: newTemplateRules.map((rule) => String(rule || '').trim()).filter(Boolean),
-      scoring: newTemplateScoring.map((row) => ({
-        label: row.label,
-        points: Number(row.points),
-        phase: row.phase,
-      })),
+      scoring: newTemplateScoring,
       questions: newTemplateQuestions.map((question, index) => ({
         id: String(question?.id || '').trim() || `cq-${index + 1}`,
         promptType: question.promptType,

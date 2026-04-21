@@ -104,7 +104,7 @@ export function buildSnapshotPayloadFromSelection({ roundRows, planCatalog, sele
       type: row.round.type,
       intro: row.round.intro || '',
       rules: cloneJson(row.round.rules || []),
-      scoring: cloneJson(row.round.scoring || []),
+      scoring: cloneJson(row.round.scoring || {}),
       questions,
     })
   }
@@ -120,13 +120,21 @@ export function buildEditorSnapshot({ name, intro, rules, scoring, questions }) 
   const normalizedRules = Array.isArray(rules)
     ? rules.map((rule) => String(rule || '').trim())
     : []
-  const normalizedScoring = Array.isArray(scoring)
-    ? scoring.map((row) => ({
-      label: String(row?.label || '').trim(),
-      points: Number.parseInt(row?.points, 10) || 0,
-      phase: String(row?.phase || 'normal').trim().toLowerCase() === 'steal' ? 'steal' : 'normal',
-    }))
-    : []
+  const s = (scoring && typeof scoring === 'object' && !Array.isArray(scoring)) ? scoring : {}
+  const normalizedScoring = {
+    correctPoints: Number.parseInt(s.correctPoints, 10) || 3,
+    wrongPoints: Number.parseInt(s.wrongPoints, 10) || -1,
+    correctLabel: String(s.correctLabel || '').trim() || null,
+    wrongLabel: String(s.wrongLabel || '').trim() || null,
+    stealEnabled: s.stealEnabled !== false,
+    correctStealPoints: Number.parseInt(s.correctStealPoints, 10) || 2,
+    wrongStealPoints: Number.parseInt(s.wrongStealPoints, 10) || 0,
+    bonuses: Array.isArray(s.bonuses)
+      ? s.bonuses
+          .filter((b) => b && String(b.label || '').trim())
+          .map((b) => ({ label: String(b.label || '').trim(), points: Number.parseInt(b.points, 10) || 0 }))
+      : [],
+  }
   const normalizedQuestions = Array.isArray(questions)
     ? questions.map((question, index) => {
       const promptType = String(question?.promptType || 'text').trim().toLowerCase()

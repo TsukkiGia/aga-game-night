@@ -2,29 +2,18 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getRevealOutcome } from '../src/utils/buzzReveal.js'
 
-test('funny bonus does not reveal answer outside steal mode', () => {
+test('funny bonus does not reveal answer', () => {
   const outcome = getRevealOutcome({
     roundType: 'slang',
-    label: 'Funny bonus',
-    points: 1,
-    stealMode: false,
+    entryKind: 'bonus',
+    bonus: { label: 'Funny bonus', points: 1, noReveal: true },
   })
   assert.deepEqual(outcome, { revealAnswer: false, revealCountry: false })
 })
 
 test('any steal scoring action reveals answer', () => {
-  const revealOnCorrectSteal = getRevealOutcome({
-    roundType: 'video',
-    label: 'Correct steal',
-    points: 2,
-    stealMode: true,
-  })
-  const revealOnWrongSteal = getRevealOutcome({
-    roundType: 'video',
-    label: 'Wrong steal',
-    points: 0,
-    stealMode: true,
-  })
+  const revealOnCorrectSteal = getRevealOutcome({ roundType: 'video', entryKind: 'correct-steal' })
+  const revealOnWrongSteal = getRevealOutcome({ roundType: 'video', entryKind: 'wrong-steal' })
   assert.deepEqual(revealOnCorrectSteal, { revealAnswer: true, revealCountry: false })
   assert.deepEqual(revealOnWrongSteal, { revealAnswer: true, revealCountry: false })
 })
@@ -32,10 +21,8 @@ test('any steal scoring action reveals answer', () => {
 test('video correct country reveals country list only', () => {
   const outcome = getRevealOutcome({
     roundType: 'video',
-    label: 'Correct country',
-    points: 1,
-    stealMode: false,
+    entryKind: 'bonus',
+    bonus: { label: 'Correct country', points: 1, revealCountry: true },
   })
   assert.deepEqual(outcome, { revealAnswer: false, revealCountry: true })
 })
-

@@ -1,9 +1,13 @@
-export const DEFAULT_SCORING = [
-  { label: 'Correct answer', points: 3, phase: 'normal' },
-  { label: 'Wrong answer', points: -1, phase: 'normal' },
-  { label: 'Correct steal', points: 2, phase: 'steal' },
-  { label: 'Wrong steal', points: 0, phase: 'steal' },
-]
+export const DEFAULT_SCORING = {
+  correctPoints: 3,
+  wrongPoints: -1,
+  correctLabel: null,
+  wrongLabel: null,
+  stealEnabled: true,
+  correctStealPoints: 2,
+  wrongStealPoints: 0,
+  bonuses: [],
+}
 
 export const DEFAULT_QUESTION = {
   promptType: 'text',

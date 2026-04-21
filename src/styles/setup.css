@@ -2796,6 +2796,146 @@
   border-top: 1px solid #e8e0d4;
 }
 
+/* ── Structured scoring panel ─────────────────────────── */
+
+.tpl-score-block {
+  background: #faf7f3;
+  border: 1px solid #e5ddd2;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 7px;
+}
+
+.tpl-score-steal-block {
+  margin-left: 0;
+}
+
+.tpl-score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #ece5da;
+}
+
+.tpl-score-row:last-child {
+  border-bottom: none;
+}
+
+.tpl-score-row-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tpl-score-row .game-config-points-input {
+  flex: 0 0 46px;
+  width: 46px;
+  height: 22px;
+  min-height: unset;
+  font-size: 12px;
+  padding: 0 4px;
+  text-align: center;
+  border-radius: 5px;
+}
+
+.tpl-score-steal-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 10px;
+  margin-bottom: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: #faf7f3;
+  border: 1px solid #e5ddd2;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tpl-score-steal-toggle input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #8b5e3c;
+  flex-shrink: 0;
+}
+
+.tpl-score-bonuses-label {
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: #756b60;
+  margin: 8px 0 5px;
+}
+
+.tpl-score-bonus-row {
+  display: grid;
+  grid-template-columns: 1fr 46px 20px;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 4px;
+  padding: 0 2px;
+}
+
+.tpl-score-bonus-row .game-config-points-input {
+  width: 46px;
+  height: 22px;
+  min-height: unset;
+  font-size: 11px;
+  padding: 0 4px;
+  text-align: center;
+  border-radius: 5px;
+}
+
+
+/* Legacy classes kept for non-template uses */
+.game-config-score-fixed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 6px;
+}
+
+.game-config-score-fixed-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.game-config-score-fixed-row .game-config-points-input {
+  flex: 0 0 66px;
+  width: 66px;
+  min-height: 30px;
+}
+
+.game-config-score-steal-row { padding-left: 2px; }
+
+.game-config-steal-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.game-config-steal-toggle input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
 .game-config-points-input {
   text-align: center !important;
   padding-left: 6px;

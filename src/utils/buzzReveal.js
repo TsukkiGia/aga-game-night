@@ -1,28 +1,22 @@
 const REVEALABLE_ROUND_TYPES = new Set(['slang', 'video', 'charades', 'custom-buzz'])
 
-export function getRevealOutcome({ roundType, label, points, stealMode }) {
+export function getRevealOutcome({ roundType, entryKind, bonus = null }) {
   const type = String(roundType || '').trim().toLowerCase()
-  const entryLabel = String(label || '').trim()
-  const normalizedLabel = entryLabel.toLowerCase()
-  const numericPoints = Number(points)
-  const canReveal = REVEALABLE_ROUND_TYPES.has(type)
+  if (!REVEALABLE_ROUND_TYPES.has(type)) return { revealAnswer: false, revealCountry: false }
 
-  if (!canReveal) return { revealAnswer: false, revealCountry: false }
-
-  if (stealMode) {
-    // Any steal scoring action reveals the answer, regardless of points.
+  if (entryKind === 'correct-steal' || entryKind === 'wrong-steal') {
     return { revealAnswer: true, revealCountry: false }
   }
 
-  if (type === 'video' && entryLabel === 'Correct country') {
-    return { revealAnswer: false, revealCountry: true }
+  if (entryKind === 'correct') {
+    return { revealAnswer: true, revealCountry: false }
   }
 
-  const isFunnyBonus = normalizedLabel === 'funny bonus'
-  if (numericPoints > 0 && !isFunnyBonus) {
-    return { revealAnswer: true, revealCountry: false }
+  if (entryKind === 'bonus' && bonus) {
+    if (bonus.revealCountry) return { revealAnswer: false, revealCountry: true }
+    if (bonus.noReveal) return { revealAnswer: false, revealCountry: false }
+    if (bonus.points > 0) return { revealAnswer: true, revealCountry: false }
   }
 
   return { revealAnswer: false, revealCountry: false }
 }
-

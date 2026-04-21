@@ -178,67 +178,93 @@ export default function TemplateEditorModal({
             <div className="tpl-section">
               <button type="button" className="tpl-section-toggle" onClick={() => setScoringOpen((v) => !v)}>
                 <span>Scoring</span>
-                <span className="tpl-section-meta">
-                  <span className="tpl-count">{newTemplateScoring.length}</span>
-                  <span className={`tpl-chevron${scoringOpen ? ' open' : ''}`}>›</span>
-                </span>
+                <span className={`tpl-chevron${scoringOpen ? ' open' : ''}`}>›</span>
               </button>
               {scoringOpen && (
                 <div className="tpl-section-body">
-                  <div className="game-config-score-col-heads">
-                    <span>Label</span>
-                    <span>Pts</span>
-                    <span>Phase</span>
+                  <div className="tpl-score-block">
+                    <div className="tpl-score-row">
+                      <span className="tpl-score-row-label">Correct answer</span>
+                      <PointsInput
+                        value={newTemplateScoring.correctPoints ?? 3}
+                        onChange={(val) => setNewTemplateScoring((prev) => ({ ...prev, correctPoints: val }))}
+                      />
+                    </div>
+                    <div className="tpl-score-row">
+                      <span className="tpl-score-row-label">Wrong answer</span>
+                      <PointsInput
+                        value={newTemplateScoring.wrongPoints ?? -1}
+                        onChange={(val) => setNewTemplateScoring((prev) => ({ ...prev, wrongPoints: val }))}
+                      />
+                    </div>
                   </div>
-                  {newTemplateScoring.map((row, idx) => {
-                    const prevPhase = idx > 0 ? newTemplateScoring[idx - 1].phase : null
-                    const isGroupBreak = row.phase === 'steal' && prevPhase === 'normal'
-                    return (
-                      <div
-                        key={`score-${idx}`}
-                        className={`game-config-template-row game-config-template-row-score${isGroupBreak ? ' score-group-break' : ''}`}
-                      >
-                        <input
-                          className="team-name-input game-config-field"
-                          type="text"
-                          value={row.label}
-                          onChange={(e) => setNewTemplateScoring((prev) => prev.map((item, i) => i === idx ? { ...item, label: e.target.value } : item))}
-                          placeholder="e.g. Correct answer"
-                        />
+
+                  <label className="tpl-score-steal-toggle">
+                    <input
+                      type="checkbox"
+                      checked={newTemplateScoring.stealEnabled !== false}
+                      onChange={(e) => setNewTemplateScoring((prev) => ({ ...prev, stealEnabled: e.target.checked }))}
+                    />
+                    <span>Opponents can steal</span>
+                  </label>
+
+                  {newTemplateScoring.stealEnabled !== false && (
+                    <div className="tpl-score-block tpl-score-steal-block">
+                      <div className="tpl-score-row">
+                        <span className="tpl-score-row-label">Correct steal</span>
                         <PointsInput
-                          value={row.points}
-                          onChange={(val) => setNewTemplateScoring((prev) => prev.map((item, i) => i !== idx ? item : { ...item, points: val }))}
-                        />
-                        <select
-                          className="team-name-input game-config-field game-config-select"
-                          value={row.phase}
-                          onChange={(e) => setNewTemplateScoring((prev) => {
-                            const newPhase = e.target.value
-                            const moved = { ...prev[idx], phase: newPhase }
-                            const rest = prev.filter((_, i) => i !== idx)
-                            const insertAt = rest.reduce((last, item, i) => item.phase === newPhase ? i + 1 : last, 0)
-                            return [...rest.slice(0, insertAt), moved, ...rest.slice(insertAt)]
-                          })}
-                        >
-                          <option value="normal">Normal</option>
-                          <option value="steal">Steal</option>
-                        </select>
-                        <IconRemoveButton
-                          onClick={() => setNewTemplateScoring((prev) => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx))}
-                          ariaLabel="Remove scoring row"
+                          value={newTemplateScoring.correctStealPoints ?? 2}
+                          onChange={(val) => setNewTemplateScoring((prev) => ({ ...prev, correctStealPoints: val }))}
                         />
                       </div>
-                    )
-                  })}
+                      <div className="tpl-score-row">
+                        <span className="tpl-score-row-label">Wrong steal</span>
+                        <PointsInput
+                          value={newTemplateScoring.wrongStealPoints ?? 0}
+                          onChange={(val) => setNewTemplateScoring((prev) => ({ ...prev, wrongStealPoints: val }))}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="tpl-score-bonuses-label">Bonus actions</div>
+                  {(newTemplateScoring.bonuses || []).map((bonus, idx) => (
+                    <div key={`bonus-${idx}`} className="tpl-score-bonus-row">
+                      <input
+                        className="team-name-input game-config-field"
+                        type="text"
+                        value={bonus.label}
+                        onChange={(e) => setNewTemplateScoring((prev) => ({
+                          ...prev,
+                          bonuses: prev.bonuses.map((b, i) => i === idx ? { ...b, label: e.target.value } : b),
+                        }))}
+                        placeholder="e.g. Funny bonus"
+                      />
+                      <PointsInput
+                        value={bonus.points}
+                        onChange={(val) => setNewTemplateScoring((prev) => ({
+                          ...prev,
+                          bonuses: prev.bonuses.map((b, i) => i === idx ? { ...b, points: val } : b),
+                        }))}
+                      />
+                      <IconRemoveButton
+                        onClick={() => setNewTemplateScoring((prev) => ({
+                          ...prev,
+                          bonuses: prev.bonuses.filter((_, i) => i !== idx),
+                        }))}
+                        ariaLabel="Remove bonus"
+                      />
+                    </div>
+                  ))}
                   <button
                     type="button"
                     className="game-config-add-row-btn"
-                    onClick={() => setNewTemplateScoring((prev) => {
-                      const next = [...prev, { label: '', points: 0, phase: 'normal' }]
-                      return next.sort((a, b) => a.phase === b.phase ? 0 : a.phase === 'normal' ? -1 : 1)
-                    })}
+                    onClick={() => setNewTemplateScoring((prev) => ({
+                      ...prev,
+                      bonuses: [...(prev.bonuses || []), { label: '', points: 0 }],
+                    }))}
                   >
-                    + Score Row
+                    + Bonus
                   </button>
                 </div>
               )}
