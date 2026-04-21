@@ -1,3 +1,5 @@
+import { emitAnswerState, emitAnswerTimeout } from './answerEvents.js'
+
 export function registerHostSocketHandlers(socket, ctx) {
   const {
     queryFn,
@@ -79,8 +81,7 @@ export function registerHostSocketHandlers(socket, ctx) {
 
   function broadcastAnswerState(code, st) {
     const answerState = serializeHostSyncState(st).answerState
-    io.to(hostRoom(code)).emit('answer:state', answerState)
-    io.to(`${code}:members`).emit('answer:state', answerState)
+    emitAnswerState(io, hostRoom, code, answerState)
   }
 
   function lockAnswerStateForHostedMode(st) {
@@ -644,8 +645,7 @@ export function registerHostSocketHandlers(socket, ctx) {
         answer: String(context.expectedAnswer || '').trim(),
       }
       io.to(hostRoom(code)).emit('host:timer:expired')
-      io.to(hostRoom(code)).emit('answer:timeout', timeoutPayload)
-      io.to(`${code}:members`).emit('answer:timeout', timeoutPayload)
+      emitAnswerTimeout(io, hostRoom, code, timeoutPayload)
       broadcastAnswerState(code, st)
       persistRuntimeStateInBackground(code, st)
       respond({ ok: true, accepted: true })

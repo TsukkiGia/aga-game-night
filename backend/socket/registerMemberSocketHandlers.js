@@ -1,3 +1,5 @@
+import { emitAnswerAttempt, emitAnswerCorrect, emitAnswerState } from './answerEvents.js'
+
 export function registerMemberSocketHandlers(socket, ctx) {
   const {
     io,
@@ -336,11 +338,9 @@ export function registerMemberSocketHandlers(socket, ctx) {
       })
       const correctPayload = { ...basePayload, points, answer: context.expectedAnswer }
       io.to(hostRoom(code)).emit('state:sync', serializeHostSyncState(st))
-      io.to(hostRoom(code)).emit('answer:correct', correctPayload)
-      io.to(`${code}:members`).emit('answer:correct', correctPayload)
+      emitAnswerCorrect(io, hostRoom, code, correctPayload)
       const answerState = serializeMemberSyncState(st).answerState
-      io.to(hostRoom(code)).emit('answer:state', answerState)
-      io.to(`${code}:members`).emit('answer:state', answerState)
+      emitAnswerState(io, hostRoom, code, answerState)
       persistTeams(code, st.teams).catch((err) => {
         console.error('[persistTeams/member:answer:submit]', err)
       })
@@ -356,11 +356,9 @@ export function registerMemberSocketHandlers(socket, ctx) {
       questionId: context.cursorId,
       timestamp: now,
     })
-    io.to(hostRoom(code)).emit('answer:attempt', basePayload)
-    io.to(`${code}:members`).emit('answer:attempt', basePayload)
+    emitAnswerAttempt(io, hostRoom, code, basePayload)
     const answerState = serializeMemberSyncState(st).answerState
-    io.to(hostRoom(code)).emit('answer:state', answerState)
-    io.to(`${code}:members`).emit('answer:state', answerState)
+    emitAnswerState(io, hostRoom, code, answerState)
     persistRuntimeStateInBackground(code, st)
     respond({ ok: true, correct: false })
   })

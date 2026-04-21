@@ -11,6 +11,7 @@ import QuestionSidebar from './QuestionSidebar'
 import ModalShell from './ModalShell'
 import Timer from './Timer'
 import { isHostlessMode } from '../gameplayMode'
+import { resolvePrimaryPositivePoints } from '../utils/scoring'
 
 export default function QuestionView({
   planCatalog = null,
@@ -63,25 +64,6 @@ export default function QuestionView({
     ? String(question?.meaning || '').trim()
     : String(question?.answer || '').trim()
   const hostlessAnswerExplanation = String(question?.explanation || '').trim()
-
-  function resolvePrimaryPositivePoints(scoring, { allowSteal = false, fallback = 3 } = {}) {
-    if (Array.isArray(scoring)) {
-      const entry = scoring.find((row) => {
-        const points = Number.parseInt(row?.points, 10)
-        if (!Number.isInteger(points) || points <= 0) return false
-        if (allowSteal) return true
-        return !String(row?.label || '').toLowerCase().includes('steal')
-      })
-      if (!entry) return fallback
-      const points = Number.parseInt(entry.points, 10)
-      return Number.isInteger(points) && points > 0 ? points : fallback
-    }
-    if (scoring && typeof scoring === 'object') {
-      const points = Number.parseInt(scoring.correctPoints, 10)
-      return Number.isInteger(points) && points > 0 ? points : fallback
-    }
-    return fallback
-  }
 
   const activePair = isCharades
     ? new Set([(selectedTurnIndex * 2) % teams.length, (selectedTurnIndex * 2 + 1) % teams.length])

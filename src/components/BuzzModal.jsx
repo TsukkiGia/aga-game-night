@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Timer from './Timer'
 import { getRevealOutcome } from '../utils/buzzReveal'
+import { normalizeScoringConfig } from '../utils/scoring'
 
 // Round types that support in-modal answer reveal
 const REVEAL_ANSWER_CONFIG = {
@@ -70,7 +71,7 @@ export default function BuzzModal({
 
   if (!buzzWinner?.team) return null
 
-  const scoring = round.scoring || {}
+  const scoring = normalizeScoringConfig(round?.scoring)
   const correctLabel = scoring.correctLabel || 'Correct answer'
   const wrongLabel = scoring.wrongLabel || 'Wrong answer'
 

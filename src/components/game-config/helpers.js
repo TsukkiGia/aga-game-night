@@ -1,6 +1,7 @@
 import { buildPlanCatalog, defaultPlanIds, normalizePlanIdsWithRoundIntros } from '../../gamePlan.js'
 import { CUSTOM_ROUND_TYPE } from '../../roundCatalog.js'
 import { cleanUrl } from '../../utils/mediaPrompt.js'
+import { normalizeScoringConfig } from '../../utils/scoring.js'
 
 const HEALTHY_DEFAULT_TARGETS = [
   { roundNames: ['guess the language'], count: 10 },
@@ -120,21 +121,7 @@ export function buildEditorSnapshot({ name, intro, rules, scoring, questions }) 
   const normalizedRules = Array.isArray(rules)
     ? rules.map((rule) => String(rule || '').trim())
     : []
-  const s = (scoring && typeof scoring === 'object' && !Array.isArray(scoring)) ? scoring : {}
-  const normalizedScoring = {
-    correctPoints: Number.parseInt(s.correctPoints, 10) || 3,
-    wrongPoints: Number.parseInt(s.wrongPoints, 10) || -1,
-    correctLabel: String(s.correctLabel || '').trim() || null,
-    wrongLabel: String(s.wrongLabel || '').trim() || null,
-    stealEnabled: s.stealEnabled !== false,
-    correctStealPoints: Number.parseInt(s.correctStealPoints, 10) || 2,
-    wrongStealPoints: Number.parseInt(s.wrongStealPoints, 10) || 0,
-    bonuses: Array.isArray(s.bonuses)
-      ? s.bonuses
-          .filter((b) => b && String(b.label || '').trim())
-          .map((b) => ({ label: String(b.label || '').trim(), points: Number.parseInt(b.points, 10) || 0 }))
-      : [],
-  }
+  const normalizedScoring = normalizeScoringConfig(scoring)
   const normalizedQuestions = Array.isArray(questions)
     ? questions.map((question, index) => {
       const promptType = String(question?.promptType || 'text').trim().toLowerCase()

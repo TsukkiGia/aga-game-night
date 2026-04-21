@@ -1,13 +1,4 @@
-export const DEFAULT_SCORING = {
-  correctPoints: 3,
-  wrongPoints: -1,
-  correctLabel: null,
-  wrongLabel: null,
-  stealEnabled: true,
-  correctStealPoints: 2,
-  wrongStealPoints: 0,
-  bonuses: [],
-}
+export { DEFAULT_SCORING } from '../../utils/scoring.js'
 
 export const DEFAULT_QUESTION = {
   promptType: 'text',

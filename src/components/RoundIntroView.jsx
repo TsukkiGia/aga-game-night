@@ -1,32 +1,5 @@
 import QuestionSidebar from './QuestionSidebar'
-
-function scoringToDisplayRows(scoring) {
-  if (!scoring) return []
-  if (Array.isArray(scoring)) {
-    return scoring
-      .map((entry) => {
-        if (!entry || typeof entry !== 'object') return null
-        return {
-          label: String(entry.label || '').trim() || 'Score',
-          points: Number.isFinite(Number(entry.points)) ? Number(entry.points) : 0,
-        }
-      })
-      .filter(Boolean)
-  }
-  if (typeof scoring !== 'object') return []
-  const s = scoring
-  const rows = []
-  rows.push({ label: s.correctLabel || 'Correct answer', points: s.correctPoints ?? 3 })
-  for (const bonus of (Array.isArray(s.bonuses) ? s.bonuses : [])) {
-    rows.push({ label: bonus.label, points: bonus.points })
-  }
-  rows.push({ label: s.wrongLabel || 'Wrong answer', points: s.wrongPoints ?? -1 })
-  if (s.stealEnabled !== false) {
-    rows.push({ label: 'Correct steal', points: s.correctStealPoints ?? 2 })
-    rows.push({ label: 'Wrong steal', points: s.wrongStealPoints ?? 0 })
-  }
-  return rows
-}
+import { scoringToDisplayRows } from '../utils/scoring'
 
 export default function RoundIntroView({
   planCatalog = null,

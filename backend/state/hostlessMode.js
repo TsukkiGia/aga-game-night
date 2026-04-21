@@ -4,11 +4,12 @@ import {
   splitQuestionCursor,
   parseRoundIntroCursor,
 } from '../../shared/questionCursor.js'
+import {
+  normalizeGameplayMode,
+  isHostlessMode,
+  isHostlessRoundSupported,
+} from '../../shared/gameplayMode.js'
 
-const HOSTED_MODE = 'hosted'
-const HOSTLESS_MODE = 'hostless'
-const SUPPORTED_GAMEPLAY_MODES = new Set([HOSTED_MODE, HOSTLESS_MODE])
-const UNSUPPORTED_HOSTLESS_ROUND_TYPES = new Set(['charades', 'thesis'])
 const TRIMMABLE_ANSWER_SUFFIXES = new Set([
   'rice',
   'soup',
@@ -212,21 +213,7 @@ function deriveImplicitAcceptedAnswers(roundType, question, expectedAnswer) {
   return dedupeAnswerVariants(next)
 }
 
-export function normalizeGameplayMode(rawMode, fallback = HOSTED_MODE) {
-  const normalized = normalizeText(rawMode).toLowerCase()
-  if (SUPPORTED_GAMEPLAY_MODES.has(normalized)) return normalized
-  return fallback
-}
-
-export function isHostlessMode(mode) {
-  return normalizeGameplayMode(mode) === HOSTLESS_MODE
-}
-
-export function isHostlessRoundSupported(roundType) {
-  const normalized = normalizeRoundType(roundType)
-  if (!normalized) return false
-  return !UNSUPPORTED_HOSTLESS_ROUND_TYPES.has(normalized)
-}
+export { normalizeGameplayMode, isHostlessMode, isHostlessRoundSupported }
 
 export function resolveHostlessQuestionContext(st) {
   const roundCatalog = Array.isArray(st?.roundCatalog) ? st.roundCatalog : []
