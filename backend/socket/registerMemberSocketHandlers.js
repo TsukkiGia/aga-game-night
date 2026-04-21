@@ -256,7 +256,9 @@ export function registerMemberSocketHandlers(socket, ctx) {
       return
     }
 
-    const guess = String(payload?.guess || '').trim().slice(0, HOSTLESS_MAX_GUESS_LENGTH)
+    const payloadObj = (payload && typeof payload === 'object' && !Array.isArray(payload)) ? payload : {}
+    const guess = String(payloadObj.guess || '').trim().slice(0, HOSTLESS_MAX_GUESS_LENGTH)
+    const submittedQuestionId = String(payloadObj.questionId || '').trim()
     if (!guess) {
       respond({ ok: false, error: 'invalid-guess' })
       return
@@ -267,7 +269,11 @@ export function registerMemberSocketHandlers(socket, ctx) {
       respond({ ok: false, error: 'question-locked' })
       return
     }
-    if (!isHostlessRoundSupported(context.roundType) || !context.expectedAnswer) {
+    if (submittedQuestionId && submittedQuestionId !== context.cursorId) {
+      respond({ ok: false, error: 'stale-question' })
+      return
+    }
+    if (!isHostlessRoundSupported(context.roundType) || !Array.isArray(context.expectedAnswers) || context.expectedAnswers.length === 0) {
       respond({ ok: false, error: 'unsupported-round' })
       return
     }
@@ -292,12 +298,12 @@ export function registerMemberSocketHandlers(socket, ctx) {
       respond({ ok: false, error: 'invalid-guess' })
       return
     }
-    const lastSubmitAt = Number(guard.lastSubmitAtBySocket.get(socket.id) || 0)
-    if (now - lastSubmitAt < HOSTLESS_SUBMIT_COOLDOWN_MS) {
-      respond({ ok: false, error: 'rate-limited' })
+    if (guard.normalizedGuesses.has(guessNorm)) {
+      respond({ ok: false, error: 'duplicate-guess' })
       return
     }
-    if (guard.normalizedGuesses.has(guessNorm)) {
+    const lastSubmitAt = Number(guard.lastSubmitAtBySocket.get(socket.id) || 0)
+    if (now - lastSubmitAt < HOSTLESS_SUBMIT_COOLDOWN_MS) {
       respond({ ok: false, error: 'rate-limited' })
       return
     }
@@ -316,7 +322,7 @@ export function registerMemberSocketHandlers(socket, ctx) {
       questionId: context.cursorId,
     }
 
-    if (isGuessCorrect(guess, context.expectedAnswer)) {
+    if (isGuessCorrect(guess, context.expectedAnswer, context.expectedAnswers)) {
       const points = resolveHostlessPoints(context.round)
       st.teams[idx].score = Number(st.teams[idx].score || 0) + points
       lockAnswerState(st, {

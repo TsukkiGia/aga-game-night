@@ -2,6 +2,17 @@ const HOSTED_MODE = 'hosted'
 const HOSTLESS_MODE = 'hostless'
 const SUPPORTED_GAMEPLAY_MODES = new Set([HOSTED_MODE, HOSTLESS_MODE])
 const UNSUPPORTED_HOSTLESS_ROUND_TYPES = new Set(['charades', 'thesis'])
+const TRIMMABLE_ANSWER_SUFFIXES = new Set([
+  'rice',
+  'soup',
+  'stew',
+  'sauce',
+  'dish',
+  'bread',
+  'curry',
+  'porridge',
+  'salad',
+])
 
 const MAX_ATTEMPTS_IN_STATE = 24
 
@@ -121,13 +132,6 @@ function roundAndQuestionFromCursorId(roundCatalog, cursorId) {
   }
 }
 
-function scoringPhase(entry) {
-  const explicit = normalizeText(entry?.phase).toLowerCase()
-  if (explicit === 'steal') return 'steal'
-  if (explicit === 'normal') return 'normal'
-  const label = normalizeText(entry?.label).toLowerCase()
-  return label.includes('steal') ? 'steal' : 'normal'
-}
 
 function hostlessExpectedAnswerForQuestion(roundType, question) {
   if (!question || typeof question !== 'object') return ''
@@ -135,6 +139,88 @@ function hostlessExpectedAnswerForQuestion(roundType, question) {
   if (roundType === 'slang') return normalizeText(question.meaning)
   if (roundType === 'custom-buzz') return normalizeText(question.answer)
   return ''
+}
+
+function hostlessAcceptedAnswersForQuestion(question) {
+  if (!question || typeof question !== 'object') return []
+  if (!Array.isArray(question.acceptedAnswers)) return []
+  const next = []
+  const seen = new Set()
+  for (const raw of question.acceptedAnswers) {
+    const value = normalizeText(raw).slice(0, 240)
+    if (!value) continue
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    next.push(value)
+    if (next.length >= 20) break
+  }
+  return next
+}
+
+function dedupeAnswerVariants(values) {
+  const out = []
+  const seen = new Set()
+  for (const raw of values) {
+    const value = normalizeText(raw).slice(0, 240)
+    if (!value) continue
+    const key = normalizeGuessForMatch(value)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(value)
+    if (out.length >= 60) break
+  }
+  return out
+}
+
+function stripLeadingFiller(value) {
+  return normalizeText(value)
+    .replace(/^(to|a|an|the)\s+/i, '')
+    .replace(/^someone who\s+/i, '')
+    .replace(/^the state of being\s+/i, '')
+    .trim()
+}
+
+function deriveGenericSuffixAliases(answer) {
+  const cleaned = normalizeText(answer)
+  if (!cleaned) return []
+  const words = cleaned.split(/\s+/).filter(Boolean)
+  if (words.length < 2) return []
+  const suffix = words[words.length - 1]?.toLowerCase()
+  if (!TRIMMABLE_ANSWER_SUFFIXES.has(suffix)) return []
+  const base = words.slice(0, -1).join(' ').trim()
+  if (!base) return []
+  return [base]
+}
+
+function deriveSlangMeaningAliases(meaning) {
+  const cleaned = normalizeText(meaning)
+  if (!cleaned) return []
+  const variants = [cleaned]
+  const withoutParens = cleaned.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()
+  if (withoutParens && withoutParens !== cleaned) variants.push(withoutParens)
+
+  const fragments = []
+  for (const value of variants) {
+    value
+      .split(/\s*\/\s*|\s*;\s*|\s*,\s*|\s+or\s+/i)
+      .map((part) => stripLeadingFiller(part))
+      .filter(Boolean)
+      .forEach((part) => fragments.push(part))
+  }
+  return dedupeAnswerVariants(fragments)
+}
+
+function deriveImplicitAcceptedAnswers(roundType, question, expectedAnswer) {
+  if (!question || typeof question !== 'object') return []
+  const next = []
+  if (roundType === 'slang') {
+    next.push(...deriveSlangMeaningAliases(String(question.meaning || expectedAnswer || '')))
+  }
+  if (roundType === 'custom-buzz' || roundType === 'video') {
+    next.push(...deriveGenericSuffixAliases(String(expectedAnswer || question.answer || '')))
+  }
+  return dedupeAnswerVariants(next)
 }
 
 export function normalizeGameplayMode(rawMode, fallback = HOSTED_MODE) {
@@ -173,6 +259,7 @@ export function resolveHostlessQuestionContext(st) {
       roundType: '',
       supportedRound: false,
       expectedAnswer: '',
+      expectedAnswers: [],
       canAcceptAnswers: false,
       unsupportedReason: 'no-question',
     }
@@ -180,22 +267,32 @@ export function resolveHostlessQuestionContext(st) {
 
   const roundType = normalizeRoundType(baseContext.round?.type)
   const supportedRound = isHostlessRoundSupported(roundType)
-  const expectedAnswer = baseContext.itemType === 'question'
-    ? hostlessExpectedAnswerForQuestion(roundType, baseContext.question)
-    : ''
+  const expectedAnswers = baseContext.itemType === 'question'
+    ? (() => {
+        const primary = hostlessExpectedAnswerForQuestion(roundType, baseContext.question)
+        const aliases = hostlessAcceptedAnswersForQuestion(baseContext.question)
+        const implicit = deriveImplicitAcceptedAnswers(roundType, baseContext.question, primary)
+        const merged = dedupeAnswerVariants([primary, ...aliases, ...implicit])
+        if (merged.length > 0) return merged
+        if (!primary) return aliases
+        return [primary, ...aliases]
+      })()
+    : []
+  const expectedAnswer = expectedAnswers[0] || ''
 
-  const canAcceptAnswers = baseContext.itemType === 'question' && supportedRound && Boolean(expectedAnswer)
+  const canAcceptAnswers = baseContext.itemType === 'question' && supportedRound && expectedAnswers.length > 0
 
   let unsupportedReason = ''
   if (baseContext.itemType !== 'question') unsupportedReason = 'no-question'
   else if (!supportedRound) unsupportedReason = 'unsupported-round'
-  else if (!expectedAnswer) unsupportedReason = 'missing-answer'
+  else if (expectedAnswers.length === 0) unsupportedReason = 'missing-answer'
 
   return {
     ...baseContext,
     roundType,
     supportedRound,
     expectedAnswer,
+    expectedAnswers,
     canAcceptAnswers,
     unsupportedReason,
   }
@@ -325,12 +422,10 @@ export function recordWrongAttempt(st, attemptPayload) {
 }
 
 export function resolveHostlessPoints(round) {
-  const scoringRows = Array.isArray(round?.scoring) ? round.scoring : []
-  for (const row of scoringRows) {
-    const points = Number.parseInt(row?.points, 10)
-    if (!Number.isInteger(points) || points <= 0) continue
-    if (scoringPhase(row) === 'steal') continue
-    return points
+  const scoring = round?.scoring
+  if (scoring && typeof scoring === 'object' && !Array.isArray(scoring)) {
+    const points = Number.parseInt(scoring.correctPoints, 10)
+    return Number.isInteger(points) && points > 0 ? points : 3
   }
   return 3
 }
@@ -400,11 +495,29 @@ function maybeSplitCandidateAnswers(expectedAnswer) {
   return [...new Set(candidates)]
 }
 
-export function isGuessCorrect(guess, expectedAnswer) {
+function collectCandidateAnswers(expectedAnswer, expectedAnswers = []) {
+  const candidates = []
+  const seen = new Set()
+  const queue = [expectedAnswer]
+  if (Array.isArray(expectedAnswers)) queue.push(...expectedAnswers)
+
+  for (const raw of queue) {
+    const split = maybeSplitCandidateAnswers(raw)
+    for (const candidate of split) {
+      const key = normalizeGuessForMatch(candidate)
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      candidates.push(candidate)
+    }
+  }
+  return candidates
+}
+
+export function isGuessCorrect(guess, expectedAnswer, expectedAnswers = []) {
   const guessNorm = normalizeGuessForMatch(guess)
   if (!guessNorm) return false
 
-  const candidates = maybeSplitCandidateAnswers(expectedAnswer)
+  const candidates = collectCandidateAnswers(expectedAnswer, expectedAnswers)
   for (const candidate of candidates) {
     const expectedNorm = normalizeGuessForMatch(candidate)
     if (!expectedNorm) continue

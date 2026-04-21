@@ -1598,6 +1598,121 @@ test('host-less timer expiry locks question and reveals answer when nobody is co
   }
 })
 
+test('host-less timer expiry ignores stale question ids', async () => {
+  const twoQuestionRound = {
+    id: 'hostless-custom-2q',
+    type: 'custom-buzz',
+    name: 'Host-less custom (2q)',
+    intro: 'Answer by submitting',
+    rules: ['First correct answer scores'],
+    scoring: { correctPoints: 4, wrongPoints: -1, stealEnabled: false },
+    questions: [
+      {
+        id: 'hcq-1',
+        promptType: 'text',
+        promptText: 'Capital of Ghana?',
+        answer: 'Accra',
+      },
+      {
+        id: 'hcq-2',
+        promptType: 'text',
+        promptText: 'Capital of Nigeria?',
+        answer: 'Abuja',
+      },
+    ],
+  }
+
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    await emitAck(host, 'host:setup', {
+      teams: TEAMS,
+      gameplayMode: 'hostless',
+      roundCatalog: [twoQuestionRound],
+      gamePlan: ['intro:hostless-custom-2q', 'q:hostless-custom-2q:hcq-1', 'q:hostless-custom-2q:hcq-2'],
+    })
+    await emitAck(host, 'host:question:set', 'q:hostless-custom-2q:hcq-1')
+    await emitAck(member, 'member:join', sessionCode, 0, 'Alice')
+
+    host.emit('host:timer:expired', { questionId: 'q:hostless-custom-2q:hcq-2' })
+    await waitNoEvent(host, 'answer:timeout', 300)
+    await waitNoEvent(member, 'answer:timeout', 300)
+
+    const state = harness.getState(sessionCode)
+    assert.equal(state.answerState.questionId, 'q:hostless-custom-2q:hcq-1')
+    assert.equal(state.answerState.status, 'open')
+    assert.equal(state.answerState.winner, null)
+  } finally {
+    await harness.close()
+  }
+})
+
+test('host-less submit rejects stale client question ids', async () => {
+  const twoQuestionRound = {
+    id: 'hostless-custom-submit-stale',
+    type: 'custom-buzz',
+    name: 'Host-less stale submit guard',
+    intro: 'Answer by submitting',
+    rules: ['First correct answer scores'],
+    scoring: { correctPoints: 4, wrongPoints: -1, stealEnabled: false },
+    questions: [
+      {
+        id: 'hcq-1',
+        promptType: 'text',
+        promptText: 'Capital of Ghana?',
+        answer: 'Accra',
+      },
+      {
+        id: 'hcq-2',
+        promptType: 'text',
+        promptText: 'Capital of Nigeria?',
+        answer: 'Abuja',
+      },
+    ],
+  }
+
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    await emitAck(host, 'host:setup', {
+      teams: TEAMS,
+      gameplayMode: 'hostless',
+      roundCatalog: [twoQuestionRound],
+      gamePlan: ['intro:hostless-custom-submit-stale', 'q:hostless-custom-submit-stale:hcq-1', 'q:hostless-custom-submit-stale:hcq-2'],
+    })
+    await emitAck(host, 'host:question:set', 'q:hostless-custom-submit-stale:hcq-1')
+    await emitAck(member, 'member:join', sessionCode, 0, 'Alice')
+
+    await emitAck(host, 'host:question:set', 'q:hostless-custom-submit-stale:hcq-2')
+
+    const noCorrect = waitNoEvent(host, 'answer:correct', 300)
+    const noAttempt = waitNoEvent(host, 'answer:attempt', 300)
+    const staleSubmit = await emitAck(member, 'member:answer:submit', {
+      guess: 'Abuja',
+      questionId: 'q:hostless-custom-submit-stale:hcq-1',
+    })
+    assert.equal(staleSubmit.ok, false)
+    assert.equal(staleSubmit.error, 'stale-question')
+    await noCorrect
+    await noAttempt
+
+    const state = harness.getState(sessionCode)
+    assert.equal(state.teams[0].score, 0)
+    assert.equal(state.answerState.questionId, 'q:hostless-custom-submit-stale:hcq-2')
+    assert.equal(state.answerState.status, 'open')
+  } finally {
+    await harness.close()
+  }
+})
+
 test('host-less mode rejects answer submissions for unsupported rounds', async () => {
   const harness = await createHarness()
   try {
@@ -1626,7 +1741,7 @@ test('host-less mode rejects answer submissions for unsupported rounds', async (
   }
 })
 
-test('host-less mode rate-limits duplicate spam guesses per question', async () => {
+test('host-less mode blocks duplicate guesses with explicit duplicate error', async () => {
   const harness = await createHarness()
   try {
     const host = await harness.connect()
@@ -1649,7 +1764,7 @@ test('host-less mode rate-limits duplicate spam guesses per question', async () 
 
     const duplicate = await emitAck(member, 'member:answer:submit', { guess: 'Tema' })
     assert.equal(duplicate.ok, false)
-    assert.equal(duplicate.error, 'rate-limited')
+    assert.equal(duplicate.error, 'duplicate-guess')
   } finally {
     await harness.close()
   }

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
 const MAX_RULES = 20
-const MAX_SCORING = 20
 const MAX_QUESTIONS = 200
 
 const BUILTIN_ROUND_TYPES = new Set(['video', 'slang', 'charades', 'thesis'])
@@ -42,24 +41,89 @@ function normalizeRules(rawRules) {
   return next
 }
 
-function normalizeScoring(rawScoring) {
-  if (!Array.isArray(rawScoring)) return []
+function normalizeAcceptedAnswers(rawAcceptedAnswers) {
+  if (!Array.isArray(rawAcceptedAnswers)) return []
   const next = []
   const seen = new Set()
-  for (const entry of rawScoring) {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue
-    const label = cleanString(entry.label, 100)
-    if (!label) continue
-    const dedupeKey = label.toLowerCase()
-    if (seen.has(dedupeKey)) continue
-    const points = cleanInt(entry.points, 0)
-    const phaseRaw = cleanString(entry.phase, 16).toLowerCase()
-    const phase = phaseRaw === 'steal' ? 'steal' : 'normal'
-    next.push({ label, points, phase })
-    seen.add(dedupeKey)
-    if (next.length >= MAX_SCORING) break
+  for (const raw of rawAcceptedAnswers) {
+    const value = cleanString(raw, 240)
+    if (!value) continue
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    next.push(value)
+    if (next.length >= 20) break
   }
   return next
+}
+
+function normalizeNewScoring(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const correctPoints = cleanInt(raw.correctPoints, 3)
+  const wrongPoints = cleanInt(raw.wrongPoints, -1)
+  const stealEnabled = raw.stealEnabled !== false
+  const correctStealPoints = cleanInt(raw.correctStealPoints, 2)
+  const wrongStealPoints = cleanInt(raw.wrongStealPoints, 0)
+  const correctLabel = cleanString(raw.correctLabel, 120) || null
+  const wrongLabel = cleanString(raw.wrongLabel, 120) || null
+  const bonuses = Array.isArray(raw.bonuses)
+    ? raw.bonuses.map((b) => {
+        if (!b || typeof b !== 'object') return null
+        const label = cleanString(b.label, 120)
+        if (!label) return null
+        const points = cleanInt(b.points, 0)
+        return {
+          label, points,
+          ...(b.revealCountry ? { revealCountry: true } : {}),
+          ...(b.noReveal ? { noReveal: true } : {}),
+        }
+      }).filter(Boolean).slice(0, 10)
+    : []
+  return { correctPoints, wrongPoints, correctLabel, wrongLabel, stealEnabled, correctStealPoints, wrongStealPoints, bonuses }
+}
+
+function migrateOldScoringArray(arr) {
+  const entries = arr.map((e) => {
+    if (!e || typeof e !== 'object') return null
+    const label = cleanString(e.label, 100)
+    if (!label) return null
+    const points = cleanInt(e.points, 0)
+    const phaseRaw = cleanString(e.phase, 16).toLowerCase()
+    const isSteal = phaseRaw === 'steal' || (!phaseRaw && label.toLowerCase().includes('steal'))
+    return { label, points, isSteal }
+  }).filter(Boolean)
+
+  const stealEntries = entries.filter((e) => e.isSteal)
+  const normalEntries = entries.filter((e) => !e.isSteal)
+  if (normalEntries.length === 0) return null
+
+  const maxPoints = Math.max(...normalEntries.map((e) => e.points))
+  const correctEntry = normalEntries.find((e) => e.points === maxPoints) || normalEntries[0]
+  const remaining = normalEntries.filter((e) => e !== correctEntry)
+  const wrongEntry = remaining.find((e) => e.points < 0) || remaining[remaining.length - 1] || null
+  const bonusEntries = remaining.filter((e) => e !== wrongEntry)
+
+  const correctSteal = stealEntries.find((e) => e.points > 0) || stealEntries[0] || null
+  const wrongSteal = stealEntries.find((e) => e !== correctSteal) || null
+
+  return {
+    correctPoints: correctEntry.points,
+    wrongPoints: wrongEntry ? wrongEntry.points : -1,
+    correctLabel: correctEntry.label !== 'Correct answer' ? correctEntry.label : null,
+    wrongLabel: wrongEntry && wrongEntry.label !== 'Wrong answer' ? wrongEntry.label : null,
+    stealEnabled: stealEntries.length > 0,
+    correctStealPoints: correctSteal ? correctSteal.points : 2,
+    wrongStealPoints: wrongSteal ? wrongSteal.points : 0,
+    bonuses: bonusEntries.map((e) => ({ label: e.label, points: e.points })),
+  }
+}
+
+function normalizeScoring(rawScoring) {
+  if (Array.isArray(rawScoring)) {
+    const migrated = migrateOldScoringArray(rawScoring)
+    return migrated ? normalizeNewScoring(migrated) : null
+  }
+  return normalizeNewScoring(rawScoring)
 }
 
 function normalizeCustomQuestion(rawQuestion, index) {
@@ -70,6 +134,7 @@ function normalizeCustomQuestion(rawQuestion, index) {
   const mediaUrl = cleanString(rawQuestion.mediaUrl, 2000)
   const answer = cleanString(rawQuestion.answer, 200)
   const explanation = cleanString(rawQuestion.explanation, 2000)
+  const acceptedAnswers = normalizeAcceptedAnswers(rawQuestion.acceptedAnswers)
   if (!answer) return null
 
   if (promptType === 'text' && !promptText) return null
@@ -83,6 +148,7 @@ function normalizeCustomQuestion(rawQuestion, index) {
     ...(promptText ? { promptText } : {}),
     ...(mediaUrl ? { mediaUrl } : {}),
     answer,
+    ...(acceptedAnswers.length > 0 ? { acceptedAnswers } : {}),
     ...(explanation ? { explanation } : {}),
   }
 }
@@ -138,6 +204,8 @@ function normalizeBuiltinQuestion(rawQuestion, index, roundId) {
       .filter(Boolean)
       .slice(0, 20)
   }
+  const acceptedAnswers = normalizeAcceptedAnswers(rawQuestion.acceptedAnswers)
+  if (acceptedAnswers.length > 0) out.acceptedAnswers = acceptedAnswers
 
   if (Object.keys(out).length <= 1) return null
   return out
@@ -181,7 +249,7 @@ export function normalizeRoundCatalog(rawCatalog) {
     const intro = cleanString(round.intro, 2000)
     const rules = normalizeRules(round.rules)
     const scoring = normalizeScoring(round.scoring)
-    if (scoring.length === 0) continue
+    if (!scoring) continue
 
     const questions = type === CUSTOM_ROUND_TYPE
       ? normalizeCustomQuestions(round.questions)
@@ -212,7 +280,7 @@ export function normalizeRoundTemplatePayload(rawPayload) {
   const scoring = normalizeScoring(rawPayload.scoring)
   const questions = normalizeCustomQuestions(rawPayload.questions)
 
-  if (!name || scoring.length === 0 || questions.length === 0) return null
+  if (!name || !scoring || questions.length === 0) return null
   return {
     name,
     type: CUSTOM_ROUND_TYPE,
@@ -234,7 +302,7 @@ export function roundFromTemplateRow(row) {
   const rules = normalizeRules(row?.rules)
   const scoring = normalizeScoring(row?.scoring)
   const questions = normalizeCustomQuestions(row?.questions)
-  if (scoring.length === 0 || questions.length === 0) return null
+  if (!scoring || questions.length === 0) return null
 
   return {
     id: `custom-template-${templateId}`,

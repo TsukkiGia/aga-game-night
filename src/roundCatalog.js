@@ -33,31 +33,89 @@ function normalizeRules(rawRules) {
     .slice(0, 20)
 }
 
-function scoringPhase(entry) {
-  const explicit = cleanString(entry?.phase, 16).toLowerCase()
-  if (explicit === 'steal') return 'steal'
-  if (explicit === 'normal') return 'normal'
-  const label = cleanString(entry?.label, 120).toLowerCase()
-  return label.includes('steal') ? 'steal' : 'normal'
-}
-
-function normalizeScoring(rawScoring) {
-  if (!Array.isArray(rawScoring)) return []
+function normalizeAcceptedAnswers(rawAcceptedAnswers) {
+  if (!Array.isArray(rawAcceptedAnswers)) return []
   const out = []
   const seen = new Set()
-  for (const row of rawScoring) {
-    if (!row || typeof row !== 'object' || Array.isArray(row)) continue
-    const label = cleanString(row.label, 120)
-    if (!label) continue
-    const dedupeKey = label.toLowerCase()
-    if (seen.has(dedupeKey)) continue
-    const points = cleanInt(row.points, 0)
-    const phase = scoringPhase(row)
-    out.push({ label, points, phase })
-    seen.add(dedupeKey)
+  for (const raw of rawAcceptedAnswers) {
+    const value = cleanString(raw, 240)
+    if (!value) continue
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(value)
     if (out.length >= 20) break
   }
   return out
+}
+
+function normalizeNewScoring(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const correctPoints = cleanInt(raw.correctPoints, 3)
+  const wrongPoints = cleanInt(raw.wrongPoints, -1)
+  const stealEnabled = raw.stealEnabled !== false
+  const correctStealPoints = cleanInt(raw.correctStealPoints, 2)
+  const wrongStealPoints = cleanInt(raw.wrongStealPoints, 0)
+  const correctLabel = cleanString(raw.correctLabel, 120) || null
+  const wrongLabel = cleanString(raw.wrongLabel, 120) || null
+  const bonuses = Array.isArray(raw.bonuses)
+    ? raw.bonuses.map((b) => {
+        if (!b || typeof b !== 'object') return null
+        const label = cleanString(b.label, 120)
+        if (!label) return null
+        const points = cleanInt(b.points, 0)
+        return {
+          label, points,
+          ...(b.revealCountry ? { revealCountry: true } : {}),
+          ...(b.noReveal ? { noReveal: true } : {}),
+        }
+      }).filter(Boolean).slice(0, 10)
+    : []
+  return { correctPoints, wrongPoints, correctLabel, wrongLabel, stealEnabled, correctStealPoints, wrongStealPoints, bonuses }
+}
+
+function migrateOldScoringArray(arr) {
+  const entries = arr.map((e) => {
+    if (!e || typeof e !== 'object') return null
+    const label = cleanString(e.label, 120)
+    if (!label) return null
+    const points = cleanInt(e.points, 0)
+    const phaseRaw = cleanString(e.phase, 16).toLowerCase()
+    const isSteal = phaseRaw === 'steal' || (!phaseRaw && label.toLowerCase().includes('steal'))
+    return { label, points, isSteal }
+  }).filter(Boolean)
+
+  const stealEntries = entries.filter((e) => e.isSteal)
+  const normalEntries = entries.filter((e) => !e.isSteal)
+  if (normalEntries.length === 0) return null
+
+  const maxPoints = Math.max(...normalEntries.map((e) => e.points))
+  const correctEntry = normalEntries.find((e) => e.points === maxPoints) || normalEntries[0]
+  const remaining = normalEntries.filter((e) => e !== correctEntry)
+  const wrongEntry = remaining.find((e) => e.points < 0) || remaining[remaining.length - 1] || null
+  const bonusEntries = remaining.filter((e) => e !== wrongEntry)
+
+  const correctSteal = stealEntries.find((e) => e.points > 0) || stealEntries[0] || null
+  const wrongSteal = stealEntries.find((e) => e !== correctSteal) || null
+
+  return {
+    correctPoints: correctEntry.points,
+    wrongPoints: wrongEntry ? wrongEntry.points : -1,
+    correctLabel: correctEntry.label !== 'Correct answer' ? correctEntry.label : null,
+    wrongLabel: wrongEntry && wrongEntry.label !== 'Wrong answer' ? wrongEntry.label : null,
+    stealEnabled: stealEntries.length > 0,
+    correctStealPoints: correctSteal ? correctSteal.points : 2,
+    wrongStealPoints: wrongSteal ? wrongSteal.points : 0,
+    bonuses: bonusEntries.map((e) => ({ label: e.label, points: e.points })),
+  }
+}
+
+function normalizeScoring(rawScoring) {
+  if (Array.isArray(rawScoring)) {
+    const migrated = migrateOldScoringArray(rawScoring)
+    return migrated ? normalizeNewScoring(migrated) : null
+  }
+  return normalizeNewScoring(rawScoring)
 }
 
 function normalizeCustomQuestion(rawQuestion, index) {
@@ -69,6 +127,7 @@ function normalizeCustomQuestion(rawQuestion, index) {
   const mediaUrl = cleanString(rawQuestion.mediaUrl, 2000)
   const answer = cleanString(rawQuestion.answer, 200)
   const explanation = cleanString(rawQuestion.explanation, 2000)
+  const acceptedAnswers = normalizeAcceptedAnswers(rawQuestion.acceptedAnswers)
   const id = cleanString(rawQuestion.id, 80) || `cq-${index + 1}`
   if (!answer) return null
   if (promptType === 'text' && !promptText) return null
@@ -80,6 +139,7 @@ function normalizeCustomQuestion(rawQuestion, index) {
     ...(promptText ? { promptText } : {}),
     ...(mediaUrl ? { mediaUrl } : {}),
     answer,
+    ...(acceptedAnswers.length > 0 ? { acceptedAnswers } : {}),
     ...(explanation ? { explanation } : {}),
   }
 }
@@ -132,6 +192,8 @@ function normalizeBuiltinQuestion(rawQuestion, index, roundId) {
       .filter(Boolean)
       .slice(0, 20)
   }
+  const acceptedAnswers = normalizeAcceptedAnswers(rawQuestion.acceptedAnswers)
+  if (acceptedAnswers.length > 0) out.acceptedAnswers = acceptedAnswers
   if (Object.keys(out).length <= 1) return null
   return out
 }
@@ -160,7 +222,7 @@ function normalizeRound(rawRound, index) {
   const name = cleanString(rawRound.name, 120)
   if (!name) return null
   const scoring = normalizeScoring(rawRound.scoring)
-  if (scoring.length === 0) return null
+  if (!scoring) return null
   const questions = type === CUSTOM_ROUND_TYPE
     ? normalizeCustomQuestions(rawRound.questions)
     : normalizeBuiltinQuestions(rawRound.questions, id)

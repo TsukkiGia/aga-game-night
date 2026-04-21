@@ -26,7 +26,9 @@ function deriveStatusFromSync(sync, teamIndex, memberName) {
 function mapSubmitError(code) {
   if (code === 'invalid-guess') return 'Enter an answer before submitting.'
   if (code === 'question-locked') return 'This question is locked. Wait for the next one.'
+  if (code === 'stale-question') return 'Question changed. Wait for the latest prompt, then submit again.'
   if (code === 'unsupported-round') return 'This round does not support host-less submissions.'
+  if (code === 'duplicate-guess') return 'Someone already guessed that and it was wrong. Try a different answer.'
   if (code === 'rate-limited') return 'Too fast. Wait a moment and try again.'
   if (code === 'unauthorized') return 'You need to rejoin your team first.'
   return 'Could not submit answer right now.'
@@ -284,6 +286,16 @@ export default function BuzzerPage() {
       if (payload.status === 'open') {
         setCorrectEvent(null)
         setTimeoutEvent(null)
+        return
+      }
+      const revealedAnswer = String(payload?.revealedAnswer || '').trim()
+      if (payload.status === 'locked' && !payload?.winner && revealedAnswer) {
+        setCorrectEvent(null)
+        setTimeoutEvent((prev) => (
+          prev?.questionId === payload.questionId && String(prev?.answer || '').trim() === revealedAnswer
+            ? prev
+            : { questionId: payload.questionId, answer: revealedAnswer }
+        ))
       }
     }
 
@@ -399,8 +411,13 @@ export default function BuzzerPage() {
     e.preventDefault()
     if (!hostlessModeActive) return
     const trimmedGuess = guess.trim()
+    const questionId = String(answerState?.questionId || '').trim()
     if (!trimmedGuess) {
       setSubmitError('Enter an answer before submitting.')
+      return
+    }
+    if (!questionId) {
+      setSubmitError('Question is syncing. Try again in a moment.')
       return
     }
     if (answerState?.status !== 'open') {
@@ -410,7 +427,7 @@ export default function BuzzerPage() {
 
     setSubmittingGuess(true)
     setSubmitError('')
-    socket.emit('member:answer:submit', { guess: trimmedGuess }, (result) => {
+    socket.emit('member:answer:submit', { guess: trimmedGuess, questionId }, (result) => {
       setSubmittingGuess(false)
       if (!result?.ok) {
         setSubmitError(mapSubmitError(result?.error))

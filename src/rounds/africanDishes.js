@@ -6,6 +6,7 @@ const DISHES = [
     promptText: 'Name this African dish.',
     mediaUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Jollof_Rice_with_Stew.jpg/1280px-Jollof_Rice_with_Stew.jpg',
     answer: 'Jollof Rice',
+    acceptedAnswers: ['Jollof'],
     explanation: 'Jollof rice is a beloved one-pot rice dish cooked in tomato sauce, found across West Africa — particularly Nigeria, Ghana, and Senegal.',
   },
   {
@@ -134,11 +135,12 @@ export default {
     'Wrong answer: -1',
     'After a miss, one steal is available (+2 / 0)',
   ],
-  scoring: [
-    { label: 'Correct answer', points: 3, phase: 'normal' },
-    { label: 'Wrong answer', points: -1, phase: 'normal' },
-    { label: 'Correct steal', points: 2, phase: 'steal' },
-    { label: 'Wrong steal', points: 0, phase: 'steal' },
-  ],
+  scoring: {
+    correctPoints: 3,
+    wrongPoints: -1,
+    stealEnabled: true,
+    correctStealPoints: 2,
+    wrongStealPoints: 0,
+  },
   questions: DISHES,
 }
