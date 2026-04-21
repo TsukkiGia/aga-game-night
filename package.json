@@ -13,7 +13,8 @@
     "test": "node --test",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "migrate:legacy-template-scoring": "node --env-file=.env scripts/migrate-legacy-template-scoring.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
