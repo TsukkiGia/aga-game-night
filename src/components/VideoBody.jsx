@@ -3,7 +3,7 @@ import { playTransition } from '../sounds'
 import PromptMediaElement from './PromptMediaElement'
 import { cleanUrl, resolveVideoSource } from '../utils/mediaPrompt'
 
-export default function VideoBody({ question, paused }) {
+export default function VideoBody({ question, paused, allowReveal = true }) {
   const videoRef = useRef(null)
   const iframeRef = useRef(null)
   const [revealed, setRevealed] = useState(false)
@@ -74,9 +74,9 @@ export default function VideoBody({ question, paused }) {
           onVideoError={handleVideoError}
         />
       )}
-      {!revealed ? (
+      {allowReveal && !revealed ? (
         <button className="qv-reveal-btn" onClick={() => { playTransition(); setRevealed(true) }}>Reveal Answer ▼</button>
-      ) : (
+      ) : allowReveal ? (
         <div className="buzz-popup-answer">
           <div className="buzz-popup-answer-label">Answer</div>
           <div className="buzz-popup-answer-text">{question.answer}</div>
@@ -84,7 +84,7 @@ export default function VideoBody({ question, paused }) {
             <div className="buzz-popup-answer-explanation">{question.explanation}</div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

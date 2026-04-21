@@ -63,6 +63,39 @@
   align-items: center;
   gap: 12px;
 }
+.home-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+}
+.home-mode-toggle-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 9px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.home-mode-toggle-btn:hover:not(:disabled) {
+  background: #f5efe8;
+  color: var(--text);
+}
+.home-mode-toggle-btn.active {
+  background: var(--teal-bg);
+  color: var(--teal);
+}
+.home-mode-toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .home-hostless-pill {
   padding: 10px 14px;
   border-radius: 12px;

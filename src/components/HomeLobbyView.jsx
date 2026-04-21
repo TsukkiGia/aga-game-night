@@ -1,5 +1,5 @@
 import CodesPanel from './CodesPanel'
-import { isHostlessMode } from '../gameplayMode'
+import { isHostlessMode, GAMEPLAY_MODE_HOSTED, GAMEPLAY_MODE_HOSTLESS } from '../gameplayMode'
 
 export default function HomeLobbyView({
   teams,
@@ -19,6 +19,9 @@ export default function HomeLobbyView({
   onArm,
   onDismiss,
   gameplayMode = 'hosted',
+  onGameplayModeChange = () => {},
+  gameplayModeSwitching = false,
+  gameplayModeError = '',
 }) {
   const hostlessModeActive = isHostlessMode(gameplayMode)
   return (
@@ -37,14 +40,32 @@ export default function HomeLobbyView({
         </div>
         {newGameError && <div className="host-auth-error">{newGameError}</div>}
         <div className="home-actions-primary">
+          <div className="home-mode-toggle" role="group" aria-label="Gameplay mode">
+            <button
+              type="button"
+              className={`home-mode-toggle-btn${!hostlessModeActive ? ' active' : ''}`}
+              onClick={() => onGameplayModeChange(GAMEPLAY_MODE_HOSTED)}
+              disabled={gameplayModeSwitching}
+            >
+              Hosted
+            </button>
+            <button
+              type="button"
+              className={`home-mode-toggle-btn${hostlessModeActive ? ' active' : ''}`}
+              onClick={() => onGameplayModeChange(GAMEPLAY_MODE_HOSTLESS)}
+              disabled={gameplayModeSwitching}
+            >
+              Host-less
+            </button>
+          </div>
           {hostlessModeActive ? (
-            <div className="home-hostless-pill">Host-less mode active</div>
+            <div className="home-hostless-pill">{gameplayModeSwitching ? 'Switching mode…' : 'Host-less mode active'}</div>
           ) : (
             <>
               <button
                 className={`arm-btn ${armed ? 'armed' : ''}`}
                 onClick={onArm}
-                disabled={armed || buzzWinner !== null}
+                disabled={armed || buzzWinner !== null || gameplayModeSwitching}
               >
                 {armed ? '🔴 Listening…' : '🎯 Arm Buzzers'}
               </button>
@@ -53,9 +74,10 @@ export default function HomeLobbyView({
               )}
             </>
           )}
-          <button className="home-start-game-btn" onClick={onStart} disabled={startDisabled}>▶ Start Game</button>
+          <button className="home-start-game-btn" onClick={onStart} disabled={startDisabled || gameplayModeSwitching}>▶ Start Game</button>
         </div>
       </div>
+      {gameplayModeError && <div className="host-auth-error">{gameplayModeError}</div>}
     </div>
   )
 }

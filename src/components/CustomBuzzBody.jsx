@@ -3,7 +3,7 @@ import VideoBody from './VideoBody'
 import PromptMediaElement from './PromptMediaElement'
 import { cleanUrl, isCountryOutlineImageUrl } from '../utils/mediaPrompt'
 
-export default function CustomBuzzBody({ question, paused = false }) {
+export default function CustomBuzzBody({ question, paused = false, allowReveal = true }) {
   const promptType = String(question?.promptType || '').trim().toLowerCase()
   const promptText = String(question?.promptText || '').trim()
   const mediaUrl = cleanUrl(question?.mediaUrl)
@@ -28,7 +28,7 @@ export default function CustomBuzzBody({ question, paused = false }) {
     return (
       <div className="qv-custom-wrap">
         {promptText && <div className="qv-custom-prompt">{promptText}</div>}
-        <VideoBody question={mappedQuestion} paused={paused} />
+        <VideoBody question={mappedQuestion} paused={paused} allowReveal={allowReveal} />
       </div>
     )
   }
@@ -55,9 +55,9 @@ export default function CustomBuzzBody({ question, paused = false }) {
           )}
         </div>
       )}
-      {!revealed ? (
+      {allowReveal && !revealed ? (
         <button className="qv-reveal-btn" onClick={() => setRevealed(true)}>Reveal Answer ▼</button>
-      ) : (
+      ) : allowReveal ? (
         <div className="buzz-popup-answer qv-custom-answer-card">
           <div className="buzz-popup-answer-label">Answer</div>
           <div className="buzz-popup-answer-text">{question?.answer}</div>
@@ -65,7 +65,7 @@ export default function CustomBuzzBody({ question, paused = false }) {
             <div className="buzz-popup-answer-explanation">{question.explanation}</div>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

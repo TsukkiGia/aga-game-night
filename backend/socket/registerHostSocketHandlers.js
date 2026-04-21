@@ -19,6 +19,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     normalizeReactionStats,
     normalizeGameplayMode,
     serializeHostSyncState,
+    serializeMemberSyncState,
     resetAnswerStateForCursor,
     resolveHostlessQuestionContext,
     isHostlessMode,
@@ -198,7 +199,14 @@ export function registerHostSocketHandlers(socket, ctx) {
       }
       const previousGameplayMode = normalizeGameplayMode(st.gameplayMode)
 
-      const isNewGame = JSON.stringify(normalizedTeams.map(t => t.name)) !== JSON.stringify(st.teams.map(t => t.name))
+      const hasTeamIdentityChanges = normalizedTeams.some((team, index) => {
+        const existingTeam = st.teams[index]
+        if (!existingTeam || typeof existingTeam !== 'object') return true
+        const existingName = String(existingTeam.name || '').trim()
+        const existingColor = String(existingTeam.color || '').trim()
+        return existingName !== team.name || existingColor !== team.color
+      })
+      const isNewGame = normalizedTeams.length !== st.teams.length || hasTeamIdentityChanges
       if (isNewGame) {
         st = {
           ...initialState(),
@@ -300,9 +308,11 @@ export function registerHostSocketHandlers(socket, ctx) {
       ? normalizeRoundCatalog(payload.roundCatalog)
       : normalizeRoundCatalog(st.roundCatalog)
     const normalizedReactionStats = normalizeReactionStats(payload.reactionStats ?? st.reactionStats)
+    const previousGameplayMode = normalizeGameplayMode(st.gameplayMode)
     const normalizedGameplayMode = Object.hasOwn(payload, 'gameplayMode')
-      ? normalizeGameplayMode(payload.gameplayMode, normalizeGameplayMode(st.gameplayMode))
-      : normalizeGameplayMode(st.gameplayMode)
+      ? normalizeGameplayMode(payload.gameplayMode, previousGameplayMode)
+      : previousGameplayMode
+    const gameplayModeChanged = normalizedGameplayMode !== previousGameplayMode
 
     st.teams = normalizedTeams.map((team, index) => ({
       ...team,
@@ -315,11 +325,31 @@ export function registerHostSocketHandlers(socket, ctx) {
     st.roundCatalog = normalizedRoundCatalog
     st.reactionStats = normalizedReactionStats
     st.gameplayMode = normalizedGameplayMode
-    ensureAnswerStateForMode(st)
+    if (gameplayModeChanged) {
+      st.armed = false
+      st.armedAtMs = null
+      st.lastArmAtMs = null
+      st.attemptedSocketIds = new Set()
+      st.buzzedBy = null
+      st.buzzedMemberName = null
+      st.allowedTeamIndices = null
+      st.doublePoints = false
+      ensureAnswerStateForMode(st, { forceReset: true })
+      hostlessSubmitGuards.delete(code)
+    } else {
+      ensureAnswerStateForMode(st)
+    }
 
     try {
       await persistTeams(code, st.teams)
       await persistRuntimeState(code, st)
+      if (gameplayModeChanged) {
+        io.to(hostRoom(code)).emit('state:sync', serializeHostSyncState(st))
+        io.to(hostRoom(code)).emit('host:question', st.hostQuestionCursor)
+        io.to(`${code}:members`).emit('buzz:reset')
+        io.to(`${code}:members`).emit('member:sync', serializeMemberSyncState(st))
+        broadcastAnswerState(code, st)
+      }
       respond({ ok: true })
     } catch (err) {
       console.error('[host:runtime:update]', err)
@@ -570,7 +600,36 @@ export function registerHostSocketHandlers(socket, ctx) {
       return
     }
     if (!st) return
-    if (isHostlessMode(st.gameplayMode)) return
+    if (isHostlessMode(st.gameplayMode)) {
+      const context = resolveHostlessQuestionContext(st)
+      if (context.itemType !== 'question' || !context.cursorId) return
+      if (String(st?.answerState?.questionId || '') !== context.cursorId) {
+        resetAnswerStateForCursor(st)
+      }
+      if (st?.answerState?.status !== 'open' || st?.answerState?.winner) return
+
+      const existingAttempts = Array.isArray(st?.answerState?.recentAttempts)
+        ? st.answerState.recentAttempts
+        : []
+      st.answerState = {
+        questionId: context.cursorId,
+        status: 'locked',
+        winner: null,
+        revealedAnswer: String(context.expectedAnswer || '').trim() || null,
+        recentAttempts: existingAttempts,
+      }
+
+      const timeoutPayload = {
+        questionId: context.cursorId,
+        answer: String(context.expectedAnswer || '').trim(),
+      }
+      io.to(hostRoom(code)).emit('host:timer:expired')
+      io.to(hostRoom(code)).emit('answer:timeout', timeoutPayload)
+      io.to(`${code}:members`).emit('answer:timeout', timeoutPayload)
+      broadcastAnswerState(code, st)
+      persistRuntimeStateInBackground(code, st)
+      return
+    }
     // Timer expiry should stop countdown flow, but keep current buzz winner
     // visible until the host explicitly scores/resets.
     st.armed = false

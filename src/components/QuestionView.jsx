@@ -9,6 +9,7 @@ import CustomBuzzBody from './CustomBuzzBody'
 import JoinQrModal from './JoinQrModal'
 import QuestionSidebar from './QuestionSidebar'
 import ModalShell from './ModalShell'
+import Timer from './Timer'
 import { isHostlessMode } from '../gameplayMode'
 
 export default function QuestionView({
@@ -23,7 +24,9 @@ export default function QuestionView({
   answerState = null,
   hostlessAttemptFeed = [],
   hostlessCorrectEvent = null,
+  hostlessTimeoutEvent = null,
   onDismissHostlessCorrect = () => {},
+  onDismissHostlessTimeout = () => {},
   buzzerUrl = '',
   isRoundIncluded = () => true,
   isQuestionIncluded = () => true,
@@ -40,10 +43,16 @@ export default function QuestionView({
   const isCharades = round?.type === 'charades'
   const isThesis   = round?.type === 'thesis'
   const hostlessModeActive = isHostlessMode(gameplayMode)
-  const hostlessWinner = hostlessCorrectEvent || answerState?.winner || null
   const showHostlessWinnerModal = Boolean(hostlessCorrectEvent)
+  const showHostlessTimeoutModal = Boolean(hostlessTimeoutEvent)
   const shouldPauseMedia = Boolean(buzzWinner || showHostlessWinnerModal)
   const selectedTurnIndex = Math.max(0, (Number(displayQuestionNumber) || (questionIndex + 1)) - 1)
+
+  const hostlessAnswerLabel = round?.type === 'slang' ? 'Meaning' : 'Answer'
+  const hostlessAnswerText = round?.type === 'slang'
+    ? String(question?.meaning || '').trim()
+    : String(question?.answer || '').trim()
+  const hostlessAnswerExplanation = String(question?.explanation || '').trim()
 
   const activePair = isCharades
     ? new Set([(selectedTurnIndex * 2) % teams.length, (selectedTurnIndex * 2 + 1) % teams.length])
@@ -191,9 +200,9 @@ export default function QuestionView({
 
         {/* ── Question body ── */}
         <div className="qv-body">
-          {round.type === 'video'    && <VideoBody    key={question.id} question={question} paused={shouldPauseMedia} />}
-          {round.type === 'slang'    && <SlangBody    key={question.id} question={question} />}
-          {round.type === 'custom-buzz' && <CustomBuzzBody key={question.id} question={question} paused={shouldPauseMedia} />}
+          {round.type === 'video'    && <VideoBody    key={question.id} question={question} paused={shouldPauseMedia} allowReveal={!hostlessModeActive} />}
+          {round.type === 'slang'    && <SlangBody    key={question.id} question={question} allowReveal={!hostlessModeActive} />}
+          {round.type === 'custom-buzz' && <CustomBuzzBody key={question.id} question={question} paused={shouldPauseMedia} allowReveal={!hostlessModeActive} />}
           {round.type === 'charades' && (
             <div className="charades-wrap">
               <div className="charades-active-teams">
@@ -247,18 +256,17 @@ export default function QuestionView({
           <div className="qv-hostless-state">
             {answerState?.status === 'open' ? 'Answer submissions are open.' : 'Question locked.'}
           </div>
-          {hostlessWinner && (
-            <div className="qv-hostless-correct">
-              <div className="qv-hostless-correct-text">
-                {hostlessWinner.memberName
-                  ? `${hostlessWinner.memberName} from ${hostlessWinner.team?.name || 'Team'} got it right`
-                  : `${hostlessWinner.team?.name || 'A team'} answered correctly`}
-                {Number.isFinite(hostlessWinner.points) ? ` • +${hostlessWinner.points}` : ''}
-              </div>
-              {hostlessCorrectEvent && (
-                <button type="button" className="qv-hostless-dismiss" onClick={onDismissHostlessCorrect}>Hide</button>
-              )}
-            </div>
+          {answerState?.status === 'open' && (
+            <Timer
+              key={`hostless-${String(answerState?.questionId || question?.id || '')}`}
+              seconds={30}
+              autoStart
+              showControls={false}
+              onExpire={() => {
+                if (answerState?.status !== 'open' || answerState?.winner) return
+                onTimerExpired?.()
+              }}
+            />
           )}
           {hostlessAttemptFeed.length > 0 && (
             <div className="qv-hostless-feed" aria-live="polite">
@@ -320,9 +328,13 @@ export default function QuestionView({
               ? `${hostlessCorrectEvent.memberName} answered correctly for ${hostlessCorrectEvent.team.name}.`
               : 'A correct answer has been submitted.'}
           </p>
-          {Number.isFinite(hostlessCorrectEvent.points) && (
-            <div className="hostless-correct-points">{`+${hostlessCorrectEvent.points} points awarded`}</div>
-          )}
+          <div className="buzz-popup-answer">
+            <div className="buzz-popup-answer-label">{hostlessAnswerLabel}</div>
+            <div className="buzz-popup-answer-text">{hostlessCorrectEvent.answer || hostlessAnswerText || 'No answer available.'}</div>
+            {hostlessAnswerExplanation && (
+              <div className="buzz-popup-answer-explanation">{hostlessAnswerExplanation}</div>
+            )}
+          </div>
           <div className="hostless-correct-actions">
             <button type="button" className="back-btn" onClick={onDismissHostlessCorrect}>
               Close
@@ -332,6 +344,36 @@ export default function QuestionView({
               className="start-btn hostless-correct-cta"
               onClick={() => {
                 onDismissHostlessCorrect()
+                onMarkDone()
+                onNext()
+              }}
+            >
+              Next Question →
+            </button>
+          </div>
+        </ModalShell>
+      )}
+      {showHostlessTimeoutModal && (
+        <ModalShell onClose={onDismissHostlessTimeout} dialogClassName="hostless-correct-modal">
+          <div className="help-popup-tag">Time's Up</div>
+          <h2 className="hostless-correct-title">No one got it in 30 seconds</h2>
+          <p className="hostless-correct-sub">The correct answer is shown below.</p>
+          <div className="buzz-popup-answer">
+            <div className="buzz-popup-answer-label">{hostlessAnswerLabel}</div>
+            <div className="buzz-popup-answer-text">{hostlessTimeoutEvent.answer || hostlessAnswerText || 'No answer available.'}</div>
+            {hostlessAnswerExplanation && (
+              <div className="buzz-popup-answer-explanation">{hostlessAnswerExplanation}</div>
+            )}
+          </div>
+          <div className="hostless-correct-actions">
+            <button type="button" className="back-btn" onClick={onDismissHostlessTimeout}>
+              Close
+            </button>
+            <button
+              type="button"
+              className="start-btn hostless-correct-cta"
+              onClick={() => {
+                onDismissHostlessTimeout()
                 onMarkDone()
                 onNext()
               }}

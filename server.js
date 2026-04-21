@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url'
 import { dirname, join, resolve } from 'path'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'node:crypto'
-import { runMigrations, query } from './src/db.js'
+import { runMigrations, query, withTransaction } from './src/db.js'
 import { generateSessionCode } from './backend/sessionCode.js'
 import { isHostAuthorized, isHostController, normalizeHostRole } from './backend/hostAuth.js'
 import { registerHostSocketHandlers } from './backend/socket/registerHostSocketHandlers.js'
@@ -70,7 +70,7 @@ function getAuthMaxAttempts() {
   return raw
 }
 
-export function createBuzzServer({ queryFn = query } = {}) {
+export function createBuzzServer({ queryFn = query, withTransactionFn = withTransaction } = {}) {
   const app = express()
   app.use(express.json())
   const httpServer = createServer(app)
@@ -97,6 +97,11 @@ export function createBuzzServer({ queryFn = query } = {}) {
   }
 
   function authAttemptKey(socket) {
+    const forwarded = socket.handshake.headers['x-forwarded-for']
+    if (forwarded) {
+      const ip = String(forwarded).split(',')[0].trim()
+      if (ip) return ip
+    }
     return String(socket.handshake.address || socket.id || 'unknown')
   }
 
@@ -126,9 +131,10 @@ export function createBuzzServer({ queryFn = query } = {}) {
     rec.count += 1
   }
 
-  const { getState, ensureState, persistTeams, persistRuntimeState, persistRuntimeStateInBackground } = createRuntimeStore({
+  const { ensureState, persistTeams, persistRuntimeState, persistRuntimeStateInBackground } = createRuntimeStore({
     queryFn,
     sessions,
+    withTransactionFn,
   })
   const leaveMemberTeamRooms = (socket, code, teamCount) => leaveTeamRooms(socket, code, teamCount, memberTeamRoom)
   const broadcastSessionMembers = (code, st) => broadcastMembers(io, hostRoom, code, st)
@@ -263,7 +269,6 @@ export function createBuzzServer({ queryFn = query } = {}) {
       sessions,
       pendingSoundResults,
       ensureState,
-      getState,
       initialState,
       persistTeams,
       persistRuntimeState,
@@ -278,6 +283,7 @@ export function createBuzzServer({ queryFn = query } = {}) {
       normalizeReactionStats,
       normalizeGameplayMode,
       serializeHostSyncState,
+      serializeMemberSyncState,
       resetAnswerStateForCursor,
       resolveHostlessQuestionContext,
       isHostlessMode,

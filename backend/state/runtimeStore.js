@@ -9,12 +9,7 @@ import {
   normalizeAnswerState,
 } from './sessionState.js'
 
-export function createRuntimeStore({ queryFn, sessions }) {
-  function getState(code) {
-    if (!sessions.has(code)) sessions.set(code, initialState())
-    return sessions.get(code)
-  }
-
+export function createRuntimeStore({ queryFn, sessions, withTransactionFn = null }) {
   async function hydrateStateFromDb(code) {
     const { rows } = await queryFn(
       `
@@ -123,21 +118,26 @@ export function createRuntimeStore({ queryFn, sessions }) {
   }
 
   async function persistTeams(code, teams) {
-    for (let i = 0; i < teams.length; i++) {
-      const team = teams[i]
-      await queryFn(
-        `
-          INSERT INTO teams (session_id, idx, name, color, score)
-          VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT (session_id, idx)
-          DO UPDATE SET
-            name = EXCLUDED.name,
-            color = EXCLUDED.color,
-            score = EXCLUDED.score
-        `,
-        [code, i, team.name, team.color, Number.isFinite(team.score) ? team.score : 0]
-      )
+    if (teams.length === 0) {
+      await queryFn('DELETE FROM teams WHERE session_id = $1', [code])
+      return
     }
+    const entries = []
+    const params = [code]
+    for (let i = 0; i < teams.length; i++) {
+      const offset = i * 4 + 2
+      entries.push(`($1, $${offset}, $${offset + 1}, $${offset + 2}, $${offset + 3})`)
+      params.push(i, teams[i].name, teams[i].color, Number.isFinite(teams[i].score) ? teams[i].score : 0)
+    }
+    await queryFn(
+      `INSERT INTO teams (session_id, idx, name, color, score)
+       VALUES ${entries.join(', ')}
+       ON CONFLICT (session_id, idx) DO UPDATE SET
+         name = EXCLUDED.name,
+         color = EXCLUDED.color,
+         score = EXCLUDED.score`,
+      params
+    )
     await queryFn('DELETE FROM teams WHERE session_id = $1 AND idx >= $2', [code, teams.length])
   }
 
@@ -160,33 +160,22 @@ export function createRuntimeStore({ queryFn, sessions }) {
     const answerState = normalizeAnswerState(st.answerState, typeof st.hostQuestionCursor === 'string' ? st.hostQuestionCursor : null)
     st.gameplayMode = gameplayMode
     st.answerState = answerState
-    await queryFn(
-      `
-        UPDATE sessions
-        SET gameplay_mode = $2
-        WHERE id = $1 AND status = 'active'
-      `,
-      [code, gameplayMode]
-    )
-    await queryFn(
-      `
-        INSERT INTO game_state (
-          session_id,
-          round_index,
-          question_index,
-          armed,
-          streaks,
-          done_questions,
-          host_question_cursor,
-          double_points,
-          game_plan,
-          round_catalog,
-          reaction_stats,
-          answer_state
+
+    const gameStateParams = [code, roundIndex, questionIndex, st.armed, streaks, doneQuestions, hostQuestionCursor, Boolean(st.doublePoints), gamePlan, JSON.stringify(roundCatalog), JSON.stringify(reactionStats), JSON.stringify(answerState)]
+    const buzzStateParams = [code, st.buzzedBy, st.buzzedMemberName, allowedTeamIndices]
+
+    const doWrites = async (qFn) => {
+      await qFn(
+        `UPDATE sessions SET gameplay_mode = $2 WHERE id = $1 AND status = 'active'`,
+        [code, gameplayMode]
+      )
+      await qFn(
+        `INSERT INTO game_state (
+          session_id, round_index, question_index, armed, streaks, done_questions,
+          host_question_cursor, double_points, game_plan, round_catalog, reaction_stats, answer_state
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb)
-        ON CONFLICT (session_id)
-        DO UPDATE SET
+        ON CONFLICT (session_id) DO UPDATE SET
           round_index = EXCLUDED.round_index,
           question_index = EXCLUDED.question_index,
           armed = EXCLUDED.armed,
@@ -197,22 +186,25 @@ export function createRuntimeStore({ queryFn, sessions }) {
           game_plan = EXCLUDED.game_plan,
           round_catalog = EXCLUDED.round_catalog,
           reaction_stats = EXCLUDED.reaction_stats,
-          answer_state = EXCLUDED.answer_state
-      `,
-      [code, roundIndex, questionIndex, st.armed, streaks, doneQuestions, hostQuestionCursor, Boolean(st.doublePoints), gamePlan, JSON.stringify(roundCatalog), JSON.stringify(reactionStats), JSON.stringify(answerState)]
-    )
-    await queryFn(
-      `
-        INSERT INTO buzz_state (session_id, winner_team_index, buzzed_member_name, allowed_team_indices)
+          answer_state = EXCLUDED.answer_state`,
+        gameStateParams
+      )
+      await qFn(
+        `INSERT INTO buzz_state (session_id, winner_team_index, buzzed_member_name, allowed_team_indices)
         VALUES ($1, $2, $3, $4)
-        ON CONFLICT (session_id)
-        DO UPDATE SET
+        ON CONFLICT (session_id) DO UPDATE SET
           winner_team_index = EXCLUDED.winner_team_index,
           buzzed_member_name = EXCLUDED.buzzed_member_name,
-          allowed_team_indices = EXCLUDED.allowed_team_indices
-      `,
-      [code, st.buzzedBy, st.buzzedMemberName, allowedTeamIndices]
-    )
+          allowed_team_indices = EXCLUDED.allowed_team_indices`,
+        buzzStateParams
+      )
+    }
+
+    if (withTransactionFn) {
+      await withTransactionFn(doWrites)
+    } else {
+      await doWrites(queryFn)
+    }
   }
 
   function persistRuntimeStateInBackground(code, st) {
@@ -222,7 +214,6 @@ export function createRuntimeStore({ queryFn, sessions }) {
   }
 
   return {
-    getState,
     ensureState,
     persistTeams,
     persistRuntimeState,

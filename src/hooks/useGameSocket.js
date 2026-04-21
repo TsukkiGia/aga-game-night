@@ -11,6 +11,7 @@ export function useGameSocket(initialTeams, options = {}) {
   const onStateSync = typeof options.onStateSync === 'function' ? options.onStateSync : null
   const onAnswerAttempt = typeof options.onAnswerAttempt === 'function' ? options.onAnswerAttempt : null
   const onAnswerCorrect = typeof options.onAnswerCorrect === 'function' ? options.onAnswerCorrect : null
+  const onAnswerTimeout = typeof options.onAnswerTimeout === 'function' ? options.onAnswerTimeout : null
   const onAnswerState = typeof options.onAnswerState === 'function' ? options.onAnswerState : null
   const setupPayload = (options.setupPayload && typeof options.setupPayload === 'object' && !Array.isArray(options.setupPayload))
     ? options.setupPayload
@@ -21,6 +22,7 @@ export function useGameSocket(initialTeams, options = {}) {
   const onStateSyncRef = useRef(onStateSync)
   const onAnswerAttemptRef = useRef(onAnswerAttempt)
   const onAnswerCorrectRef = useRef(onAnswerCorrect)
+  const onAnswerTimeoutRef = useRef(onAnswerTimeout)
   const onAnswerStateRef = useRef(onAnswerState)
 
   useEffect(() => {
@@ -29,9 +31,10 @@ export function useGameSocket(initialTeams, options = {}) {
     onStateSyncRef.current = onStateSync
     onAnswerAttemptRef.current = onAnswerAttempt
     onAnswerCorrectRef.current = onAnswerCorrect
+    onAnswerTimeoutRef.current = onAnswerTimeout
     onAnswerStateRef.current = onAnswerState
     setupPayloadRef.current = setupPayload
-  }, [onBuzzWinner, onBuzzAttempt, onStateSync, setupPayload, onAnswerAttempt, onAnswerCorrect, onAnswerState])
+  }, [onBuzzWinner, onBuzzAttempt, onStateSync, setupPayload, onAnswerAttempt, onAnswerCorrect, onAnswerTimeout, onAnswerState])
   const [armed, setArmed] = useState(false)
   const [buzzWinner, setBuzzWinner] = useState(null)
   const [gameplayMode, setGameplayMode] = useState(() => normalizeGameplayMode(setupPayload?.gameplayMode))
@@ -245,6 +248,11 @@ export function useGameSocket(initialTeams, options = {}) {
       onAnswerCorrectRef.current?.(payload)
     }
 
+    function onAnswerTimeoutEvent(payload) {
+      if (!payload || typeof payload !== 'object') return
+      onAnswerTimeoutRef.current?.(payload)
+    }
+
     function onAnswerStateEvent(payload) {
       if (!payload || typeof payload !== 'object') return
       setAnswerState(payload)
@@ -263,6 +271,7 @@ export function useGameSocket(initialTeams, options = {}) {
     socket.on('buzz:attempt', onBuzzAttemptEvent)
     socket.on('answer:attempt', onAnswerAttemptEvent)
     socket.on('answer:correct', onAnswerCorrectEvent)
+    socket.on('answer:timeout', onAnswerTimeoutEvent)
     socket.on('answer:state', onAnswerStateEvent)
     socket.on('host:members', onHostMembers)
     socket.on('host:sfx:play', onRemoteSound)
@@ -281,6 +290,7 @@ export function useGameSocket(initialTeams, options = {}) {
       socket.off('buzz:attempt', onBuzzAttemptEvent)
       socket.off('answer:attempt', onAnswerAttemptEvent)
       socket.off('answer:correct', onAnswerCorrectEvent)
+      socket.off('answer:timeout', onAnswerTimeoutEvent)
       socket.off('answer:state', onAnswerStateEvent)
       socket.off('host:members', onHostMembers)
       socket.off('host:sfx:play', onRemoteSound)

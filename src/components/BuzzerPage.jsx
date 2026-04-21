@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { socket } from '../socket'
 import { loadBuzzerIdentity, saveBuzzerIdentity, clearBuzzerIdentity } from '../storage'
 import { normalizeGameplayMode, isHostlessMode } from '../gameplayMode'
-import { playCorrect } from '../sounds'
 
 // status: 'loading' | 'join' | 'waiting' | 'armed' | 'i-buzzed' | 'team-buzzed' | 'locked-out'
 
@@ -38,6 +37,7 @@ function normalizeIdentity(value) {
 }
 
 function describeCorrectEvent(payload, currentTeamIndex, currentMemberName) {
+  const answerText = String(payload?.answer || '').trim()
   if (!payload || typeof payload !== 'object') {
     return {
       title: 'Correct answer',
@@ -55,28 +55,40 @@ function describeCorrectEvent(payload, currentTeamIndex, currentMemberName) {
   if (iAmWinner) {
     return {
       title: 'Correct! You got it right',
-      body: 'You were first with the correct answer.',
-      inline: 'You got it right',
+      body: answerText ? `You guessed the right answer: ${answerText}.` : 'You were first with the correct answer.',
+      inline: answerText ? `You guessed the right answer: ${answerText}` : 'You got it right',
     }
   }
   if (sameTeamWinner && winnerName) {
     return {
       title: `${winnerName} got it right`,
-      body: `${winnerName} answered correctly for ${winnerTeamName}.`,
-      inline: `${winnerName} got it right for ${winnerTeamName}`,
+      body: answerText
+        ? `${winnerName} guessed the right answer: ${answerText}.`
+        : `${winnerName} answered correctly for ${winnerTeamName}.`,
+      inline: answerText
+        ? `${winnerName} guessed the right answer: ${answerText}`
+        : `${winnerName} got it right for ${winnerTeamName}`,
     }
   }
   if (winnerName) {
     return {
       title: `${winnerName} got it right`,
-      body: `${winnerName} from ${winnerTeamName} answered correctly.`,
-      inline: `${winnerName} from ${winnerTeamName} got it right`,
+      body: answerText
+        ? `${winnerName} guessed the right answer: ${answerText}.`
+        : `${winnerName} from ${winnerTeamName} answered correctly.`,
+      inline: answerText
+        ? `${winnerName} guessed the right answer: ${answerText}`
+        : `${winnerName} from ${winnerTeamName} got it right`,
     }
   }
   return {
     title: `${winnerTeamName} got it right`,
-    body: `${winnerTeamName} submitted the first correct answer.`,
-    inline: `${winnerTeamName} got it right`,
+    body: answerText
+      ? `${winnerTeamName} guessed the right answer: ${answerText}.`
+      : `${winnerTeamName} submitted the first correct answer.`,
+    inline: answerText
+      ? `${winnerTeamName} guessed the right answer: ${answerText}`
+      : `${winnerTeamName} got it right`,
   }
 }
 
@@ -96,6 +108,7 @@ export default function BuzzerPage() {
   const [submittingGuess, setSubmittingGuess] = useState(false)
   const [attemptToasts, setAttemptToasts] = useState([])
   const [correctEvent, setCorrectEvent] = useState(null)
+  const [timeoutEvent, setTimeoutEvent] = useState(null)
   const teamIndexRef = useRef(teamIndex)
   const nameRef = useRef(name)
   const gameplayModeRef = useRef(gameplayMode)
@@ -132,12 +145,16 @@ export default function BuzzerPage() {
       if (answerQuestionIdRef.current && answerQuestionIdRef.current !== nextQuestionId) {
         setAttemptToasts([])
         setCorrectEvent(null)
+        setTimeoutEvent(null)
         setSubmitError('')
         setGuess('')
       }
       answerQuestionIdRef.current = nextQuestionId
       setAnswerState(sync.answerState)
-      if (sync.answerState.status === 'open') setCorrectEvent(null)
+      if (sync.answerState.status === 'open') {
+        setCorrectEvent(null)
+        setTimeoutEvent(null)
+      }
     }
 
     if (isHostlessMode(nextMode)) return 'waiting'
@@ -203,6 +220,7 @@ export default function BuzzerPage() {
       setSubmitError('')
       setAttemptToasts([])
       setCorrectEvent(null)
+      setTimeoutEvent(null)
       answerQuestionIdRef.current = ''
       refreshAvailableTeams()
     }
@@ -241,8 +259,14 @@ export default function BuzzerPage() {
 
     function onAnswerCorrect(payload) {
       if (!payload || typeof payload !== 'object') return
+      setTimeoutEvent(null)
       setCorrectEvent(payload)
-      playCorrect()
+    }
+
+    function onAnswerTimeout(payload) {
+      if (!payload || typeof payload !== 'object') return
+      setCorrectEvent(null)
+      setTimeoutEvent(payload)
     }
 
     function onAnswerState(payload) {
@@ -251,22 +275,36 @@ export default function BuzzerPage() {
       if (answerQuestionIdRef.current && answerQuestionIdRef.current !== nextQuestionId) {
         setAttemptToasts([])
         setCorrectEvent(null)
+        setTimeoutEvent(null)
         setSubmitError('')
         setGuess('')
       }
       answerQuestionIdRef.current = nextQuestionId
       setAnswerState(payload)
-      if (payload.status === 'open') setCorrectEvent(null)
+      if (payload.status === 'open') {
+        setCorrectEvent(null)
+        setTimeoutEvent(null)
+      }
+    }
+
+    function onMemberSync(sync) {
+      if (!sync || typeof sync !== 'object') return
+      setStatus((prev) => {
+        if (prev === 'join' || prev === 'loading') return prev
+        return applySync(sync, teamIndexRef.current, nameRef.current)
+      })
     }
 
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
     socket.on('game:reset', onGameReset)
+    socket.on('member:sync', onMemberSync)
     socket.on('buzz:armed', onBuzzArmed)
     socket.on('buzz:reset', onBuzzReset)
     socket.on('buzz:winner', onBuzzWinner)
     socket.on('answer:attempt', onAnswerAttempt)
     socket.on('answer:correct', onAnswerCorrect)
+    socket.on('answer:timeout', onAnswerTimeout)
     socket.on('answer:state', onAnswerState)
 
     if (socket.connected) onConnect()
@@ -275,11 +313,13 @@ export default function BuzzerPage() {
       socket.off('connect', onConnect)
       socket.off('disconnect', onDisconnect)
       socket.off('game:reset', onGameReset)
+      socket.off('member:sync', onMemberSync)
       socket.off('buzz:armed', onBuzzArmed)
       socket.off('buzz:reset', onBuzzReset)
       socket.off('buzz:winner', onBuzzWinner)
       socket.off('answer:attempt', onAnswerAttempt)
       socket.off('answer:correct', onAnswerCorrect)
+      socket.off('answer:timeout', onAnswerTimeout)
       socket.off('answer:state', onAnswerState)
       socket.disconnect()
     }
@@ -400,6 +440,7 @@ export default function BuzzerPage() {
     setSubmitError('')
     setAttemptToasts([])
     setCorrectEvent(null)
+    setTimeoutEvent(null)
     answerQuestionIdRef.current = ''
   }
 
@@ -522,7 +563,12 @@ export default function BuzzerPage() {
         {correctEvent && (
           <div className="buzzer-hostless-correct" role="status" aria-live="polite">
             <strong>{correctCopy.inline}</strong>
-            {Number.isFinite(correctEvent.points) && <span>{` +${correctEvent.points} points`}</span>}
+          </div>
+        )}
+
+        {timeoutEvent && (
+          <div className="buzzer-hostless-correct" role="status" aria-live="polite">
+            <strong>{`Time's up. Correct answer: ${String(timeoutEvent.answer || '').trim() || 'Not available'}`}</strong>
           </div>
         )}
 

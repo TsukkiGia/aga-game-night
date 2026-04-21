@@ -100,13 +100,16 @@ function createFakeQuery() {
     }
 
     if (text.includes('INSERT INTO teams (session_id, idx, name, color, score)')) {
-      const [sessionId, idx, name, color, score] = params
+      const [sessionId, ...rest] = params
       const current = teamsBySession.get(sessionId) || []
-      const existingIndex = current.findIndex((team) => team.idx === idx)
-      if (existingIndex >= 0) {
-        current[existingIndex] = { idx, name, color, score }
-      } else {
-        current.push({ idx, name, color, score })
+      for (let i = 0; i < rest.length; i += 4) {
+        const [idx, name, color, score] = rest.slice(i, i + 4)
+        const existingIndex = current.findIndex((team) => team.idx === idx)
+        if (existingIndex >= 0) {
+          current[existingIndex] = { idx, name, color, score }
+        } else {
+          current.push({ idx, name, color, score })
+        }
       }
       current.sort((a, b) => a.idx - b.idx)
       teamsBySession.set(sessionId, current)
@@ -360,7 +363,10 @@ function connectSocket(baseUrl) {
 
 async function createHarness({ queryFn } = {}) {
   const effectiveQueryFn = typeof queryFn === 'function' ? queryFn : createFakeQuery()
-  const server = createBuzzServer({ queryFn: effectiveQueryFn })
+  const server = createBuzzServer({
+    queryFn: effectiveQueryFn,
+    withTransactionFn: async (fn) => fn(effectiveQueryFn),
+  })
   const address = await server.start(0, '127.0.0.1')
   const baseUrl = `http://127.0.0.1:${address.port}`
   const sockets = []
@@ -655,6 +661,58 @@ test('reconnected host receives authoritative state via state:sync', async () =>
     assert.equal(stateSync.armed, false)
     assert.equal(stateSync.buzzedBy, 0)
     assert.equal(stateSync.buzzedMemberName, 'Alice')
+  } finally {
+    await harness.close()
+  }
+})
+
+test('host:setup treats same-count team identity changes as a new game reset', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    await emitAck(host, 'host:setup', TEAMS)
+
+    const seeded = await emitAck(host, 'host:runtime:update', {
+      teams: [
+        { name: 'Team A', color: 'ember', score: 12 },
+        { name: 'Team B', color: 'gold', score: 8 },
+      ],
+      doneQuestions: ['q:seed:question'],
+      streaks: [3, 2],
+      doublePoints: true,
+      reactionStats: {
+        '0:alice': {
+          key: '0:alice',
+          name: 'Alice',
+          teamName: 'Team A',
+          teamIndex: 0,
+          bestMs: 420,
+          lastMs: 520,
+          totalMs: 940,
+          attempts: 2,
+        },
+      },
+    })
+    assert.equal(seeded.ok, true)
+
+    const renamedSetup = await emitAck(host, 'host:setup', [
+      { name: 'Renamed A', color: 'ember' },
+      { name: 'Team B', color: 'gold' },
+    ])
+    assert.equal(renamedSetup.ok, true)
+
+    const state = harness.getState(sessionCode)
+    assert.equal(state.teams[0].name, 'Renamed A')
+    assert.equal(state.teams[1].name, 'Team B')
+    assert.equal(state.teams[0].score, 0)
+    assert.equal(state.teams[1].score, 0)
+    assert.deepEqual(state.streaks, [0, 0])
+    assert.deepEqual(state.doneQuestions, [])
+    assert.equal(state.doublePoints, false)
+    assert.deepEqual(state.reactionStats, {})
   } finally {
     await harness.close()
   }
@@ -1095,6 +1153,58 @@ test('host question cursor sync requires auth and broadcasts updates', async () 
   }
 })
 
+test('switching gameplay mode resets live buzz state and syncs members', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    await emitAck(host, 'host:setup', {
+      teams: TEAMS,
+      roundCatalog: [HOSTLESS_CUSTOM_ROUND],
+      gamePlan: ['intro:hostless-custom', 'q:hostless-custom:hcq-1'],
+      gameplayMode: 'hosted',
+    })
+    await emitAck(host, 'host:question:set', 'q:hostless-custom:hcq-1')
+    await emitAck(member, 'member:join', sessionCode, 0, 'Alice')
+    await emitAck(host, 'host:arm')
+
+    const winnerPromise = once(host, 'buzz:winner')
+    member.emit('member:buzz')
+    await winnerPromise
+
+    const memberBuzzReset = once(member, 'buzz:reset')
+    const memberSync = once(member, 'member:sync')
+    const switched = await emitAck(host, 'host:runtime:update', {
+      teams: TEAMS,
+      doneQuestions: [],
+      gameplayMode: 'hostless',
+      streaks: [0, 0],
+      doublePoints: true,
+      gamePlan: ['intro:hostless-custom', 'q:hostless-custom:hcq-1'],
+      roundCatalog: [HOSTLESS_CUSTOM_ROUND],
+      reactionStats: {},
+    })
+    assert.equal(switched.ok, true)
+
+    await memberBuzzReset
+    const memberSyncPayload = await memberSync
+    assert.equal(memberSyncPayload.gameplayMode, 'hostless')
+    assert.equal(memberSyncPayload.answerState?.status, 'open')
+
+    const state = harness.getState(sessionCode)
+    assert.equal(state.gameplayMode, 'hostless')
+    assert.equal(state.armed, false)
+    assert.equal(state.buzzedBy, null)
+    assert.equal(state.allowedTeamIndices, null)
+    assert.equal(state.doublePoints, false)
+  } finally {
+    await harness.close()
+  }
+})
+
 test('state hydration errors return server-error acks instead of throwing', async () => {
   const baseQuery = createFakeQuery()
   const queryFn = async (text, params = []) => {
@@ -1428,16 +1538,61 @@ test('host-less mode accepts wrong attempts, scores first correct answer, and lo
     assert.equal(correctPayload.teamIndex, 0)
     assert.equal(correctPayload.memberName, 'Alice')
     assert.equal(correctPayload.points, 4)
+    assert.equal(correctPayload.answer, 'Accra')
 
     const stateAfterCorrect = harness.getState(sessionCode)
     assert.equal(stateAfterCorrect.teams[0].score, 4)
     assert.equal(stateAfterCorrect.teams[1].score, 0)
     assert.equal(stateAfterCorrect.answerState.status, 'locked')
     assert.equal(stateAfterCorrect.answerState.winner.memberName, 'Alice')
+    assert.equal(stateAfterCorrect.answerState.winner.answer, 'Accra')
+    assert.equal(stateAfterCorrect.answerState.revealedAnswer, 'Accra')
 
     const postLockResult = await emitAck(memberB, 'member:answer:submit', { guess: 'Accra' })
     assert.equal(postLockResult.ok, false)
     assert.equal(postLockResult.error, 'question-locked')
+  } finally {
+    await harness.close()
+  }
+})
+
+test('host-less timer expiry locks question and reveals answer when nobody is correct', async () => {
+  const harness = await createHarness()
+  try {
+    const host = await harness.connect()
+    const member = await harness.connect()
+    const { sessionCode, pin } = await harness.createSession()
+
+    await authHost(host, sessionCode, pin)
+    await emitAck(host, 'host:setup', {
+      teams: TEAMS,
+      gameplayMode: 'hostless',
+      roundCatalog: [HOSTLESS_CUSTOM_ROUND],
+      gamePlan: ['intro:hostless-custom', 'q:hostless-custom:hcq-1'],
+    })
+    await emitAck(host, 'host:question:set', 'q:hostless-custom:hcq-1')
+    await emitAck(member, 'member:join', sessionCode, 0, 'Alice')
+
+    const wrongResult = await emitAck(member, 'member:answer:submit', { guess: 'Kumasi' })
+    assert.equal(wrongResult.ok, true)
+    assert.equal(wrongResult.correct, false)
+
+    const hostTimeout = once(host, 'answer:timeout')
+    const memberTimeout = once(member, 'answer:timeout')
+    host.emit('host:timer:expired')
+    const hostPayload = await hostTimeout
+    const memberPayload = await memberTimeout
+    assert.equal(hostPayload.answer, 'Accra')
+    assert.equal(memberPayload.answer, 'Accra')
+
+    const state = harness.getState(sessionCode)
+    assert.equal(state.answerState.status, 'locked')
+    assert.equal(state.answerState.winner, null)
+    assert.equal(state.answerState.revealedAnswer, 'Accra')
+
+    const postTimeoutResult = await emitAck(member, 'member:answer:submit', { guess: 'Accra' })
+    assert.equal(postTimeoutResult.ok, false)
+    assert.equal(postTimeoutResult.error, 'question-locked')
   } finally {
     await harness.close()
   }

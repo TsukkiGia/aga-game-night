@@ -211,6 +211,7 @@ function normalizeWinner(rawWinner) {
     teamIndex,
     memberName: normalizeText(rawWinner.memberName).slice(0, 80) || null,
     guess: normalizeText(rawWinner.guess).slice(0, 240) || null,
+    answer: normalizeText(rawWinner.answer).slice(0, 240) || null,
     points: Number.isInteger(points) ? points : 0,
     questionId: normalizeQuestionId(rawWinner.questionId),
     timestamp: Number.isInteger(timestamp) && timestamp > 0 ? timestamp : Date.now(),
@@ -236,6 +237,7 @@ export function buildInitialAnswerState({ questionId = null, open = false } = {}
     questionId: normalizeQuestionId(questionId),
     status: open ? 'open' : 'locked',
     winner: null,
+    revealedAnswer: null,
     recentAttempts: [],
   }
 }
@@ -248,6 +250,7 @@ export function normalizeAnswerState(rawState, fallbackQuestionId = null) {
   const status = String(rawState.status || '').trim().toLowerCase() === 'open' ? 'open' : 'locked'
   const questionId = normalizeQuestionId(rawState.questionId) || normalizeQuestionId(fallbackQuestionId)
   const winner = normalizeWinner(rawState.winner)
+  const revealedAnswer = normalizeText(rawState.revealedAnswer).slice(0, 240) || null
   const recentAttempts = Array.isArray(rawState.recentAttempts)
     ? rawState.recentAttempts.map((attempt) => normalizeAttempt(attempt)).filter(Boolean).slice(-MAX_ATTEMPTS_IN_STATE)
     : []
@@ -256,6 +259,7 @@ export function normalizeAnswerState(rawState, fallbackQuestionId = null) {
     questionId,
     status,
     winner,
+    revealedAnswer,
     recentAttempts,
   }
 }
@@ -280,6 +284,7 @@ export function serializeAnswerState(answerState, teams = []) {
           team: withTeam(normalized.winner.teamIndex),
         }
       : null,
+    revealedAnswer: normalized.revealedAnswer,
     recentAttempts: normalized.recentAttempts.map((attempt) => ({
       ...attempt,
       team: withTeam(attempt.teamIndex),
@@ -304,6 +309,7 @@ export function lockAnswerState(st, winnerPayload) {
     ...normalized,
     status: 'locked',
     winner,
+    revealedAnswer: winner.answer || normalized.revealedAnswer || null,
   }
 }
 
@@ -405,11 +411,7 @@ export function isGuessCorrect(guess, expectedAnswer) {
     if (guessNorm === expectedNorm) return true
 
     const maxEdits = allowedEditDistance(expectedNorm.length)
-    const distance = levenshteinDistance(guessNorm, expectedNorm, maxEdits)
-    if (distance > maxEdits) continue
-
-    const similarity = 1 - (distance / Math.max(guessNorm.length, expectedNorm.length, 1))
-    if (similarity >= 0.87) return true
+    if (levenshteinDistance(guessNorm, expectedNorm, maxEdits) <= maxEdits) return true
   }
 
   return false

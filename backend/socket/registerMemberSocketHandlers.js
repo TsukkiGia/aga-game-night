@@ -323,11 +323,12 @@ export function registerMemberSocketHandlers(socket, ctx) {
         teamIndex: idx,
         memberName,
         guess,
+        answer: context.expectedAnswer,
         points,
         questionId: context.cursorId,
         timestamp: now,
       })
-      const correctPayload = { ...basePayload, points }
+      const correctPayload = { ...basePayload, points, answer: context.expectedAnswer }
       io.to(hostRoom(code)).emit('state:sync', serializeHostSyncState(st))
       io.to(hostRoom(code)).emit('answer:correct', correctPayload)
       io.to(`${code}:members`).emit('answer:correct', correctPayload)

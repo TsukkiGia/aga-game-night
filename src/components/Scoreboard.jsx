@@ -23,8 +23,8 @@ import { useReactionStats } from '../hooks/useReactionStats'
 import { useRuntimePersist } from '../hooks/useRuntimePersist'
 import { useSessionActions } from '../hooks/useSessionActions'
 import { clearAll } from '../storage'
-import { playGameStart, playCorrect } from '../sounds'
-import { normalizeGameplayMode, isHostlessMode } from '../gameplayMode'
+import { playGameStart } from '../sounds'
+import { normalizeGameplayMode, isHostlessMode, isRoundSupportedInMode, gameplayModeLabel } from '../gameplayMode'
 import {
   normalizeDoneQuestionIds,
   resolveEffectivePlanForSync,
@@ -116,9 +116,14 @@ export default function Scoreboard({
   const [hostlessAttemptFeed, setHostlessAttemptFeed] = useState([])
   const [hostlessCorrectEvent, setHostlessCorrectEvent] = useState(null)
   const [hostlessAnswerState, setHostlessAnswerState] = useState(null)
+  const [hostlessTimeoutEvent, setHostlessTimeoutEvent] = useState(null)
+  const [gameplayModeSwitching, setGameplayModeSwitching] = useState(false)
+  const [gameplayModeError, setGameplayModeError] = useState('')
+  const [pendingModeSwitch, setPendingModeSwitch] = useState(null)
   const [authForm, setAuthForm] = useState({ sessionCode: '', pin: '' })
 
   const runtimeHydratedRef = useRef(false)
+  const hostlessRestorePlanRef = useRef(null)
   const [questionSidebarScrollTop, setQuestionSidebarScrollTop] = useState(0)
 
   useEffect(() => {
@@ -144,6 +149,13 @@ export default function Scoreboard({
     const normalizedDone = normalizeDoneQuestionIds(serverState?.doneQuestions, effectivePlanCatalog)
     hydrateFromServer({ ...serverState, doneQuestions: normalizedDone, roundCatalog: effectiveRoundCatalog })
     const syncedMode = normalizeGameplayMode(serverState?.gameplayMode, gameplayMode)
+    const wasHostless = isHostlessMode(gameplayMode)
+    const nextHostless = isHostlessMode(syncedMode)
+    if (!wasHostless && nextHostless && !hostlessRestorePlanRef.current) {
+      hostlessRestorePlanRef.current = [...normalizedPlanIds]
+    } else if (!nextHostless) {
+      hostlessRestorePlanRef.current = null
+    }
     setGameplayMode(syncedMode)
     onGameplayModeSync(syncedMode)
     const nextCursor = normalizeCursorId(serverState?.hostQuestionCursor, effectivePlan, effectivePlanCatalog)
@@ -167,20 +179,226 @@ export default function Scoreboard({
       },
       onAnswerCorrect: (payload) => {
         setHostlessCorrectEvent(payload)
-        playCorrect()
+        setHostlessTimeoutEvent(null)
       },
-      onAnswerState: setHostlessAnswerState,
+      onAnswerTimeout: (payload) => {
+        setHostlessCorrectEvent(null)
+        setHostlessTimeoutEvent(payload)
+      },
+      onAnswerState: (payload) => {
+        setHostlessAnswerState(payload)
+        if (payload?.status === 'open') setHostlessTimeoutEvent(null)
+      },
       setupPayload,
     }
   )
-  const effectiveGameplayMode = normalizeGameplayMode(socketGameplayMode, gameplayMode)
+  const effectiveGameplayMode = normalizeGameplayMode(gameplayMode, socketGameplayMode)
   const hostlessModeActive = isHostlessMode(effectiveGameplayMode)
+
+  const commitGameplayModeSwitch = useCallback(async (nextMode, nextPlanIds, options = {}) => {
+    if (!hostReady || gameplayModeSwitching) return false
+
+    const nextModeNormalized = normalizeGameplayMode(nextMode, effectiveGameplayMode)
+    const nextPlanSet = new Set(nextPlanIds)
+    const nextDoneQuestions = [...doneQuestions].filter((id) => nextPlanSet.has(id))
+    const nextCursorId = activeQuestionId && nextPlanSet.has(activeQuestionId)
+      ? activeQuestionId
+      : (nextPlanIds[0] || null)
+    const payload = {
+      teams: teams.map((team) => ({
+        name: String(team.name || '').trim(),
+        color: String(team.color || '').trim(),
+        score: Number.isFinite(Number(team.score)) ? Number(team.score) : 0,
+      })),
+      doneQuestions: nextDoneQuestions,
+      gameplayMode: nextModeNormalized,
+      streaks: [...streaks],
+      doublePoints: false,
+      gamePlan: nextPlanIds,
+      roundCatalog,
+      reactionStats,
+    }
+
+    setGameplayModeSwitching(true)
+    setGameplayModeError('')
+    const result = await new Promise((resolve) => {
+      socket.timeout(3000).emit('host:runtime:update', payload, (err, ack) => {
+        if (err) resolve({ ok: false, error: 'timeout' })
+        else resolve(ack || { ok: false, error: 'server-error' })
+      })
+    })
+
+    if (!result?.ok) {
+      if (result?.error === 'unauthorized') {
+        invalidateAuth('Host authorization expired while switching gameplay mode. Sign in again.')
+      } else {
+        setGameplayModeError('Could not switch gameplay mode right now. Try again.')
+      }
+      setGameplayModeSwitching(false)
+      return false
+    }
+
+    setGamePlanIds(nextPlanIds)
+    clearDoublePoints()
+    setHostlessAttemptFeed([])
+    setHostlessCorrectEvent(null)
+    setHostlessAnswerState(null)
+    setHostlessTimeoutEvent(null)
+    if (isHostlessMode(nextModeNormalized)) {
+      hostlessRestorePlanRef.current = Array.isArray(options.restorePlanIds) && options.restorePlanIds.length > 0
+        ? [...options.restorePlanIds]
+        : null
+    } else {
+      hostlessRestorePlanRef.current = null
+    }
+    setGameplayMode(nextModeNormalized)
+    onGameplayModeSync(nextModeNormalized)
+
+    if (activeItem !== null) {
+      const nextItem = nextCursorId ? planCatalog.byId.get(nextCursorId) : null
+      navigate(nextCursorId, {
+        silent: true,
+        transitionRound: nextItem?.type === 'round-intro' ? roundCatalog[nextItem.roundIndex] : null,
+      })
+    }
+
+    setGameplayModeSwitching(false)
+    return true
+  }, [
+    hostReady,
+    gameplayModeSwitching,
+    effectiveGameplayMode,
+    doneQuestions,
+    activeQuestionId,
+    teams,
+    streaks,
+    roundCatalog,
+    reactionStats,
+    clearDoublePoints,
+    invalidateAuth,
+    setGamePlanIds,
+    onGameplayModeSync,
+    activeItem,
+    planCatalog,
+    navigate,
+  ])
+
+  const requestGameplayModeSwitch = useCallback((rawNextMode) => {
+    if (!hostReady) {
+      setGameplayModeError('Host connection is not ready yet. Sign in again, then retry.')
+      return
+    }
+    const nextMode = normalizeGameplayMode(rawNextMode, effectiveGameplayMode)
+    if (nextMode === effectiveGameplayMode || gameplayModeSwitching) return
+
+    const unsupportedRoundNames = new Set()
+    let nextPlanIds = normalizedPlanIds
+    let restorePlanIds = null
+    if (isHostlessMode(nextMode)) {
+      nextPlanIds = normalizedPlanIds.filter((id) => {
+        const item = planCatalog.byId.get(id)
+        if (!item) return false
+        const round = roundCatalog[item.roundIndex]
+        const supported = isRoundSupportedInMode(round?.type, nextMode)
+        if (!supported && round?.name) unsupportedRoundNames.add(String(round.name))
+        return supported
+      })
+      const hasHostlessQuestion = nextPlanIds.some((id) => planCatalog.byId.get(id)?.type === 'question')
+      if (!hasHostlessQuestion) {
+        setGameplayModeError('No host-less compatible questions are available in this run of show.')
+        return
+      }
+      if (nextPlanIds.length !== normalizedPlanIds.length) restorePlanIds = normalizedPlanIds
+    } else if (Array.isArray(hostlessRestorePlanRef.current) && hostlessRestorePlanRef.current.length > 0) {
+      const restoredPlanIds = normalizePlanIdsWithRoundIntros(hostlessRestorePlanRef.current, planCatalog, { fallbackToDefault: false })
+      if (restoredPlanIds.length > 0) nextPlanIds = restoredPlanIds
+    }
+
+    const pending = {
+      nextMode,
+      nextPlanIds,
+      restorePlanIds,
+      unsupportedRoundNames: [...unsupportedRoundNames],
+      isDuringQuestion: activeItem !== null,
+    }
+    if (pending.isDuringQuestion || pending.unsupportedRoundNames.length > 0) {
+      setPendingModeSwitch(pending)
+      return
+    }
+    void commitGameplayModeSwitch(pending.nextMode, pending.nextPlanIds, { restorePlanIds: pending.restorePlanIds })
+  }, [
+    hostReady,
+    effectiveGameplayMode,
+    gameplayModeSwitching,
+    normalizedPlanIds,
+    planCatalog,
+    roundCatalog,
+    activeItem,
+    commitGameplayModeSwitch,
+  ])
+
+  const cancelPendingModeSwitch = useCallback(() => {
+    if (gameplayModeSwitching) return
+    setPendingModeSwitch(null)
+  }, [gameplayModeSwitching])
+
+  const confirmPendingModeSwitch = useCallback(() => {
+    if (!pendingModeSwitch) return
+    const { nextMode, nextPlanIds, restorePlanIds } = pendingModeSwitch
+    setPendingModeSwitch(null)
+    void commitGameplayModeSwitch(nextMode, nextPlanIds, { restorePlanIds })
+  }, [pendingModeSwitch, commitGameplayModeSwitch])
+
+  const gameplayModeSwitchModal = pendingModeSwitch && (
+    <ModalShell
+      onClose={cancelPendingModeSwitch}
+      closeOnOverlayClick={!gameplayModeSwitching}
+      dialogClassName="end-session-modal"
+    >
+      <div className="help-popup-tag">Switch Gameplay Mode</div>
+      <h2 className="end-session-title">{`Switch to ${gameplayModeLabel(pendingModeSwitch.nextMode)} mode?`}</h2>
+      <p className="end-session-copy">
+        {pendingModeSwitch.isDuringQuestion
+          ? 'This will reset live buzz/answer state for the current question before continuing.'
+          : 'This updates how players participate in upcoming questions.'}
+      </p>
+      {pendingModeSwitch.unsupportedRoundNames.length > 0 && (
+        <p className="end-session-copy">
+          {`Unsupported in Host-less and will be skipped: ${pendingModeSwitch.unsupportedRoundNames.join(', ')}`}
+        </p>
+      )}
+      {gameplayModeError && <div className="host-auth-error">{gameplayModeError}</div>}
+      <div className="end-session-actions">
+        <button
+          className="back-btn"
+          type="button"
+          onClick={cancelPendingModeSwitch}
+          disabled={gameplayModeSwitching}
+        >
+          {`Stay ${gameplayModeLabel(effectiveGameplayMode)}`}
+        </button>
+        <button
+          className="start-btn host-auth-submit-btn"
+          type="button"
+          onClick={confirmPendingModeSwitch}
+          disabled={gameplayModeSwitching}
+        >
+          {gameplayModeSwitching
+            ? 'Switching…'
+            : (pendingModeSwitch.unsupportedRoundNames.length > 0
+                ? 'Switch & Skip Unsupported Rounds'
+                : 'Switch Mode')}
+        </button>
+      </div>
+    </ModalShell>
+  )
 
   useEffect(() => {
     const questionId = String(answerState?.questionId || hostlessAnswerState?.questionId || '')
     if (!questionId) return
     setHostlessAttemptFeed([])
     setHostlessCorrectEvent(null)
+    setHostlessTimeoutEvent(null)
   }, [answerState?.questionId, hostlessAnswerState?.questionId])
 
   useRuntimePersist({
@@ -280,6 +498,7 @@ export default function Scoreboard({
     }
     setHostlessAttemptFeed([])
     setHostlessCorrectEvent(null)
+    setHostlessTimeoutEvent(null)
     navigate(nextCursorId, { transitionRound, silent })
   }
 
@@ -300,6 +519,7 @@ export default function Scoreboard({
     dismissBuzzAndResetMultiplier()
     setHostlessAttemptFeed([])
     setHostlessCorrectEvent(null)
+    setHostlessTimeoutEvent(null)
     setLaunching(false)
     navigateToCursor(null, { clearBuzz: false, silent: true })
   }
@@ -433,7 +653,9 @@ export default function Scoreboard({
           answerState={answerState || hostlessAnswerState}
           hostlessAttemptFeed={hostlessAttemptFeed}
           hostlessCorrectEvent={hostlessCorrectEvent}
+          hostlessTimeoutEvent={hostlessTimeoutEvent}
           onDismissHostlessCorrect={() => setHostlessCorrectEvent(null)}
+          onDismissHostlessTimeout={() => setHostlessTimeoutEvent(null)}
           isRoundIncluded={isRoundIncluded}
           isQuestionIncluded={isQuestionIncluded}
           getRoundDisplayLabel={getRoundDisplayLabel}
@@ -525,6 +747,7 @@ export default function Scoreboard({
           </div>
         </ModalShell>
       )}
+      {gameplayModeSwitchModal}
       <HomeLobbyView
         teams={teams}
         members={members}
@@ -543,6 +766,9 @@ export default function Scoreboard({
         onArm={handleArm}
         onDismiss={handleDismiss}
         gameplayMode={effectiveGameplayMode}
+        onGameplayModeChange={requestGameplayModeSwitch}
+        gameplayModeSwitching={gameplayModeSwitching}
+        gameplayModeError={gameplayModeError}
       />
     </>
   )

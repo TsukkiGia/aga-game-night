@@ -1,10 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
 import { playTimerMusic, playTick, stopTick, playTimeUp } from '../sounds'
 
-export default function Timer({ seconds = 60 }) {
+export default function Timer({ seconds = 60, onExpire = null, autoStart = false, showControls = true }) {
   const [timeLeft, setTimeLeft] = useState(seconds)
-  const [running, setRunning] = useState(false)
+  const [running, setRunning] = useState(Boolean(autoStart))
   const stopMusicRef = useRef(null)
+  const onExpireRef = useRef(onExpire)
+
+  useEffect(() => {
+    onExpireRef.current = onExpire
+  }, [onExpire])
+
+  useEffect(() => {
+    setTimeLeft(seconds)
+    setRunning(Boolean(autoStart))
+  }, [seconds, autoStart])
 
   useEffect(() => {
     if (!running || timeLeft === 0) return
@@ -14,6 +24,7 @@ export default function Timer({ seconds = 60 }) {
           setRunning(false)
           stopTick()
           playTimeUp()
+          if (typeof onExpireRef.current === 'function') onExpireRef.current()
           return 0
         }
         if (t - 1 <= 10) playTick()
@@ -41,7 +52,7 @@ export default function Timer({ seconds = 60 }) {
 
   function reset() {
     setTimeLeft(seconds)
-    setRunning(false)
+    setRunning(Boolean(autoStart))
   }
 
   const pct = (timeLeft / seconds) * 100
@@ -55,20 +66,22 @@ export default function Timer({ seconds = 60 }) {
       <div className="qv-timer-bar-track">
         <div className="qv-timer-bar-fill" style={{ width: `${pct}%`, background: urgent ? 'var(--terra)' : 'var(--teal)' }} />
       </div>
-      <div className="qv-timer-btns">
-        {!running && timeLeft === seconds && (
-          <button className="qv-timer-btn start" onClick={() => setRunning(true)}>▶ Start</button>
-        )}
-        {running && (
-          <button className="qv-timer-btn pause" onClick={() => setRunning(false)}>⏸ Pause</button>
-        )}
-        {(!running && timeLeft !== seconds) && (
-          <>
-            {timeLeft > 0 && <button className="qv-timer-btn start" onClick={() => setRunning(true)}>▶ Resume</button>}
-            <button className="qv-timer-btn reset" onClick={reset}>↺ Reset</button>
-          </>
-        )}
-      </div>
+      {showControls && (
+        <div className="qv-timer-btns">
+          {!running && timeLeft === seconds && (
+            <button className="qv-timer-btn start" onClick={() => setRunning(true)}>▶ Start</button>
+          )}
+          {running && (
+            <button className="qv-timer-btn pause" onClick={() => setRunning(false)}>⏸ Pause</button>
+          )}
+          {(!running && timeLeft !== seconds) && (
+            <>
+              {timeLeft > 0 && <button className="qv-timer-btn start" onClick={() => setRunning(true)}>▶ Resume</button>}
+              <button className="qv-timer-btn reset" onClick={reset}>↺ Reset</button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
