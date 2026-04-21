@@ -51,6 +51,15 @@
   pointer-events: auto;
 }
 
+.qv-body:has(.qv-hostless-under-media) .qv-video {
+  max-height: calc(100dvh - 450px);
+}
+
+.qv-body:has(.qv-hostless-under-media) .qv-video-yt-mask {
+  width: min(100%, calc((100dvh - 430px) * (16 / 9)));
+  max-height: calc(100dvh - 430px);
+}
+
 /* ══════════════════════════════════════════
    CUSTOM BUZZ BODY
 ══════════════════════════════════════════ */
@@ -103,6 +112,14 @@
 
 .qv-custom-image.dark-backdrop {
   background: #fff;
+}
+
+.qv-body:has(.qv-hostless-under-media) .qv-custom-image-shell {
+  max-height: min(52vh, calc(100dvh - 420px));
+}
+
+.qv-body:has(.qv-hostless-under-media) .qv-custom-image {
+  max-height: min(52vh, calc(100dvh - 420px));
 }
 
 .qv-custom-answer-card {

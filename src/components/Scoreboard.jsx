@@ -23,7 +23,7 @@ import { useReactionStats } from '../hooks/useReactionStats'
 import { useRuntimePersist } from '../hooks/useRuntimePersist'
 import { useSessionActions } from '../hooks/useSessionActions'
 import { clearAll } from '../storage'
-import { playGameStart } from '../sounds'
+import { playGameStart, playCorrect } from '../sounds'
 import { normalizeGameplayMode, isHostlessMode, isRoundSupportedInMode, gameplayModeLabel } from '../gameplayMode'
 import {
   normalizeDoneQuestionIds,
@@ -124,6 +124,7 @@ export default function Scoreboard({
 
   const runtimeHydratedRef = useRef(false)
   const hostlessRestorePlanRef = useRef(null)
+  const lastCorrectSoundKeyRef = useRef('')
   const [questionSidebarScrollTop, setQuestionSidebarScrollTop] = useState(0)
 
   useEffect(() => {
@@ -178,6 +179,15 @@ export default function Scoreboard({
         setHostlessAttemptFeed((prev) => [...prev, payload].slice(-8))
       },
       onAnswerCorrect: (payload) => {
+        const soundKey = [
+          String(payload?.questionId || ''),
+          String(payload?.teamIndex ?? ''),
+          String(payload?.timestamp ?? ''),
+        ].join('|')
+        if (soundKey && soundKey !== lastCorrectSoundKeyRef.current) {
+          lastCorrectSoundKeyRef.current = soundKey
+          playCorrect()
+        }
         setHostlessCorrectEvent(payload)
         setHostlessTimeoutEvent(null)
       },
@@ -187,7 +197,19 @@ export default function Scoreboard({
       },
       onAnswerState: (payload) => {
         setHostlessAnswerState(payload)
-        if (payload?.status === 'open') setHostlessTimeoutEvent(null)
+        if (payload?.status === 'open') {
+          setHostlessTimeoutEvent(null)
+          return
+        }
+        const revealedAnswer = String(payload?.revealedAnswer || '').trim()
+        if (payload?.status === 'locked' && !payload?.winner && revealedAnswer) {
+          setHostlessCorrectEvent(null)
+          setHostlessTimeoutEvent((prev) => (
+            prev?.questionId === payload.questionId && String(prev?.answer || '').trim() === revealedAnswer
+              ? prev
+              : { questionId: payload.questionId, answer: revealedAnswer }
+          ))
+        }
       },
       setupPayload,
     }
@@ -621,7 +643,33 @@ export default function Scoreboard({
           onArm={handleArm}
           onDismiss={dismissBuzzAndResetMultiplier}
           timerControlSignal={timerControlSignal}
-          onTimerExpired={() => socket.emit('host:timer:expired')}
+          onTimerExpired={(questionId) => {
+            const fallbackQuestionId = activeItem?.type === 'question' ? activeItem.id : ''
+            const safeQuestionId = String(questionId || fallbackQuestionId || '').trim()
+            if (safeQuestionId && fallbackQuestionId && safeQuestionId !== fallbackQuestionId) {
+              return { accepted: false, reason: 'stale-local-question-id' }
+            }
+
+            socket.timeout(4000).emit(
+              'host:timer:expired',
+              safeQuestionId ? { questionId: safeQuestionId } : {},
+              (err, ack) => {
+                if (err) {
+                  console.warn('[host:timer:expired] ack timeout/error', { safeQuestionId, err: String(err?.message || err || 'timeout') })
+                  return
+                }
+                if (ack?.error === 'unauthorized') {
+                  invalidateAuth('Host authorization expired. Sign in again.')
+                  return
+                }
+                if (!(ack?.ok && ack?.accepted !== false)) {
+                  console.warn('[host:timer:expired] not accepted', { safeQuestionId, ack })
+                }
+              }
+            )
+
+            return { accepted: true, reason: 'local-immediate' }
+          }}
           stealMode={stealMode}
           onWrongAndSteal={(allowedTeamIndices) => handleWrongAndSteal(allowedTeamIndices)}
           onMarkDone={() => { clearDoublePoints(); markDone(activeItem.id) }}
@@ -643,6 +691,7 @@ export default function Scoreboard({
           }}
           onHalftime={() => setShowHalftime(true)}
           onWinner={() => setShowWinner(true)}
+          pauseTimers={showHalftime}
           onShowReactionLeaderboard={() => {
             if (hostlessModeActive) return
             setShowReactionLeaderboard(true)

@@ -1,8 +1,45 @@
 const cache = {}
 let audioUnlocked = false
+let activeTimerStop = null
+let timerMusicSeq = 0
+let timerMusicActive = false
+const SOUND_VOLUME = {
+  timer: 0.4,
+  'tick-tock': 1,
+  buzz: 1,
+}
+
+function shouldLogTimerDebug() {
+  if (typeof window === 'undefined') return false
+  let forced = false
+  try {
+    forced = window.localStorage?.getItem('timerDebug') === '1'
+  } catch {
+    forced = false
+  }
+  return forced || Boolean(import.meta?.env?.DEV)
+}
+
+function logTimerDebug(message, details = null) {
+  if (!shouldLogTimerDebug()) return
+  if (details === null) {
+    console.info(`[timer] ${message}`)
+    return
+  }
+  console.info(`[timer] ${message}`, details)
+}
+
+function isPlayerPage() {
+  if (typeof window === 'undefined') return false
+  return String(window.location?.pathname || '').startsWith('/buzz')
+}
 
 function load(name, ext = 'wav') {
-  if (!cache[name]) cache[name] = new Audio(`/sounds/${name}.${ext}`)
+  if (!cache[name]) {
+    const audio = new Audio(`/sounds/${name}.${ext}`)
+    audio.volume = SOUND_VOLUME[name] ?? 1
+    cache[name] = audio
+  }
   return cache[name]
 }
 
@@ -71,9 +108,23 @@ export function stopSuspense() {
   }
 }
 export function playWhistle()        { play('referee-whistle', 'mp3') }
-export function playTick()   { play('tick-tock') }
+export function playTick() {
+  if (isPlayerPage()) {
+    logTimerDebug('tick suppressed on player page')
+    return
+  }
+  logTimerDebug('tick')
+  play('tick-tock')
+}
 export function stopTick()   { const a = load('tick-tock'); a.pause(); a.currentTime = 0 }
-export function playTimeUp() { play('buzz') }
+export function playTimeUp() {
+  if (isPlayerPage()) {
+    logTimerDebug('time-up suppressed on player page')
+    return
+  }
+  logTimerDebug('time-up')
+  play('buzz')
+}
 export function playTransition() { play('transition') }
 export function playCrickets()      { play('crickets') }
 export function playFaaah()         { play('faaah', 'mp3') }
@@ -119,9 +170,30 @@ export function playSoundBiteByKey(key) {
 
 // Timer music — looping, returns a stop function
 export function playTimerMusic() {
+  if (isPlayerPage()) {
+    logTimerDebug('timer music suppressed on player page')
+    return () => {}
+  }
+  const seq = ++timerMusicSeq
+  if (activeTimerStop) logTimerDebug('timer music replacing existing instance', { seq })
+  activeTimerStop?.()
   const audio = load('timer', 'mp3')
+  audio.pause()
   audio.currentTime = 0
   audio.loop = true
+  timerMusicActive = true
+  logTimerDebug('timer music start', { seq })
   audio.play().catch(() => {})
-  return () => { audio.pause(); audio.currentTime = 0 }
+  let stopped = false
+  const stop = () => {
+    if (stopped) return
+    stopped = true
+    logTimerDebug('timer music stop', { seq })
+    timerMusicActive = false
+    audio.pause()
+    audio.currentTime = 0
+    if (activeTimerStop === stop) activeTimerStop = null
+  }
+  activeTimerStop = stop
+  return stop
 }

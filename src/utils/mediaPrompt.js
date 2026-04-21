@@ -55,7 +55,7 @@ function parseTimeToSeconds(raw) {
   return (hours * 3600) + (mins * 60) + secs
 }
 
-function toYouTubeEmbedUrl(rawUrl) {
+function toYouTubeEmbedUrl(rawUrl, options = {}) {
   try {
     const url = new URL(cleanUrl(rawUrl))
     const host = url.hostname.replace(/^www\./, '').toLowerCase()
@@ -85,6 +85,7 @@ function toYouTubeEmbedUrl(rawUrl) {
       playsinline: '1',
       enablejsapi: '1',
     })
+    if (options.autoplay) params.set('autoplay', '1')
     if (typeof window !== 'undefined' && window?.location?.origin) {
       params.set('origin', window.location.origin)
     }
@@ -102,7 +103,7 @@ function resolveVideoSource(rawUrl, options = {}) {
   const cleaned = cleanUrl(rawUrl)
   if (!cleaned) return null
 
-  const youtubeEmbedUrl = toYouTubeEmbedUrl(cleaned)
+  const youtubeEmbedUrl = toYouTubeEmbedUrl(cleaned, { autoplay: Boolean(options.autoplay) })
   if (youtubeEmbedUrl) {
     return { kind: 'youtube', src: youtubeEmbedUrl, raw: cleaned, isAbsolute: true }
   }

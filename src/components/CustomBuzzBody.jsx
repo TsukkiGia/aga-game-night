@@ -3,7 +3,7 @@ import VideoBody from './VideoBody'
 import PromptMediaElement from './PromptMediaElement'
 import { cleanUrl, isCountryOutlineImageUrl } from '../utils/mediaPrompt'
 
-export default function CustomBuzzBody({ question, paused = false, allowReveal = true }) {
+export default function CustomBuzzBody({ question, paused = false, allowReveal = true, autoplayTrigger = 0 }) {
   const promptType = String(question?.promptType || '').trim().toLowerCase()
   const promptText = String(question?.promptText || '').trim()
   const mediaUrl = cleanUrl(question?.mediaUrl)
@@ -28,7 +28,12 @@ export default function CustomBuzzBody({ question, paused = false, allowReveal =
     return (
       <div className="qv-custom-wrap">
         {promptText && <div className="qv-custom-prompt">{promptText}</div>}
-        <VideoBody question={mappedQuestion} paused={paused} allowReveal={allowReveal} />
+        <VideoBody
+          question={mappedQuestion}
+          paused={paused}
+          allowReveal={allowReveal}
+          autoplayTrigger={autoplayTrigger}
+        />
       </div>
     )
   }

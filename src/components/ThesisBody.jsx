@@ -1,6 +1,6 @@
 import Timer from './Timer'
 
-export default function ThesisBody({ question }) {
+export default function ThesisBody({ question, timerPaused = false }) {
   const title = String(question?.title || '').trim()
   const options = Array.isArray(question?.options) ? question.options : []
   const isLongTitle = title.length >= 90
@@ -17,7 +17,7 @@ export default function ThesisBody({ question }) {
           <div key={opt} className="qv-thesis-mode">◈ {opt}</div>
         ))}
       </div>
-      <Timer seconds={90} />
+      <Timer seconds={90} forcePaused={timerPaused} />
     </div>
   )
 }

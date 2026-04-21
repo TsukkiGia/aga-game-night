@@ -348,11 +348,6 @@ export function useGameSocket(initialTeams, options = {}) {
     })
   }
 
-  const syncHostQuestion = useCallback((activeQuestion) => {
-    if (!hostReady) return
-    socket.emit('host:question:set', activeQuestion)
-  }, [hostReady])
-
   const invalidateAuth = useCallback((message = 'Host authorization expired. Sign in again.') => {
     setHostReady(false)
     setAuthState((prev) => ({
@@ -362,6 +357,17 @@ export function useGameSocket(initialTeams, options = {}) {
       authenticating: false,
     }))
   }, [sessionCode])
+
+  const syncHostQuestion = useCallback((activeQuestion) => {
+    if (!hostReady) return
+    socket.timeout(3000).emit('host:question:set', activeQuestion, (err, ack) => {
+      if (err) return
+      if (ack?.ok) return
+      if (ack?.error === 'unauthorized') {
+        invalidateAuth('Host authorization expired while syncing question state. Sign in again.')
+      }
+    })
+  }, [hostReady, invalidateAuth])
 
   return {
     armed,

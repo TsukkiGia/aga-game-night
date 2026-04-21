@@ -20,6 +20,7 @@ export default function QuestionView({
   stealMode, onWrongAndSteal,
   onMarkDone, onNavigate, onBack, onNext, onPrev,
   onHalftime, onWinner, onShowReactionLeaderboard, doublePoints, onToggleDouble, timerControlSignal, onTimerExpired,
+  pauseTimers = false,
   gameplayMode = 'hosted',
   answerState = null,
   hostlessAttemptFeed = [],
@@ -42,10 +43,19 @@ export default function QuestionView({
   const displayQuestionNumber = getQuestionDisplayNumber(roundIndex, questionIndex)
   const isCharades = round?.type === 'charades'
   const isThesis   = round?.type === 'thesis'
+  const isVideoRound = round?.type === 'video'
+    || (round?.type === 'custom-buzz' && String(question?.promptType || '').trim().toLowerCase() === 'video')
   const hostlessModeActive = isHostlessMode(gameplayMode)
   const showHostlessWinnerModal = Boolean(hostlessCorrectEvent)
   const showHostlessTimeoutModal = Boolean(hostlessTimeoutEvent)
-  const shouldPauseMedia = Boolean(buzzWinner || showHostlessWinnerModal)
+  const shouldPauseMedia = Boolean(buzzWinner || showHostlessWinnerModal || showHostlessTimeoutModal)
+  const hostlessTimerQuestionId = String(answerState?.questionId || question?.id || '').trim()
+  const hostlessOpenQuestion = hostlessModeActive
+    && answerState?.status === 'open'
+    && !answerState?.winner
+    && !showHostlessWinnerModal
+    && !showHostlessTimeoutModal
+    && Boolean(hostlessTimerQuestionId)
   const selectedTurnIndex = Math.max(0, (Number(displayQuestionNumber) || (questionIndex + 1)) - 1)
 
   const hostlessAnswerLabel = round?.type === 'slang' ? 'Meaning' : 'Answer'
@@ -53,6 +63,25 @@ export default function QuestionView({
     ? String(question?.meaning || '').trim()
     : String(question?.answer || '').trim()
   const hostlessAnswerExplanation = String(question?.explanation || '').trim()
+
+  function resolvePrimaryPositivePoints(scoring, { allowSteal = false, fallback = 3 } = {}) {
+    if (Array.isArray(scoring)) {
+      const entry = scoring.find((row) => {
+        const points = Number.parseInt(row?.points, 10)
+        if (!Number.isInteger(points) || points <= 0) return false
+        if (allowSteal) return true
+        return !String(row?.label || '').toLowerCase().includes('steal')
+      })
+      if (!entry) return fallback
+      const points = Number.parseInt(entry.points, 10)
+      return Number.isInteger(points) && points > 0 ? points : fallback
+    }
+    if (scoring && typeof scoring === 'object') {
+      const points = Number.parseInt(scoring.correctPoints, 10)
+      return Number.isInteger(points) && points > 0 ? points : fallback
+    }
+    return fallback
+  }
 
   const activePair = isCharades
     ? new Set([(selectedTurnIndex * 2) % teams.length, (selectedTurnIndex * 2 + 1) % teams.length])
@@ -74,6 +103,13 @@ export default function QuestionView({
   const [correctGiven, setCorrectGiven] = useState(false)
   const [confirmFinish, setConfirmFinish] = useState(false)
   const [showJoinQr, setShowJoinQr] = useState(false)
+  const [hostlessPreCountdown, setHostlessPreCountdown] = useState(null)
+  const [hostlessCountdownReadyQuestionId, setHostlessCountdownReadyQuestionId] = useState('')
+  const [hostlessAutoplayTrigger, setHostlessAutoplayTrigger] = useState(0)
+
+  const showHostlessCountdownScreen = hostlessOpenQuestion
+    && hostlessCountdownReadyQuestionId !== hostlessTimerQuestionId
+  const showHostlessTimer = hostlessOpenQuestion && !showHostlessCountdownScreen
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -86,6 +122,36 @@ export default function QuestionView({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
+
+  useEffect(() => {
+    if (!hostlessModeActive) {
+      setHostlessPreCountdown(null)
+      setHostlessCountdownReadyQuestionId('')
+      return
+    }
+    if (!hostlessOpenQuestion || !hostlessTimerQuestionId) {
+      setHostlessPreCountdown(null)
+      return
+    }
+    if (hostlessCountdownReadyQuestionId === hostlessTimerQuestionId) return
+    setHostlessPreCountdown(3)
+  }, [hostlessModeActive, hostlessOpenQuestion, hostlessTimerQuestionId, hostlessCountdownReadyQuestionId])
+
+  useEffect(() => {
+    if (!showHostlessCountdownScreen) return
+    if (pauseTimers) return
+    const value = Number.isInteger(hostlessPreCountdown) ? hostlessPreCountdown : 3
+    const id = setTimeout(() => {
+      if (value <= 1) {
+        setHostlessPreCountdown(null)
+        setHostlessCountdownReadyQuestionId(hostlessTimerQuestionId)
+        if (isVideoRound) setHostlessAutoplayTrigger((prev) => prev + 1)
+        return
+      }
+      setHostlessPreCountdown(value - 1)
+    }, 1000)
+    return () => clearTimeout(id)
+  }, [showHostlessCountdownScreen, pauseTimers, hostlessPreCountdown, hostlessTimerQuestionId, isVideoRound])
 
   if (!round || !question) {
     return (
@@ -200,87 +266,119 @@ export default function QuestionView({
 
         {/* ── Question body ── */}
         <div className="qv-body">
-          {round.type === 'video'    && <VideoBody    key={question.id} question={question} paused={shouldPauseMedia} allowReveal={!hostlessModeActive} />}
-          {round.type === 'slang'    && <SlangBody    key={question.id} question={question} allowReveal={!hostlessModeActive} />}
-          {round.type === 'custom-buzz' && <CustomBuzzBody key={question.id} question={question} paused={shouldPauseMedia} allowReveal={!hostlessModeActive} />}
-          {round.type === 'charades' && (
-            <div className="charades-wrap">
-              <div className="charades-active-teams">
-                {[...activePair].map(i => (
-                  <button
-                    key={i}
-                    className={`charades-active-chip color-${teams[i].color}`}
-                    onClick={() => {
-                      const pts = round.scoring.find(s => s.points > 0 && !s.label.toLowerCase().includes('steal'))?.points ?? 3
-                      onAdjust(i, pts)
-                    }}
-                    title={`Award ${teams[i].name} correct answer points`}
-                  >
-                    {teams[i].name}
-                  </button>
-                ))}
-                <span className="charades-active-label">are up</span>
+          <div className={`qv-body-stack${hostlessModeActive ? ' hostless' : ''}`}>
+            {showHostlessCountdownScreen ? (
+              <div className="qv-hostless-countdown-screen" role="status" aria-live="polite">
+                <div className="qv-hostless-countdown-label">Get ready</div>
+                <div className="qv-hostless-countdown-value">
+                  {Number.isInteger(hostlessPreCountdown) ? hostlessPreCountdown : 3}
+                </div>
               </div>
-              <CharadesBody key={question.id} question={question} />
-            </div>
-          )}
-          {isThesis && (
-            <div className="qv-thesis-shell">
-              <div className="charades-active-teams">
-                {[...activePair].map(i => (
-                  <button
-                    key={i}
-                    className={`charades-active-chip color-${teams[i].color}`}
-                    onClick={() => {
-                      const pts = round.scoring.find(s => s.points > 0)?.points ?? 3
-                      onAdjust(i, pts)
-                      setCorrectGiven(true)
-                    }}
-                    title={`Award ${teams[i].name} majority vote points`}
-                  >
-                    {teams[i].name}
-                  </button>
-                ))}
-                <span className="charades-active-label">is up</span>
-              </div>
-              <ThesisBody key={question.id} question={question} />
-            </div>
-          )}
+            ) : (
+              <>
+                {round.type === 'video'    && (
+                  <VideoBody
+                    key={question.id}
+                    question={question}
+                    paused={shouldPauseMedia}
+                    allowReveal={!hostlessModeActive}
+                    autoplayTrigger={hostlessModeActive ? hostlessAutoplayTrigger : 0}
+                  />
+                )}
+                {round.type === 'slang'    && <SlangBody    key={question.id} question={question} allowReveal={!hostlessModeActive} />}
+                {round.type === 'custom-buzz' && (
+                  <CustomBuzzBody
+                    key={question.id}
+                    question={question}
+                    paused={shouldPauseMedia}
+                    allowReveal={!hostlessModeActive}
+                    autoplayTrigger={hostlessModeActive ? hostlessAutoplayTrigger : 0}
+                  />
+                )}
+                {round.type === 'charades' && (
+                  <div className="charades-wrap">
+                    <div className="charades-active-teams">
+                      {[...activePair].map(i => (
+                        <button
+                          key={i}
+                          className={`charades-active-chip color-${teams[i].color}`}
+                          onClick={() => {
+                            const pts = resolvePrimaryPositivePoints(round.scoring, { allowSteal: false, fallback: 3 })
+                            onAdjust(i, pts)
+                          }}
+                          title={`Award ${teams[i].name} correct answer points`}
+                        >
+                          {teams[i].name}
+                        </button>
+                      ))}
+                      <span className="charades-active-label">are up</span>
+                    </div>
+                    <CharadesBody key={question.id} question={question} timerPaused={pauseTimers} />
+                  </div>
+                )}
+                {isThesis && (
+                  <div className="qv-thesis-shell">
+                    <div className="charades-active-teams">
+                      {[...activePair].map(i => (
+                        <button
+                          key={i}
+                          className={`charades-active-chip color-${teams[i].color}`}
+                          onClick={() => {
+                            const pts = resolvePrimaryPositivePoints(round.scoring, { allowSteal: true, fallback: 3 })
+                            onAdjust(i, pts)
+                            setCorrectGiven(true)
+                          }}
+                          title={`Award ${teams[i].name} majority vote points`}
+                        >
+                          {teams[i].name}
+                        </button>
+                      ))}
+                      <span className="charades-active-label">is up</span>
+                    </div>
+                    <ThesisBody key={question.id} question={question} timerPaused={pauseTimers} />
+                  </div>
+                )}
+                {hostlessModeActive && (
+                  <div className="qv-hostless-under-media">
+                    <div className="qv-hostless-state">
+                      {answerState?.status === 'open' ? 'Answer submissions are open.' : 'Question locked.'}
+                    </div>
+                    {showHostlessTimer && (
+                      <Timer
+                        key={`hostless-${hostlessTimerQuestionId}`}
+                        seconds={30}
+                        autoStart
+                        showControls={false}
+                        soundEnabled={!isVideoRound}
+                        forcePaused={pauseTimers}
+                        onExpire={() => {
+                          if (!showHostlessTimer) return
+                          return onTimerExpired?.(hostlessTimerQuestionId) ?? false
+                        }}
+                      />
+                    )}
+                    {hostlessAttemptFeed.length > 0 && (
+                      <div className="qv-hostless-feed" aria-live="polite">
+                        {hostlessAttemptFeed.slice(-4).map((attempt, index) => (
+                          <div key={`${attempt.timestamp || 0}-${index}`} className="qv-hostless-attempt">
+                            <strong>{attempt.team?.name || 'Team'}</strong>
+                            {attempt.memberName ? ` · ${attempt.memberName}` : ''}
+                            {` guessed "${attempt.guess}"`}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
       </div>
 
       {/* ── Arm row ──────────────────────────────────── */}
-      {hostlessModeActive ? (
-        <div className="qv-hostless-row">
-          <div className="qv-hostless-state">
-            {answerState?.status === 'open' ? 'Answer submissions are open.' : 'Question locked.'}
-          </div>
-          {answerState?.status === 'open' && (
-            <Timer
-              key={`hostless-${String(answerState?.questionId || question?.id || '')}`}
-              seconds={30}
-              autoStart
-              showControls={false}
-              onExpire={() => {
-                if (answerState?.status !== 'open' || answerState?.winner) return
-                onTimerExpired?.()
-              }}
-            />
-          )}
-          {hostlessAttemptFeed.length > 0 && (
-            <div className="qv-hostless-feed" aria-live="polite">
-              {hostlessAttemptFeed.slice(-4).map((attempt, index) => (
-                <div key={`${attempt.timestamp || 0}-${index}`} className="qv-hostless-attempt">
-                  <strong>{attempt.team?.name || 'Team'}</strong>
-                  {attempt.memberName ? ` · ${attempt.memberName}` : ''}
-                  {` guessed "${attempt.guess}"`}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
+      {!hostlessModeActive && (
         <div className="qv-arm-row arm-row">
           <button
             className={`double-pts-btn${doublePoints ? ' active' : ''}`}

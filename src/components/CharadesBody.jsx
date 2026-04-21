@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import Timer from './Timer'
 
-export default function CharadesBody({ question }) {
+export default function CharadesBody({ question, timerPaused = false }) {
   const [revealed, setRevealed] = useState(false)
   return (
     <div className="qv-charades-wrap">
       <div className="qv-charades-label">Guess the Phrase before time runs out</div>
-      <Timer seconds={60} />
+      <Timer seconds={60} forcePaused={timerPaused} />
       {!revealed ? (
         <button className="qv-reveal-btn" onClick={() => setRevealed(true)}>Reveal Phrase ▼</button>
       ) : (

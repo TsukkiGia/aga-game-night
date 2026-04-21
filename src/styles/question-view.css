@@ -237,6 +237,57 @@
   min-height: 0;
 }
 
+.qv-body-stack {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.qv-body-stack.hostless {
+  width: min(100%, 980px);
+  justify-content: center;
+  gap: 10px;
+  margin: 0 auto;
+}
+
+.qv-hostless-under-media {
+  width: min(100%, 820px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.qv-hostless-countdown-screen {
+  width: min(100%, 980px);
+  min-height: min(62vh, 620px);
+  border-radius: 24px;
+  background: #000;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+}
+.qv-hostless-countdown-label {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+}
+.qv-hostless-countdown-value {
+  font-size: clamp(84px, 16vw, 190px);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+}
+
 /* Arm row inside question view */
 .qv-arm-row {
   padding: 16px 24px;
@@ -527,10 +578,31 @@
   align-items: safe center;
 }
 
+.qv-main .qv-body:has(.qv-body-stack.hostless) {
+  align-items: safe center;
+  padding: 12px 24px;
+}
+
 /* Media rounds: tighter padding so content fills available height */
 .qv-main .qv-body:has(.qv-custom-image-shell),
 .qv-main .qv-body:has(.qv-video-wrap) {
   padding: 16px 24px;
+}
+
+.qv-hostless-under-media .qv-timer {
+  gap: 6px;
+}
+
+.qv-hostless-under-media .qv-timer-display {
+  font-size: clamp(42px, 5.4vh, 54px);
+}
+
+.qv-hostless-under-media .qv-timer-bar-track {
+  width: min(280px, 56vw);
+}
+
+.qv-hostless-under-media .qv-hostless-feed {
+  justify-content: center;
 }
 
 .qv-empty-state {

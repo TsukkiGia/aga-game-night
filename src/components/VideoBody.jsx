@@ -1,16 +1,32 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { playTransition } from '../sounds'
 import PromptMediaElement from './PromptMediaElement'
 import { cleanUrl, resolveVideoSource } from '../utils/mediaPrompt'
 
-export default function VideoBody({ question, paused, allowReveal = true }) {
+export default function VideoBody({ question, paused, allowReveal = true, autoplayTrigger = 0 }) {
   const videoRef = useRef(null)
   const iframeRef = useRef(null)
+  const lastAutoplayTriggerRef = useRef(0)
   const [revealed, setRevealed] = useState(false)
   const [loadError, setLoadError] = useState('')
   const videoPath = cleanUrl(question.video)
   const videoSource = resolveVideoSource(videoPath, { localVideoBasePath: '/videos' })
   const isYouTube = videoSource?.kind === 'youtube'
+  const shouldAutoplay = (Number(autoplayTrigger) || 0) > 0
+
+  const requestAutoplay = useCallback(() => {
+    if (paused) return
+    if (isYouTube) {
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
+        '*'
+      )
+      return
+    }
+    const el = videoRef.current
+    if (!el) return
+    el.play().catch(() => {})
+  }, [paused, isYouTube])
 
   useEffect(() => {
     if (!paused) return
@@ -25,6 +41,14 @@ export default function VideoBody({ question, paused, allowReveal = true }) {
     if (!el) return
     el.pause()
   }, [paused, isYouTube])
+
+  useEffect(() => {
+    const trigger = Number(autoplayTrigger) || 0
+    if (trigger <= 0) return
+    if (trigger === lastAutoplayTriggerRef.current) return
+    lastAutoplayTriggerRef.current = trigger
+    requestAutoplay()
+  }, [autoplayTrigger, requestAutoplay])
 
   function handleVideoError() {
     if (!videoSource) {
@@ -58,10 +82,12 @@ export default function VideoBody({ question, paused, allowReveal = true }) {
             mediaUrl={videoPath}
             localVideoBasePath="/videos"
             iframeRef={iframeRef}
-            iframeClassName="qv-video-yt-frame"
-            iframeTitle={question?.id || 'YouTube video'}
-            onIframeError={handleVideoError}
-          />
+          iframeClassName="qv-video-yt-frame"
+          iframeTitle={question?.id || 'YouTube video'}
+          youtubeAutoplay={shouldAutoplay}
+          onIframeLoad={requestAutoplay}
+          onIframeError={handleVideoError}
+        />
         </div>
       ) : (
         <PromptMediaElement
@@ -71,6 +97,9 @@ export default function VideoBody({ question, paused, allowReveal = true }) {
           videoRef={videoRef}
           videoClassName="qv-video"
           controls
+          autoPlay={shouldAutoplay}
+          playsInline
+          onVideoLoadedData={requestAutoplay}
           onVideoError={handleVideoError}
         />
       )}

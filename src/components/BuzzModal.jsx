@@ -10,18 +10,14 @@ const REVEAL_ANSWER_CONFIG = {
   'custom-buzz': { label: 'Answer',  getText: (q) => q.answer, showExplanation: true },
 }
 
-function scoringPhase(entry) {
-  const explicit = String(entry?.phase || '').trim().toLowerCase()
-  if (explicit === 'steal' || explicit === 'normal') return explicit
-  const label = String(entry?.label || '').trim().toLowerCase()
-  return label.includes('steal') ? 'steal' : 'normal'
-}
-
 export default function BuzzModal({
   buzzWinner, teams, round, question,
   stealMode, doublePoints, stealAllowedTeamIndices = null,
   onAdjust, onDismiss, onWrongAndSteal, timerControlSignal, onTimerExpired,
 }) {
+  const isVideoQuestion = round?.type === 'video'
+    || (round?.type === 'custom-buzz' && String(question?.promptType || '').trim().toLowerCase() === 'video')
+  const timerSoundEnabled = !isVideoQuestion
   const [revealedInModal, setRevealedInModal] = useState(false)
   const [revealedCountry, setRevealedCountry] = useState(false)
   const [buzzCountdown, setBuzzCountdown] = useState(null)
@@ -45,15 +41,15 @@ export default function BuzzModal({
       count--
       setBuzzCountdown(count)
       if (count > 0) {
-        playTick()
+        if (timerSoundEnabled) playTick()
       } else {
         stopTick()
-        playTimeUp()
+        if (timerSoundEnabled) playTimeUp()
         clearInterval(buzzCountdownRef.current)
         onTimerExpiredRef.current?.()
       }
     }, 1000)
-  }, [])
+  }, [timerSoundEnabled])
 
   useEffect(() => {
     if (!buzzWinner || buzzWinner.manual) { setBuzzCountdown(null); return }
@@ -86,6 +82,18 @@ export default function BuzzModal({
 
   if (!buzzWinner?.team) return null
 
+  const scoring = round.scoring || {}
+  const correctLabel = scoring.correctLabel || 'Correct answer'
+  const wrongLabel = scoring.wrongLabel || 'Wrong answer'
+
+  function handleScore(points, entryKind, bonus = null) {
+    stopCountdown()
+    onAdjust(buzzWinner.teamIndex, points)
+    const outcome = getRevealOutcome({ roundType: round.type, entryKind, bonus })
+    if (outcome.revealCountry) setRevealedCountry(true)
+    if (outcome.revealAnswer) setRevealedInModal(true)
+  }
+
   return (
     <div className="buzz-overlay" onClick={handleDismiss}>
       <div
@@ -106,39 +114,49 @@ export default function BuzzModal({
         </div>
         <div className="buzz-popup-score">Current Score: {teams[buzzWinner.teamIndex]?.score ?? 0} pts</div>
         <div className="buzz-popup-scoring">
-          {(round.scoring || [])
-            .filter((entry) => {
-              const isStealEntry = scoringPhase(entry) === 'steal'
-              return stealMode ? isStealEntry : !isStealEntry
-            })
-            .map(({ label, points }) => {
-              const displayPoints = doublePoints ? points * 2 : points
-              return (
-                <button
-                  key={label}
-                  className={`buzz-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
-                  onClick={() => {
-                    stopCountdown()
-                    onAdjust(buzzWinner.teamIndex, points)
-                    const outcome = getRevealOutcome({
-                      roundType: round.type,
-                      label,
-                      points,
-                      stealMode,
-                    })
-                    if (outcome.revealCountry) setRevealedCountry(true)
-                    if (outcome.revealAnswer) setRevealedInModal(true)
-                  }}
-                  title={label}
-                >
-                  <span className="buzz-pts-label">{label}</span>
-                  <span className="buzz-pts-value">{displayPoints > 0 ? `+${displayPoints}` : displayPoints}</span>
-                </button>
-              )
-            })}
+          {stealMode ? (
+            <>
+              <ScoringButton
+                label="Correct steal"
+                points={scoring.correctStealPoints ?? 2}
+                doublePoints={doublePoints}
+                onClick={() => handleScore(scoring.correctStealPoints ?? 2, 'correct-steal')}
+              />
+              <ScoringButton
+                label="Wrong steal"
+                points={scoring.wrongStealPoints ?? 0}
+                doublePoints={doublePoints}
+                onClick={() => handleScore(scoring.wrongStealPoints ?? 0, 'wrong-steal')}
+              />
+            </>
+          ) : (
+            <>
+              <ScoringButton
+                label={correctLabel}
+                points={scoring.correctPoints ?? 3}
+                doublePoints={doublePoints}
+                onClick={() => handleScore(scoring.correctPoints ?? 3, 'correct')}
+              />
+              {(scoring.bonuses || []).map((bonus) => (
+                <ScoringButton
+                  key={bonus.label}
+                  label={bonus.label}
+                  points={bonus.points}
+                  doublePoints={doublePoints}
+                  onClick={() => handleScore(bonus.points, 'bonus', bonus)}
+                />
+              ))}
+              <ScoringButton
+                label={wrongLabel}
+                points={scoring.wrongPoints ?? -1}
+                doublePoints={doublePoints}
+                onClick={() => handleScore(scoring.wrongPoints ?? -1, 'wrong')}
+              />
+            </>
+          )}
         </div>
 
-        {!stealMode && (round.scoring || []).some((entry) => scoringPhase(entry) === 'steal') && (
+        {!stealMode && scoring.stealEnabled !== false && (
           <button
             className="buzz-steal-btn"
             onClick={() => {
@@ -179,5 +197,19 @@ export default function BuzzModal({
         })()}
       </div>
     </div>
+  )
+}
+
+function ScoringButton({ label, points, doublePoints, onClick }) {
+  const display = doublePoints ? points * 2 : points
+  return (
+    <button
+      className={`buzz-pts-btn ${points > 0 ? 'pos' : 'neg'}`}
+      onClick={onClick}
+      title={label}
+    >
+      <span className="buzz-pts-label">{label}</span>
+      <span className="buzz-pts-value">{display > 0 ? `+${display}` : display}</span>
+    </button>
   )
 }

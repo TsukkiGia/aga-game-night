@@ -589,24 +589,44 @@ export function registerHostSocketHandlers(socket, ctx) {
     respond({ ok: true })
   })
 
-  socket.on('host:timer:expired', async () => {
-    if (!isHostController(socket)) return
+  socket.on('host:timer:expired', async (arg1, arg2) => {
+    const payload = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}
+    const respond = typeof arg1 === 'function' ? arg1 : (typeof arg2 === 'function' ? arg2 : () => {})
+    if (!isHostController(socket)) {
+      respond({ ok: false, accepted: false, error: 'unauthorized' })
+      return
+    }
     const code = socket.data.sessionCode
+    const timerQuestionId = String(payload.questionId || '').trim()
     let st
     try {
       st = await ensureState(code)
     } catch (err) {
       console.error('[host:timer:expired]', err)
+      respond({ ok: false, accepted: false, error: 'server-error' })
       return
     }
-    if (!st) return
+    if (!st) {
+      respond({ ok: false, accepted: false, error: 'session-not-found' })
+      return
+    }
     if (isHostlessMode(st.gameplayMode)) {
       const context = resolveHostlessQuestionContext(st)
-      if (context.itemType !== 'question' || !context.cursorId) return
+      if (context.itemType !== 'question' || !context.cursorId) {
+        respond({ ok: true, accepted: false, reason: 'no-active-question' })
+        return
+      }
+      if (timerQuestionId && timerQuestionId !== context.cursorId) {
+        respond({ ok: true, accepted: false, reason: 'stale-question-id' })
+        return
+      }
       if (String(st?.answerState?.questionId || '') !== context.cursorId) {
         resetAnswerStateForCursor(st)
       }
-      if (st?.answerState?.status !== 'open' || st?.answerState?.winner) return
+      if (st?.answerState?.status !== 'open' || st?.answerState?.winner) {
+        respond({ ok: true, accepted: false, reason: 'question-locked' })
+        return
+      }
 
       const existingAttempts = Array.isArray(st?.answerState?.recentAttempts)
         ? st.answerState.recentAttempts
@@ -628,6 +648,7 @@ export function registerHostSocketHandlers(socket, ctx) {
       io.to(`${code}:members`).emit('answer:timeout', timeoutPayload)
       broadcastAnswerState(code, st)
       persistRuntimeStateInBackground(code, st)
+      respond({ ok: true, accepted: true })
       return
     }
     // Timer expiry should stop countdown flow, but keep current buzz winner
@@ -638,6 +659,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     st.attemptedSocketIds = new Set()
     io.to(hostRoom(code)).emit('host:timer:expired')
     persistRuntimeStateInBackground(code, st)
+    respond({ ok: true, accepted: true })
   })
 
   // ── Buzzers ─────────────────────────────────────────────────────────

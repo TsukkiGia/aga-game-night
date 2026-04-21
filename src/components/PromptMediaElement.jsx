@@ -13,9 +13,11 @@ export default function PromptMediaElement({
   iframeReferrerPolicy = 'strict-origin-when-cross-origin',
   loading = undefined,
   controls = true,
+  autoPlay = false,
   muted = false,
   playsInline = false,
   videoPreload = 'metadata',
+  youtubeAutoplay = false,
   imageRef = null,
   videoRef = null,
   iframeRef = null,
@@ -46,7 +48,7 @@ export default function PromptMediaElement({
   }
 
   if (normalizedType !== 'video') return null
-  const videoSource = resolveVideoSource(url, { localVideoBasePath })
+  const videoSource = resolveVideoSource(url, { localVideoBasePath, autoplay: youtubeAutoplay })
   if (!videoSource) return null
 
   if (videoSource.kind === 'youtube') {
@@ -72,6 +74,7 @@ export default function PromptMediaElement({
       className={videoClassName}
       src={videoSource.src}
       controls={controls}
+      autoPlay={autoPlay}
       muted={muted}
       playsInline={playsInline}
       preload={videoPreload}
