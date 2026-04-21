@@ -10,12 +10,13 @@ export default {
     'Wrong answer: -3',
     'After a miss, one steal is available (+2 / 0)',
   ],
-  scoring: [
-    { label: 'Correct answer', points: 3, phase: 'normal' },
-    { label: 'Wrong answer', points: -3, phase: 'normal' },
-    { label: 'Correct steal', points: 2, phase: 'steal' },
-    { label: 'Wrong steal', points: 0, phase: 'steal' },
-  ],
+  scoring: {
+    correctPoints: 3,
+    wrongPoints: -3,
+    stealEnabled: true,
+    correctStealPoints: 2,
+    wrongStealPoints: 0,
+  },
   questions: [
     {
       id: 'bna-01',

@@ -11,6 +11,7 @@ import africanSkylines from './rounds/africanSkylines.js'
 import beforeAndAfter from './rounds/beforeAndAfter.js'
 import africanHistory from './rounds/africanHistory.js'
 import whoAmI from './rounds/whoAmI.js'
+import nollywoodActors from './rounds/nollywoodActors.js'
 import nameTheCountry from './rounds/nameTheCountry.js'
 import slangBee         from './rounds/slangBee.js'
 import thesisTranslator from './rounds/thesisTranslator.js'
@@ -25,6 +26,7 @@ const rounds = [
   beforeAndAfter,
   africanHistory,
   whoAmI,
+  nollywoodActors,
   nameTheCountry,
   flagTriviaDescriptions,
   charades,

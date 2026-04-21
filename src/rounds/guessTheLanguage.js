@@ -10,13 +10,15 @@ export default {
     'A steal is always available after any answer — +2 correct, no penalty for wrong steal. You can only steal with a language guess.',
     'Host reveals the answer with a short explanation',
   ],
-  scoring: [
-    { label: 'Correct language', points: 3 },
-    { label: 'Correct country',  points: 1 },
-    { label: 'Wrong answer',  points: -1 },
-    { label: 'Correct steal',    points: 2 },
-    { label: 'Wrong steal',      points: 0 },
-  ],
+  scoring: {
+    correctPoints: 3,
+    correctLabel: 'Correct language',
+    wrongPoints: -1,
+    stealEnabled: true,
+    correctStealPoints: 2,
+    wrongStealPoints: 0,
+    bonuses: [{ label: 'Correct country', points: 1, revealCountry: true }],
+  },
   questions: [
     {
       id: 'gtl-yoruba',

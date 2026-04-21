@@ -11,12 +11,13 @@ export default {
     'If time runs out, one steal is open — buzz in to attempt',
     'Correct steal: +2 pts — wrong steal: no penalty',
   ],
-  scoring: [
-    { label: 'Correct answer', points: 3 },
-    { label: 'Wrong answer',  points: 0 },
-    { label: 'Correct steal',  points: 2 },
-    { label: 'Wrong steal',    points: 0 },
-  ],
+  scoring: {
+    correctPoints: 3,
+    wrongPoints: 0,
+    stealEnabled: true,
+    correctStealPoints: 2,
+    wrongStealPoints: 0,
+  },
   questions: [
     { id: 'c1', phrase: 'Braiding Hair' },
     { id: 'c2', phrase: 'Azonto Dance' },

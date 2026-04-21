@@ -11,10 +11,13 @@ export default {
     '90 seconds — timer starts when the title is revealed',
     'Crowd votes on the best translation — winning team gets +3 pts',
   ],
-  scoring: [
-    { label: 'Funny', points: 3 },
-    { label: 'Not Funny',  points: 0 },
-  ],
+  scoring: {
+    correctPoints: 3,
+    correctLabel: 'Funny',
+    wrongPoints: 0,
+    wrongLabel: 'Not Funny',
+    stealEnabled: false,
+  },
   questions: [
     {
       id: 'r4q1',

@@ -10,13 +10,15 @@ export default {
     'Wrong answer is -1',
     'After a wrong answer, a steal is available (+2 for correct steal, 0 for wrong steal)',
   ],
-  scoring: [
-    { label: 'Correct song', points: 3 },
-    { label: 'Correct artist', points: 1 },
-    { label: 'Wrong answer', points: -1 },
-    { label: 'Correct steal', points: 2 },
-    { label: 'Wrong steal', points: 0 },
-  ],
+  scoring: {
+    correctPoints: 3,
+    correctLabel: 'Correct song',
+    wrongPoints: -1,
+    stealEnabled: true,
+    correctStealPoints: 2,
+    wrongStealPoints: 0,
+    bonuses: [{ label: 'Correct artist', points: 1 }],
+  },
   questions: [
     {
       id: 'gts-last-last',

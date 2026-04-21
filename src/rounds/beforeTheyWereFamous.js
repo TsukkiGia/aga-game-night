@@ -10,12 +10,14 @@ export default {
     'Wrong answer: -1',
     'After a miss, one steal is available (+2 / 0)',
   ],
-  scoring: [
-    { label: 'Correct artist', points: 3, phase: 'normal' },
-    { label: 'Wrong answer', points: -1, phase: 'normal' },
-    { label: 'Correct steal', points: 2, phase: 'steal' },
-    { label: 'Wrong steal', points: 0, phase: 'steal' },
-  ],
+  scoring: {
+    correctPoints: 3,
+    correctLabel: 'Correct artist',
+    wrongPoints: -1,
+    stealEnabled: true,
+    correctStealPoints: 2,
+    wrongStealPoints: 0,
+  },
   questions: [
     {
       id: 'btwf-01',
