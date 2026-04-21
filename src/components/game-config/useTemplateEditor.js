@@ -3,7 +3,7 @@ import {
   CUSTOM_ROUND_TYPE,
   normalizeRoundCatalog,
   templateToRound,
-} from '../../roundCatalog'
+} from '../../core/roundCatalog'
 import { mediaUrlFeedback } from '../../utils/mediaPrompt'
 import { DEFAULT_QUESTION, DEFAULT_SCORING } from './constants'
 import { buildEditorSnapshot, cloneJson } from './helpers'

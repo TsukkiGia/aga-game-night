@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { isCustomTemplateRound, templateToRound } from '../../roundCatalog'
+import { isCustomTemplateRound, templateToRound } from '../../core/roundCatalog'
 
 export function useTemplateLibrary({ session, initialCatalog }) {
   const [customTemplates, setCustomTemplates] = useState(() =>

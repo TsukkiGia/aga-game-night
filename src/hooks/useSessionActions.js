@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { socket } from '../socket'
-import { clearAll, clearHostCredentials } from '../storage'
+import { socket } from '../core/socket'
+import { clearAll, clearHostCredentials } from '../core/storage'
 
 export function useSessionActions({ invalidateAuth, clearDoublePoints, handleDismiss, resetStats, onReset, onEndSession }) {
   const [startingNewGame, setStartingNewGame] = useState(false)

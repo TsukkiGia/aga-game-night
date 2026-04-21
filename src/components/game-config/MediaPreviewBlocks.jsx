@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import PromptMediaElement from '../PromptMediaElement'
+import PromptMediaElement from '../question-bodies/PromptMediaElement'
 import { cleanUrl, isCountryOutlineImageUrl } from '../../utils/mediaPrompt'
 
 export function MediaPreview({ promptType, mediaUrl }) {

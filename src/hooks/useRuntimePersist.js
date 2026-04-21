@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { socket } from '../socket'
-import { normalizeReactionStats } from '../reactionStats'
+import { socket } from '../core/socket'
+import { normalizeReactionStats } from '../core/reactionStats'
 
 const TIMEOUT_MS    = 3000
 const RETRY_BASE_MS = 600

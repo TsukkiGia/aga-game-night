@@ -1,5 +1,5 @@
-import ModalShell from '../ModalShell'
-import ModalHeader from '../ModalHeader'
+import ModalShell from '../ui/ModalShell'
+import ModalHeader from '../ui/ModalHeader'
 
 export default function BrowseTemplatesModal({
   items = [],

@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
-import { SCORES_KEY, DONE_KEY, loadScores, loadDone, clearAll, setStorageItem } from '../storage'
-import { playCorrect, playWrong } from '../sounds'
-import rounds from '../rounds'
-import { buildPlanCatalog, normalizeDoneQuestionIds, questionItemIdFor } from '../gamePlan'
-import { normalizeRoundCatalog } from '../roundCatalog'
+import { SCORES_KEY, DONE_KEY, loadScores, loadDone, clearAll, setStorageItem } from '../core/storage'
+import { playCorrect, playWrong } from '../core/sounds'
+import rounds from '../core/rounds'
+import { buildPlanCatalog, normalizeDoneQuestionIds, questionItemIdFor } from '../core/gamePlan'
+import { normalizeRoundCatalog } from '../core/roundCatalog'
 
 const STREAK_THRESHOLD = 3
 const DEFAULT_ROUND_CATALOG = normalizeRoundCatalog(rounds)

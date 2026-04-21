@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { playTransition } from '../sounds'
-import { ACTIVE_QUESTION_KEY, normalizeQuestionCursor, getStorageItem, setStorageItem } from '../storage'
+import { playTransition } from '../core/sounds'
+import { ACTIVE_QUESTION_KEY, normalizeQuestionCursor, getStorageItem, setStorageItem } from '../core/storage'
 
 function loadActiveQuestion() {
   try {

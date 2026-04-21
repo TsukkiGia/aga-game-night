@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import rounds from '../src/rounds.js'
+import rounds from '../src/core/rounds.js'
 import {
   buildPlanCatalog,
   defaultPlanIds,
@@ -10,7 +10,7 @@ import {
   resolveEffectivePlanForSync,
   legacyPairToItemId,
   questionItemIdFor,
-} from '../src/gamePlan.js'
+} from '../src/core/gamePlan.js'
 
 const catalog = buildPlanCatalog(rounds)
 

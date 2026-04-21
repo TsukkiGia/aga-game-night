@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mapHostAuthError } from '../src/auth.js'
+import { mapHostAuthError } from '../src/core/auth.js'
 
 test('mapHostAuthError returns user-facing auth messages', () => {
   assert.equal(

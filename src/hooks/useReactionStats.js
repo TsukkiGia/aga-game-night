@@ -3,7 +3,7 @@ import {
   clearQuestionLastFromReactionStats,
   normalizeReactionStats,
   updateReactionStatsWithAttempt,
-} from '../reactionStats'
+} from '../core/reactionStats'
 import { questionPreviewHeadline } from '../components/game-config/helpers'
 
 export function useReactionStats({ activeItem, planDisplay, roundCatalog }) {

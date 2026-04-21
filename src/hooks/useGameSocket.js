@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { socket } from '../socket'
-import { playBuzzIn, playArm, playSoundBiteByKey, unlockAudio } from '../sounds'
-import { mapHostAuthError } from '../auth'
-import { clearHostCredentials, readHostCredentials, writeHostCredentials } from '../storage'
-import { normalizeGameplayMode } from '../gameplayMode'
+import { socket } from '../core/socket'
+import { playBuzzIn, playArm, playSoundBiteByKey, unlockAudio } from '../core/sounds'
+import { mapHostAuthError } from '../core/auth'
+import { clearHostCredentials, readHostCredentials, writeHostCredentials } from '../core/storage'
+import { normalizeGameplayMode } from '../core/gameplayMode'
 
 export function useGameSocket(initialTeams, options = {}) {
   const onBuzzWinner = typeof options.onBuzzWinner === 'function' ? options.onBuzzWinner : null

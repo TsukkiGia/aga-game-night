@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import rounds from '../src/rounds.js'
-import { buildPlanCatalog } from '../src/gamePlan.js'
+import rounds from '../src/core/rounds.js'
+import { buildPlanCatalog } from '../src/core/gamePlan.js'
 import { buildHealthyDefaultSelection } from '../src/components/game-config/helpers.js'
 
 test('healthy default selection targets language/slang/flag rounds only with balanced counts', () => {

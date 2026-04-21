@@ -17,6 +17,20 @@ export function leaveTeamRooms(socket, code, teamCount, memberTeamRoom) {
 }
 
 export function broadcastMembers(io, hostRoom, code, st) {
-  const memberNames = st.teams.map((_, i) => Object.values(st.members[i] || {}))
+  const memberNames = st.teams.map((_, i) => {
+    const roster = st.members[i]
+    if (!roster || typeof roster !== 'object') return []
+    const seenNames = new Set()
+    const dedupedNames = []
+    for (const rawName of Object.values(roster)) {
+      const displayName = String(rawName || '').trim()
+      if (!displayName) continue
+      const key = displayName.toLowerCase()
+      if (seenNames.has(key)) continue
+      seenNames.add(key)
+      dedupedNames.push(displayName)
+    }
+    return dedupedNames
+  })
   io.to(hostRoom(code)).emit('host:members', memberNames)
 }

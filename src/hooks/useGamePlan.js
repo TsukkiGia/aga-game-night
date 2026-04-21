@@ -3,7 +3,7 @@ import {
   normalizePlanIdsWithRoundIntros,
   normalizeCursorId,
   questionItemIdFor,
-} from '../gamePlan'
+} from '../core/gamePlan'
 
 export function useGamePlan({ gamePlanIds, planCatalog, roundCatalog, activeQuestion, transition }) {
   const normalizedPlanIds = useMemo(

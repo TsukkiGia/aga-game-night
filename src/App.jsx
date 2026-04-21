@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from 'react'
-import Setup from './components/Setup'
-import Scoreboard from './components/Scoreboard'
-import BuzzerPage from './components/BuzzerPage'
-import HostMobilePage from './components/HostMobilePage'
-import SessionGate from './components/SessionGate'
-import SplashScreen from './components/SplashScreen'
-import GameConfig from './components/GameConfig'
-import GamePlanPreview from './components/GamePlanPreview'
-import CompanionSetup from './components/CompanionSetup'
-import SetupProgress from './components/SetupProgress'
+import Setup from './components/setup-flow/Setup'
+import Scoreboard from './components/pages/Scoreboard'
+import BuzzerPage from './components/pages/BuzzerPage'
+import HostMobilePage from './components/pages/HostMobilePage'
+import SessionGate from './components/setup-flow/SessionGate'
+import SplashScreen from './components/setup-flow/SplashScreen'
+import GameConfig from './components/setup-flow/GameConfig'
+import GamePlanPreview from './components/setup-flow/GamePlanPreview'
+import CompanionSetup from './components/setup-flow/CompanionSetup'
+import SetupProgress from './components/setup-flow/SetupProgress'
 import {
   TEAMS_KEY,
   GAME_PLAN_KEY,
@@ -21,13 +21,13 @@ import {
   normalizeSavedTeams,
   getStorageItem,
   setStorageItem,
-} from './storage'
-import { normalizeGameplayMode, isHostlessMode } from './gameplayMode'
+} from './core/storage'
+import { normalizeGameplayMode, isHostlessMode } from './core/gameplayMode'
 import { useWakeLock } from './hooks/useWakeLock'
-import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong, playHelloGetDown, playOhNoNo, playDontProvokeMe, playWhyAreYouRunning } from './sounds'
-import rounds from './rounds'
-import { buildPlanCatalog, normalizePlanIdsWithRoundIntros } from './gamePlan'
-import { normalizeRoundCatalog } from './roundCatalog'
+import { playCrickets, playFaaah, playCorrectAnswer, playNani, playWhatTheHell, playShocked, playAirhorn, playBoo, playLaughter, playOkayy, playVeryWrong, playHelloGetDown, playOhNoNo, playDontProvokeMe, playWhyAreYouRunning } from './core/sounds'
+import rounds from './core/rounds'
+import { buildPlanCatalog, normalizePlanIdsWithRoundIntros } from './core/gamePlan'
+import { normalizeRoundCatalog } from './core/roundCatalog'
 import './App.css'
 
 const pathname = window.location.pathname

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { questionPreviewMedia } from './helpers'
 import { isCountryOutlineImageUrl } from '../../utils/mediaPrompt'
-import PromptMediaElement from '../PromptMediaElement'
-import CloseIconButton from '../CloseIconButton'
-import ModalShell from '../ModalShell'
+import PromptMediaElement from '../question-bodies/PromptMediaElement'
+import CloseIconButton from '../ui/CloseIconButton'
+import ModalShell from '../ui/ModalShell'
 
 const PREVIEW_PAGE_SIZE = 8
 const PREVIEW_MEDIA_OBSERVER_MARGIN = '220px'

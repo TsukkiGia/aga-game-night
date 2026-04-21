@@ -1,4 +1,4 @@
-import { isCustomTemplateRound } from '../../roundCatalog'
+import { isCustomTemplateRound } from '../../core/roundCatalog'
 
 export default function RoundSidebar({
   gameplayMode,

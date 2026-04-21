@@ -1,5 +1,5 @@
-import { buildPlanCatalog, defaultPlanIds, normalizePlanIdsWithRoundIntros } from '../../gamePlan.js'
-import { CUSTOM_ROUND_TYPE } from '../../roundCatalog.js'
+import { buildPlanCatalog, defaultPlanIds, normalizePlanIdsWithRoundIntros } from '../../core/gamePlan.js'
+import { CUSTOM_ROUND_TYPE } from '../../core/roundCatalog.js'
 import { cleanUrl } from '../../utils/mediaPrompt.js'
 import { normalizeScoringConfig } from '../../utils/scoring.js'
 

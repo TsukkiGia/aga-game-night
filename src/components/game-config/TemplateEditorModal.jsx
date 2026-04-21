@@ -3,10 +3,10 @@ import { mediaUrlFeedback } from '../../utils/mediaPrompt'
 import { DEFAULT_QUESTION } from './constants'
 import { cloneJson } from './helpers'
 import { MediaPreview } from './MediaPreviewBlocks'
-import CloseIconButton from '../CloseIconButton'
-import ModalShell from '../ModalShell'
-import ModalHeader from '../ModalHeader'
-import IconRemoveButton from '../IconRemoveButton'
+import CloseIconButton from '../ui/CloseIconButton'
+import ModalShell from '../ui/ModalShell'
+import ModalHeader from '../ui/ModalHeader'
+import IconRemoveButton from '../ui/IconRemoveButton'
 
 function PointsInput({ value, onChange }) {
   const [draft, setDraft] = useState(null)

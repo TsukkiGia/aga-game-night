@@ -15,7 +15,7 @@ import {
   setStorageItem,
   saveBuzzerIdentity,
   writeHostCredentials,
-} from '../src/storage.js'
+} from '../src/core/storage.js'
 
 function createLocalStorageMock() {
   const store = new Map()
