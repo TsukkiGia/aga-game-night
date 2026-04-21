@@ -69,7 +69,6 @@ export function setStorageItem(baseKey, value) {
 export function removeStorageItem(baseKey) {
   try {
     localStorage.removeItem(scopedKey(baseKey))
-    localStorage.removeItem(baseKey) // legacy key cleanup
   } catch {
     // Ignore storage failures.
   }

@@ -10,7 +10,6 @@ const TYPE_LABEL = {
 }
 
 function isQuestionDone(doneQuestions, roundIndex, questionIndex, planCatalog) {
-  if (doneQuestions?.has(`${roundIndex}-${questionIndex}`)) return true
   if (!planCatalog) return false
   const itemId = questionItemIdFor(roundIndex, questionIndex, planCatalog)
   return Boolean(itemId && doneQuestions?.has(itemId))

@@ -11,7 +11,7 @@ test('normalizeRoundCatalog keeps templateId for custom rounds', () => {
       name: 'Custom Round',
       intro: '',
       rules: ['Rule'],
-      scoring: [{ label: 'Correct', points: 3, phase: 'normal' }],
+      scoring: { correctPoints: 3, wrongPoints: -1, stealEnabled: true, correctStealPoints: 2, wrongStealPoints: 0, bonuses: [] },
       questions: [{ id: 'cq-1', promptType: 'text', promptText: 'Prompt', answer: 'Answer' }],
     },
   ])

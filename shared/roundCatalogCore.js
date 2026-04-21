@@ -13,9 +13,6 @@ export function createRoundCatalogNormalizer(options = {}) {
   const maxQuestions = Number.isInteger(options.maxQuestions) && options.maxQuestions > 0 ? options.maxQuestions : 200
   const builtinTypes = toSet(options.builtinRoundTypes, DEFAULT_BUILTIN_TYPES)
   const promptTypes = toSet(options.promptTypes, DEFAULT_PROMPT_TYPES)
-  const legacyScoringLabelMaxLength = Number.isInteger(options.legacyScoringLabelMaxLength) && options.legacyScoringLabelMaxLength > 0
-    ? options.legacyScoringLabelMaxLength
-    : 120
   const customQuestionIdFactory = typeof options.customQuestionIdFactory === 'function'
     ? options.customQuestionIdFactory
     : ((index) => `cq-${index + 1}`)
@@ -105,47 +102,7 @@ export function createRoundCatalogNormalizer(options = {}) {
     }
   }
 
-  function migrateOldScoringArray(arr) {
-    const entries = arr.map((entry) => {
-      if (!entry || typeof entry !== 'object') return null
-      const label = cleanString(entry.label, legacyScoringLabelMaxLength)
-      if (!label) return null
-      const points = cleanInt(entry.points, 0)
-      const phaseRaw = cleanString(entry.phase, 16).toLowerCase()
-      const isSteal = phaseRaw === 'steal' || (!phaseRaw && label.toLowerCase().includes('steal'))
-      return { label, points, isSteal }
-    }).filter(Boolean)
-
-    const stealEntries = entries.filter((entry) => entry.isSteal)
-    const normalEntries = entries.filter((entry) => !entry.isSteal)
-    if (normalEntries.length === 0) return null
-
-    const maxPoints = Math.max(...normalEntries.map((entry) => entry.points))
-    const correctEntry = normalEntries.find((entry) => entry.points === maxPoints) || normalEntries[0]
-    const remaining = normalEntries.filter((entry) => entry !== correctEntry)
-    const wrongEntry = remaining.find((entry) => entry.points < 0) || remaining[remaining.length - 1] || null
-    const bonusEntries = remaining.filter((entry) => entry !== wrongEntry)
-
-    const correctSteal = stealEntries.find((entry) => entry.points > 0) || stealEntries[0] || null
-    const wrongSteal = stealEntries.find((entry) => entry !== correctSteal) || null
-
-    return {
-      correctPoints: correctEntry.points,
-      wrongPoints: wrongEntry ? wrongEntry.points : -1,
-      correctLabel: correctEntry.label !== 'Correct answer' ? correctEntry.label : null,
-      wrongLabel: wrongEntry && wrongEntry.label !== 'Wrong answer' ? wrongEntry.label : null,
-      stealEnabled: stealEntries.length > 0,
-      correctStealPoints: correctSteal ? correctSteal.points : 2,
-      wrongStealPoints: wrongSteal ? wrongSteal.points : 0,
-      bonuses: bonusEntries.map((entry) => ({ label: entry.label, points: entry.points })),
-    }
-  }
-
   function normalizeScoring(rawScoring) {
-    if (Array.isArray(rawScoring)) {
-      const migrated = migrateOldScoringArray(rawScoring)
-      return migrated ? normalizeNewScoring(migrated) : null
-    }
     return normalizeNewScoring(rawScoring)
   }
 

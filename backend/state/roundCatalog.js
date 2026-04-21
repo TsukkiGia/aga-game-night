@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { createRoundCatalogNormalizer, CUSTOM_ROUND_TYPE } from '../../shared/roundCatalogCore.js'
 
 const roundCatalogNormalizer = createRoundCatalogNormalizer({
-  legacyScoringLabelMaxLength: 100,
   customQuestionIdFactory: (index) => `cq-${index + 1}-${randomUUID().slice(0, 8)}`,
 })
 

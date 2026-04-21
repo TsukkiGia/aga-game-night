@@ -56,11 +56,6 @@ export function registerMemberSocketHandlers(socket, ctx) {
 
   // ── Member: get teams ───────────────────────────────────────────────
   socket.on('member:get-teams', async (sessionCode, callback) => {
-    // Support both (sessionCode, callback) and legacy (callback) signatures
-    if (typeof sessionCode === 'function') {
-      callback = sessionCode
-      sessionCode = null
-    }
     const respond = typeof callback === 'function' ? callback : () => {}
     const code = String(sessionCode || '').trim().toUpperCase()
     if (!code) {

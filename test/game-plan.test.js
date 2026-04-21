@@ -8,7 +8,6 @@ import {
   normalizeCursorId,
   normalizeDoneQuestionIds,
   resolveEffectivePlanForSync,
-  legacyPairToItemId,
   questionItemIdFor,
 } from '../src/core/gamePlan.js'
 
@@ -48,22 +47,21 @@ test('normalizePlanIdsWithRoundIntros inserts round intro ahead of selected ques
   assert.deepEqual(normalized, [introId, qId])
 })
 
-test('normalizeCursorId maps legacy pair to item id and enforces plan membership', () => {
-  const mapped = legacyPairToItemId([0, 0], catalog)
-  assert.ok(mapped)
-
-  const included = normalizeCursorId([0, 0], defaultPlanIds(catalog), catalog)
-  assert.equal(included, mapped)
-
+test('normalizeCursorId accepts only cursor ids and enforces plan membership', () => {
+  const qId = questionItemIdFor(0, 0, catalog)
+  const included = normalizeCursorId(qId, defaultPlanIds(catalog), catalog)
+  assert.equal(included, qId)
   const roundIntroOnly = [catalog.introIdByRoundIndex.get(0)]
-  const excluded = normalizeCursorId([0, 0], roundIntroOnly, catalog)
+  const excluded = normalizeCursorId(qId, roundIntroOnly, catalog)
   assert.equal(excluded, null)
+  const legacyPair = normalizeCursorId([0, 0], defaultPlanIds(catalog), catalog)
+  assert.equal(legacyPair, null)
 })
 
-test('normalizeDoneQuestionIds converts legacy done keys and filters invalid/non-question ids', () => {
+test('normalizeDoneQuestionIds keeps only valid question ids', () => {
   const qId = questionItemIdFor(0, 0, catalog)
   const introId = catalog.introIdByRoundIndex.get(0)
-  const normalized = normalizeDoneQuestionIds(['0-0', qId, introId, 'bad', '0-0'], catalog)
+  const normalized = normalizeDoneQuestionIds(['0-0', qId, introId, 'bad', qId], catalog)
 
   assert.deepEqual(normalized, [qId])
 })
@@ -77,7 +75,7 @@ test('plan catalog keeps unique ids with built-in and custom rounds combined', (
       name: 'Custom',
       intro: '',
       rules: ['Rule'],
-      scoring: [{ label: 'Correct', points: 3, phase: 'normal' }],
+      scoring: { correctPoints: 3, wrongPoints: -1, stealEnabled: true, correctStealPoints: 2, wrongStealPoints: 0, bonuses: [] },
       questions: [{ id: 'cq-1', promptType: 'text', promptText: 'Prompt', answer: 'Answer' }],
     },
   ])

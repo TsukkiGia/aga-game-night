@@ -59,7 +59,7 @@ test('snapshot payload reflects edited custom round content immediately', () => 
     name: 'Session Custom Round',
     intro: 'Custom intro',
     rules: ['Rule 1'],
-    scoring: [{ label: 'Correct answer', points: 3, phase: 'normal' }],
+    scoring: { correctPoints: 3, wrongPoints: -1, stealEnabled: true, correctStealPoints: 2, wrongStealPoints: 0, bonuses: [] },
     questions: [{ id: 'cq-1', promptType: 'text', promptText: 'Prompt', answer: 'Old Answer' }],
   }
   const catalogRounds = [customRound]
@@ -74,4 +74,3 @@ test('snapshot payload reflects edited custom round content immediately', () => 
   const after = buildSnapshotPayloadFromSelection({ roundRows, planCatalog, selectedQuestionIds })
   assert.equal(after.roundCatalog[0].questions[0].answer, 'Updated Answer')
 })
-

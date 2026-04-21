@@ -14,7 +14,7 @@ const HOSTLESS_CUSTOM_ROUND = {
   name: 'Host-less custom',
   intro: 'Answer by submitting',
   rules: ['First correct answer scores'],
-  scoring: [{ label: 'Correct', points: 4, phase: 'normal' }],
+  scoring: { correctPoints: 4, wrongPoints: -1, stealEnabled: true, correctStealPoints: 2, wrongStealPoints: 0, bonuses: [] },
   questions: [
     {
       id: 'hcq-1',
@@ -32,7 +32,7 @@ const HOSTLESS_CHARADES_ROUND = {
   name: 'Host-less charades',
   intro: '',
   rules: ['Act it out'],
-  scoring: [{ label: 'Correct', points: 3, phase: 'normal' }],
+  scoring: { correctPoints: 3, wrongPoints: -1, stealEnabled: true, correctStealPoints: 2, wrongStealPoints: 0, bonuses: [] },
   questions: [{ id: 'hc-charades-1', phrase: 'Test phrase' }],
 }
 
@@ -406,10 +406,14 @@ test('template endpoints require host credentials and return created templates',
       intro: 'Name the song',
       type: 'custom-buzz',
       rules: ['Buzz in quickly'],
-      scoring: [
-        { label: 'Correct answer', points: 3, phase: 'normal' },
-        { label: 'Correct steal', points: 2, phase: 'steal' },
-      ],
+      scoring: {
+        correctPoints: 3,
+        wrongPoints: -1,
+        stealEnabled: true,
+        correctStealPoints: 2,
+        wrongStealPoints: 0,
+        bonuses: [],
+      },
       questions: [
         {
           promptType: 'text',
@@ -770,7 +774,7 @@ test('runtime scoreboard state persists and rehydrates after reconnect', async (
           name: 'Custom Round',
           intro: 'Test intro',
           rules: ['Rule 1'],
-          scoring: [{ label: 'Correct', points: 3, phase: 'normal' }],
+          scoring: { correctPoints: 3, wrongPoints: -1, stealEnabled: true, correctStealPoints: 2, wrongStealPoints: 0, bonuses: [] },
           questions: [{ id: 'cq-1', promptType: 'text', promptText: 'Prompt', answer: 'Answer' }],
         },
       ],
@@ -1254,7 +1258,7 @@ test('host:question:get returns round catalog for companion answer view', async 
           name: 'Custom Mobile Round',
           intro: '',
           rules: ['Rule'],
-          scoring: [{ label: 'Correct', points: 3, phase: 'normal' }],
+          scoring: { correctPoints: 3, wrongPoints: -1, stealEnabled: true, correctStealPoints: 2, wrongStealPoints: 0, bonuses: [] },
           questions: [{ id: 'cq-1', promptType: 'text', promptText: 'Prompt', answer: 'Answer' }],
         },
       ],

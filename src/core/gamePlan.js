@@ -123,16 +123,7 @@ export function normalizePlanIdsWithRoundIntros(rawPlan, catalog = DEFAULT_CATAL
   return out.length > 0 ? out : (fallbackToDefault ? defaultPlanIds(catalog) : [])
 }
 
-export function legacyPairToItemId(cursorPair, catalog = DEFAULT_CATALOG) {
-  if (!Array.isArray(cursorPair) || cursorPair.length !== 2) return null
-  const [roundIndex, questionIndex] = cursorPair
-  if (!Number.isInteger(roundIndex) || roundIndex < 0) return null
-  if (questionIndex === null) return catalog.introIdByRoundIndex.get(roundIndex) || null
-  if (!Number.isInteger(questionIndex) || questionIndex < 0) return null
-  return catalog.questionIdByRoundQuestion.get(`${roundIndex}-${questionIndex}`) || null
-}
-
-export function normalizeCursorId(rawCursor, planIds, catalog = DEFAULT_CATALOG) {
+export function normalizeCursorId(rawCursor, planIds) {
   const planSet = new Set(Array.isArray(planIds) ? planIds : [])
   if (rawCursor === null || rawCursor === undefined) return null
   if (typeof rawCursor === 'string') {
@@ -140,9 +131,7 @@ export function normalizeCursorId(rawCursor, planIds, catalog = DEFAULT_CATALOG)
     if (!id) return null
     return planSet.size === 0 || planSet.has(id) ? id : null
   }
-  const fromLegacyPair = legacyPairToItemId(rawCursor, catalog)
-  if (!fromLegacyPair) return null
-  return planSet.size === 0 || planSet.has(fromLegacyPair) ? fromLegacyPair : null
+  return null
 }
 
 export function normalizeDoneQuestionIds(rawDoneQuestions, catalog = DEFAULT_CATALOG) {
@@ -158,17 +147,6 @@ export function normalizeDoneQuestionIds(rawDoneQuestions, catalog = DEFAULT_CAT
       }
       continue
     }
-    const match = asId.match(/^(\d+)-(\d+)$/)
-    if (!match) continue
-    const roundIndex = Number.parseInt(match[1], 10)
-    const questionIndex = Number.parseInt(match[2], 10)
-    if (!Number.isInteger(roundIndex) || !Number.isInteger(questionIndex)) continue
-    const mapped = legacyPairToItemId([roundIndex, questionIndex], catalog)
-    if (!mapped) continue
-    if (catalog.byId.get(mapped)?.type !== 'question') continue
-    if (seen.has(mapped)) continue
-    seen.add(mapped)
-    out.push(mapped)
   }
   return out
 }
