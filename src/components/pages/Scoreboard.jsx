@@ -170,7 +170,7 @@ export default function Scoreboard({
     gameplayMode,
   }), [normalizedPlanIds, roundCatalog, gameplayMode])
 
-  const { armed, buzzWinner, gameplayMode: socketGameplayMode, answerState, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleRearm, syncHostQuestion, timerControlSignal, invalidateAuth } = useGameSocket(
+  const { armed, buzzWinner, gameplayMode: socketGameplayMode, answerState, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleRearm, syncHostQuestion, timerControlSignal, invalidateAuth, ensureHostReady } = useGameSocket(
     initialTeams,
     {
       onBuzzAttempt: handleBuzzAttempt,
@@ -218,7 +218,20 @@ export default function Scoreboard({
   const hostlessModeActive = isHostlessMode(effectiveGameplayMode)
 
   const commitGameplayModeSwitch = useCallback(async (nextMode, nextPlanIds, options = {}) => {
-    if (!hostReady || gameplayModeSwitching) return false
+    if (gameplayModeSwitching) return false
+    if (!hostReady) {
+      const reauth = await ensureHostReady()
+      if (!reauth?.ok) {
+        if (reauth?.error === 'missing-credentials') {
+          setGameplayModeError('Host connection expired. Sign in again, then retry.')
+        } else if (reauth?.error === 'connect-timeout' || reauth?.error === 'auth-timeout' || reauth?.error === 'setup-timeout') {
+          setGameplayModeError('Still reconnecting to host. Retry in a moment.')
+        } else {
+          setGameplayModeError('Host connection is not ready yet. Sign in again, then retry.')
+        }
+        return false
+      }
+    }
 
     const nextModeNormalized = normalizeGameplayMode(nextMode, effectiveGameplayMode)
     const nextPlanSet = new Set(nextPlanIds)
@@ -288,6 +301,7 @@ export default function Scoreboard({
     return true
   }, [
     hostReady,
+    ensureHostReady,
     gameplayModeSwitching,
     effectiveGameplayMode,
     doneQuestions,
@@ -306,10 +320,6 @@ export default function Scoreboard({
   ])
 
   const requestGameplayModeSwitch = useCallback((rawNextMode) => {
-    if (!hostReady) {
-      setGameplayModeError('Host connection is not ready yet. Sign in again, then retry.')
-      return
-    }
     const nextMode = normalizeGameplayMode(rawNextMode, effectiveGameplayMode)
     if (nextMode === effectiveGameplayMode || gameplayModeSwitching) return
 
@@ -349,7 +359,6 @@ export default function Scoreboard({
     }
     void commitGameplayModeSwitch(pending.nextMode, pending.nextPlanIds, { restorePlanIds: pending.restorePlanIds })
   }, [
-    hostReady,
     effectiveGameplayMode,
     gameplayModeSwitching,
     normalizedPlanIds,

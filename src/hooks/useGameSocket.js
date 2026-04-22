@@ -24,6 +24,7 @@ export function useGameSocket(initialTeams, options = {}) {
   const onAnswerCorrectRef = useRef(onAnswerCorrect)
   const onAnswerTimeoutRef = useRef(onAnswerTimeout)
   const onAnswerStateRef = useRef(onAnswerState)
+  const authPromiseRef = useRef(null)
 
   useEffect(() => {
     onBuzzWinnerRef.current = onBuzzWinner
@@ -55,6 +56,8 @@ export function useGameSocket(initialTeams, options = {}) {
   })
 
   const submitAuth = useCallback((sessionCodeInput, pinInput, options = {}) => {
+    if (authPromiseRef.current) return authPromiseRef.current
+
     const showAuthUi = options?.showAuthUi !== false
     const normalizedSessionCode = String(sessionCodeInput || '').trim().toUpperCase()
     const normalizedPin = String(pinInput || '').trim()
@@ -70,62 +73,135 @@ export function useGameSocket(initialTeams, options = {}) {
       return Promise.resolve({ ok: false, error: 'missing-credentials' })
     }
 
-    setAuthState((prev) => ({
-      required: showAuthUi ? true : prev.required,
-      error: '',
-      sessionCode: normalizedSessionCode,
-      authenticating: true,
-    }))
+    const promise = new Promise((resolve) => {
+      setAuthState((prev) => ({
+        required: showAuthUi ? true : prev.required,
+        error: '',
+        sessionCode: normalizedSessionCode,
+        authenticating: true,
+      }))
 
-    return new Promise((resolve) => {
-      socket.emit('host:auth', { sessionCode: normalizedSessionCode, pin: normalizedPin, role: 'controller' }, (authResult) => {
-        if (!authResult?.ok) {
-          setHostReady(false)
-          setSessionCode('')
-          clearHostCredentials()
-          setAuthState({
-            required: true,
-            error: mapHostAuthError(authResult?.error),
-            sessionCode: normalizedSessionCode,
-            authenticating: false,
-          })
-          resolve({ ok: false, error: authResult?.error || 'unauthorized' })
-          return
-        }
+      if (!socket.connected) socket.connect()
 
-        writeHostCredentials(normalizedSessionCode, normalizedPin)
-        setSessionCode(normalizedSessionCode)
-        const payload = setupPayloadRef.current
-        socket.emit('host:setup', {
-          teams: initialTeams,
-          ...(Array.isArray(payload?.gamePlan) ? { gamePlan: payload.gamePlan } : {}),
-          ...(Array.isArray(payload?.roundCatalog) ? { roundCatalog: payload.roundCatalog } : {}),
-          ...(payload?.gameplayMode ? { gameplayMode: payload.gameplayMode } : {}),
-        }, (setupResult) => {
-          if (!setupResult?.ok) {
+      socket.timeout(4000).emit(
+        'host:auth',
+        { sessionCode: normalizedSessionCode, pin: normalizedPin, role: 'controller' },
+        (authErr, authResult) => {
+          if (authErr) {
             setHostReady(false)
+            setSessionCode('')
             setAuthState({
               required: true,
-              error: 'Could not initialize host session. Try again.',
+              error: 'Could not reconnect host session. Check your connection and try again.',
               sessionCode: normalizedSessionCode,
               authenticating: false,
             })
-            resolve({ ok: false, error: 'setup-failed' })
+            resolve({ ok: false, error: 'auth-timeout' })
             return
           }
 
-          setHostReady(true)
-          setAuthState({
-            required: false,
-            error: '',
-            sessionCode: normalizedSessionCode,
-            authenticating: false,
+          if (!authResult?.ok) {
+            setHostReady(false)
+            setSessionCode('')
+            clearHostCredentials()
+            setAuthState({
+              required: true,
+              error: mapHostAuthError(authResult?.error),
+              sessionCode: normalizedSessionCode,
+              authenticating: false,
+            })
+            resolve({ ok: false, error: authResult?.error || 'unauthorized' })
+            return
+          }
+
+          writeHostCredentials(normalizedSessionCode, normalizedPin)
+          setSessionCode(normalizedSessionCode)
+          const payload = setupPayloadRef.current
+          socket.timeout(4000).emit('host:setup', {
+            teams: initialTeams,
+            ...(Array.isArray(payload?.gamePlan) ? { gamePlan: payload.gamePlan } : {}),
+            ...(Array.isArray(payload?.roundCatalog) ? { roundCatalog: payload.roundCatalog } : {}),
+            ...(payload?.gameplayMode ? { gameplayMode: payload.gameplayMode } : {}),
+          }, (setupErr, setupResult) => {
+            if (setupErr) {
+              setHostReady(false)
+              setAuthState({
+                required: true,
+                error: 'Could not initialize host session. Check your connection and try again.',
+                sessionCode: normalizedSessionCode,
+                authenticating: false,
+              })
+              resolve({ ok: false, error: 'setup-timeout' })
+              return
+            }
+
+            if (!setupResult?.ok) {
+              setHostReady(false)
+              setAuthState({
+                required: true,
+                error: 'Could not initialize host session. Try again.',
+                sessionCode: normalizedSessionCode,
+                authenticating: false,
+              })
+              resolve({ ok: false, error: 'setup-failed' })
+              return
+            }
+
+            setHostReady(true)
+            setAuthState({
+              required: false,
+              error: '',
+              sessionCode: normalizedSessionCode,
+              authenticating: false,
+            })
+            resolve({ ok: true })
           })
-          resolve({ ok: true })
-        })
-      })
+        }
+      )
     })
+
+    authPromiseRef.current = promise
+    promise.finally(() => { authPromiseRef.current = null })
+    return promise
   }, [initialTeams])
+
+  const waitForSocketConnect = useCallback((timeoutMs = 2500) => new Promise((resolve) => {
+    if (socket.connected) {
+      resolve(true)
+      return
+    }
+
+    let settled = false
+    let timer = null
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      if (timer !== null) window.clearTimeout(timer)
+      socket.off('connect', onConnect)
+      socket.off('connect_error', onConnectError)
+      resolve(Boolean(value))
+    }
+    const onConnect = () => finish(true)
+    const onConnectError = () => finish(false)
+    timer = window.setTimeout(() => finish(socket.connected), timeoutMs)
+
+    socket.on('connect', onConnect)
+    socket.on('connect_error', onConnectError)
+    socket.connect()
+  }), [])
+
+  const ensureHostReady = useCallback(async () => {
+    if (hostReady) return { ok: true, error: null }
+    if (authPromiseRef.current) return authPromiseRef.current
+
+    const creds = readHostCredentials()
+    if (!creds) return { ok: false, error: 'missing-credentials' }
+
+    const connected = socket.connected ? true : await waitForSocketConnect()
+    if (!connected) return { ok: false, error: 'connect-timeout' }
+
+    return submitAuth(creds.sessionCode, creds.pin, { showAuthUi: false })
+  }, [hostReady, submitAuth, waitForSocketConnect])
 
   useEffect(() => {
     function authenticateAndSetup() {
@@ -301,6 +377,20 @@ export function useGameSocket(initialTeams, options = {}) {
     }
   }, [submitAuth])
 
+  useEffect(() => {
+    function tryAutoReauth() {
+      if (document.visibilityState === 'hidden') return
+      void ensureHostReady()
+    }
+
+    document.addEventListener('visibilitychange', tryAutoReauth)
+    window.addEventListener('focus', tryAutoReauth)
+    return () => {
+      document.removeEventListener('visibilitychange', tryAutoReauth)
+      window.removeEventListener('focus', tryAutoReauth)
+    }
+  }, [ensureHostReady])
+
   function handleArm(options = {}) {
     const safeOptions = {}
     if (options && typeof options === 'object' && !Array.isArray(options)) {
@@ -387,5 +477,6 @@ export function useGameSocket(initialTeams, options = {}) {
     syncHostQuestion,
     timerControlSignal,
     invalidateAuth,
+    ensureHostReady,
   }
 }

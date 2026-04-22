@@ -106,5 +106,22 @@ export default {
       answer: 'Mercy Johnson',
       explanation: 'Mercy Johnson was one of the highest-paid Nollywood actresses of the 2010s. Her intense emotional performances earned her the fan nickname "Queen of Tears."',
     },
+    {
+      id: 'nollywood-12',
+      promptType: 'image',
+      mediaUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/fc/Regina_Daniels_close.png',
+      promptText: 'Name this Nollywood star.',
+      answer: 'Regina Daniels',
+      explanation: 'Regina Daniels began acting as a child and became a household name across West Africa. She is one of Nollywood\'s most recognised young actresses, known for roles in "The CEO" and "Dumebi the Dictator."',
+    },
+    {
+      id: 'nollywood-13',
+      promptType: 'image',
+      mediaUrl: 'https://upload.wikimedia.org/wikipedia/commons/e/e2/PatienceOzokwor.jpg',
+      promptText: 'Name this Nollywood star.',
+      answer: 'Patience Ozokwo',
+      acceptedAnswers: ['Patience Ozorkwor', 'Mama G'],
+      explanation: 'Patience Ozokwo — affectionately known as "Mama G" — is one of Nollywood\'s most iconic veteran actresses, celebrated for her villainous mother roles and winner of multiple Africa Movie Academy Awards.',
+    },
   ],
 }
