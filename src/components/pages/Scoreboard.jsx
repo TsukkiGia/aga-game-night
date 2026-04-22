@@ -22,6 +22,7 @@ import { useGamePlan } from '../../hooks/useGamePlan'
 import { useReactionStats } from '../../hooks/useReactionStats'
 import { useRuntimePersist } from '../../hooks/useRuntimePersist'
 import { useSessionActions } from '../../hooks/useSessionActions'
+import { useHostlessRuntime } from '../../hooks/useHostlessRuntime'
 import { clearAll } from '../../core/storage'
 import { playGameStart, playCorrect } from '../../core/sounds'
 import { normalizeGameplayMode, isHostlessMode, isRoundSupportedInMode, gameplayModeLabel } from '../../core/gameplayMode'
@@ -113,10 +114,6 @@ export default function Scoreboard({
   const [tiedTeams, setTiedTeams] = useState([])
   const [showHelp, setShowHelp] = useState(false)
   const [showReactionLeaderboard, setShowReactionLeaderboard] = useState(false)
-  const [hostlessAttemptFeed, setHostlessAttemptFeed] = useState([])
-  const [hostlessCorrectEvent, setHostlessCorrectEvent] = useState(null)
-  const [hostlessAnswerState, setHostlessAnswerState] = useState(null)
-  const [hostlessTimeoutEvent, setHostlessTimeoutEvent] = useState(null)
   const [gameplayModeSwitching, setGameplayModeSwitching] = useState(false)
   const [gameplayModeError, setGameplayModeError] = useState('')
   const [pendingModeSwitch, setPendingModeSwitch] = useState(null)
@@ -124,8 +121,25 @@ export default function Scoreboard({
 
   const runtimeHydratedRef = useRef(false)
   const hostlessRestorePlanRef = useRef(null)
-  const lastCorrectSoundKeyRef = useRef('')
   const [questionSidebarScrollTop, setQuestionSidebarScrollTop] = useState(0)
+
+  const {
+    hostlessAttemptFeed,
+    hostlessCorrectEvent,
+    hostlessAnswerState,
+    hostlessTimeoutEvent,
+    ingestHostlessAnswerAttempt,
+    ingestHostlessAnswerCorrect,
+    ingestHostlessAnswerTimeout,
+    ingestHostlessAnswerState,
+    clearHostlessTransient,
+    resetHostlessRuntime,
+    syncHostlessQuestionBoundary,
+    dismissHostlessCorrect,
+    dismissHostlessTimeout,
+  } = useHostlessRuntime({
+    onCorrectSound: playCorrect,
+  })
 
   useEffect(() => {
     setGameplayMode(normalizeGameplayMode(initialGameplayMode))
@@ -175,42 +189,10 @@ export default function Scoreboard({
     {
       onBuzzAttempt: handleBuzzAttempt,
       onStateSync: handleRuntimeSync,
-      onAnswerAttempt: (payload) => {
-        setHostlessAttemptFeed((prev) => [...prev, payload].slice(-8))
-      },
-      onAnswerCorrect: (payload) => {
-        const soundKey = [
-          String(payload?.questionId || ''),
-          String(payload?.teamIndex ?? ''),
-          String(payload?.timestamp ?? ''),
-        ].join('|')
-        if (soundKey && soundKey !== lastCorrectSoundKeyRef.current) {
-          lastCorrectSoundKeyRef.current = soundKey
-          playCorrect()
-        }
-        setHostlessCorrectEvent(payload)
-        setHostlessTimeoutEvent(null)
-      },
-      onAnswerTimeout: (payload) => {
-        setHostlessCorrectEvent(null)
-        setHostlessTimeoutEvent(payload)
-      },
-      onAnswerState: (payload) => {
-        setHostlessAnswerState(payload)
-        if (payload?.status === 'open') {
-          setHostlessTimeoutEvent(null)
-          return
-        }
-        const revealedAnswer = String(payload?.revealedAnswer || '').trim()
-        if (payload?.status === 'locked' && !payload?.winner && revealedAnswer) {
-          setHostlessCorrectEvent(null)
-          setHostlessTimeoutEvent((prev) => (
-            prev?.questionId === payload.questionId && String(prev?.answer || '').trim() === revealedAnswer
-              ? prev
-              : { questionId: payload.questionId, answer: revealedAnswer }
-          ))
-        }
-      },
+      onAnswerAttempt: ingestHostlessAnswerAttempt,
+      onAnswerCorrect: ingestHostlessAnswerCorrect,
+      onAnswerTimeout: ingestHostlessAnswerTimeout,
+      onAnswerState: ingestHostlessAnswerState,
       setupPayload,
     }
   )
@@ -275,10 +257,7 @@ export default function Scoreboard({
 
     setGamePlanIds(nextPlanIds)
     clearDoublePoints()
-    setHostlessAttemptFeed([])
-    setHostlessCorrectEvent(null)
-    setHostlessAnswerState(null)
-    setHostlessTimeoutEvent(null)
+    resetHostlessRuntime()
     if (isHostlessMode(nextModeNormalized)) {
       hostlessRestorePlanRef.current = Array.isArray(options.restorePlanIds) && options.restorePlanIds.length > 0
         ? [...options.restorePlanIds]
@@ -311,6 +290,7 @@ export default function Scoreboard({
     roundCatalog,
     reactionStats,
     clearDoublePoints,
+    resetHostlessRuntime,
     invalidateAuth,
     setGamePlanIds,
     onGameplayModeSync,
@@ -427,10 +407,8 @@ export default function Scoreboard({
   useEffect(() => {
     const questionId = String(answerState?.questionId || hostlessAnswerState?.questionId || '')
     if (!questionId) return
-    setHostlessAttemptFeed([])
-    setHostlessCorrectEvent(null)
-    setHostlessTimeoutEvent(null)
-  }, [answerState?.questionId, hostlessAnswerState?.questionId])
+    syncHostlessQuestionBoundary(questionId)
+  }, [answerState?.questionId, hostlessAnswerState?.questionId, syncHostlessQuestionBoundary])
 
   useRuntimePersist({
     hostReady,
@@ -527,9 +505,7 @@ export default function Scoreboard({
       clearDoublePoints()
       if (!hostlessModeActive) handleDismiss()
     }
-    setHostlessAttemptFeed([])
-    setHostlessCorrectEvent(null)
-    setHostlessTimeoutEvent(null)
+    clearHostlessTransient()
     navigate(nextCursorId, { transitionRound, silent })
   }
 
@@ -548,9 +524,7 @@ export default function Scoreboard({
 
   function goBack() {
     dismissBuzzAndResetMultiplier()
-    setHostlessAttemptFeed([])
-    setHostlessCorrectEvent(null)
-    setHostlessTimeoutEvent(null)
+    clearHostlessTransient()
     setLaunching(false)
     navigateToCursor(null, { clearBuzz: false, silent: true })
   }
@@ -712,8 +686,8 @@ export default function Scoreboard({
           hostlessAttemptFeed={hostlessAttemptFeed}
           hostlessCorrectEvent={hostlessCorrectEvent}
           hostlessTimeoutEvent={hostlessTimeoutEvent}
-          onDismissHostlessCorrect={() => setHostlessCorrectEvent(null)}
-          onDismissHostlessTimeout={() => setHostlessTimeoutEvent(null)}
+          onDismissHostlessCorrect={dismissHostlessCorrect}
+          onDismissHostlessTimeout={dismissHostlessTimeout}
           isRoundIncluded={isRoundIncluded}
           isQuestionIncluded={isQuestionIncluded}
           getRoundDisplayLabel={getRoundDisplayLabel}
