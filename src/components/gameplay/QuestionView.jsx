@@ -360,7 +360,8 @@ export default function QuestionView({
       </div>
 
       {/* ── Arm row ──────────────────────────────────── */}
-      <div className="qv-arm-row arm-row" style={hostlessModeActive ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}>
+      {!hostlessModeActive && (
+        <div className="qv-arm-row arm-row">
           <button
             className={`double-pts-btn${doublePoints ? ' active' : ''}`}
             onClick={() => { if (!doublePoints) playPower(); onToggleDouble() }}
@@ -386,7 +387,8 @@ export default function QuestionView({
               🔀 Open Steal
             </button>
           )}
-      </div>
+        </div>
+      )}
 
       <JoinQrModal
         open={showJoinQr}
