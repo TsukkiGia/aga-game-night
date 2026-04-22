@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { socket } from '../core/socket'
-import { playBuzzIn, playArm, playSoundBiteByKey, unlockAudio } from '../core/sounds'
+import { playBuzzIn, playSoundBiteByKey, unlockAudio } from '../core/sounds'
 import { mapHostAuthError } from '../core/auth'
 import { clearHostCredentials, readHostCredentials, writeHostCredentials } from '../core/storage'
 import { normalizeGameplayMode } from '../core/gameplayMode'
@@ -41,7 +41,6 @@ export function useGameSocket(initialTeams, options = {}) {
   const [gameplayMode, setGameplayMode] = useState(() => normalizeGameplayMode(setupPayload?.gameplayMode))
   const [answerState, setAnswerState] = useState(null)
   const [members, setMembers] = useState([])
-  const [stealMode, setStealMode] = useState(false)
   const [hostReady, setHostReady] = useState(false)
   const [timerControlSignal, setTimerControlSignal] = useState({ sequence: 0, action: null })
   const [sessionCode, setSessionCode] = useState(() => readHostCredentials()?.sessionCode || '')
@@ -391,52 +390,25 @@ export function useGameSocket(initialTeams, options = {}) {
     }
   }, [ensureHostReady])
 
-  function handleArm(options = {}) {
+  const armBuzzers = useCallback((options = {}) => {
     const safeOptions = {}
     if (options && typeof options === 'object' && !Array.isArray(options)) {
       if (Array.isArray(options.allowedTeamIndices)) safeOptions.allowedTeamIndices = options.allowedTeamIndices
     }
-    socket.emit('host:arm', safeOptions, (result) => {
-      if (result?.ok) playArm()
-    })
-  }
-
-  function handleDismiss() {
-    socket.emit('host:reset', (result) => {
-      if (result?.ok) setStealMode(false)
-    })
-  }
-
-  function handleWrongAndSteal(config = null) {
-    let allowedTeamIndices = null
-    if (Array.isArray(config)) {
-      allowedTeamIndices = config
-    } else if (config && typeof config === 'object' && !Array.isArray(config)) {
-      if (Array.isArray(config.allowedTeamIndices)) allowedTeamIndices = config.allowedTeamIndices
-    }
-
-    socket.emit('host:reset', (resetResult) => {
-      if (!resetResult?.ok) return
-      setStealMode(true)
-      const armOptions = {}
-      if (allowedTeamIndices) armOptions.allowedTeamIndices = allowedTeamIndices
-      socket.emit('host:arm', armOptions, (armResult) => {
-        if (armResult?.ok) playArm()
-        else setStealMode(false)
+    return new Promise((resolve) => {
+      socket.emit('host:arm', safeOptions, (result) => {
+        resolve(result || { ok: false, error: 'server-error' })
       })
     })
-  }
+  }, [])
 
-  function handleRearm(options = {}) {
-    setBuzzWinner(null)
-    setStealMode(false)
-    socket.emit('host:reset', (resetResult) => {
-      if (!resetResult?.ok) return
-      socket.emit('host:arm', options, (armResult) => {
-        if (armResult?.ok) playArm()
+  const resetBuzzers = useCallback(() => {
+    return new Promise((resolve) => {
+      socket.emit('host:reset', (result) => {
+        resolve(result || { ok: false, error: 'server-error' })
       })
     })
-  }
+  }, [])
 
   const invalidateAuth = useCallback((message = 'Host authorization expired. Sign in again.') => {
     setHostReady(false)
@@ -465,15 +437,12 @@ export function useGameSocket(initialTeams, options = {}) {
     gameplayMode,
     answerState,
     members,
-    stealMode,
     hostReady,
     sessionCode,
     authState,
     submitAuth,
-    handleArm,
-    handleDismiss,
-    handleWrongAndSteal,
-    handleRearm,
+    armBuzzers,
+    resetBuzzers,
     syncHostQuestion,
     timerControlSignal,
     invalidateAuth,

@@ -185,7 +185,7 @@ export default function Scoreboard({
     gameplayMode,
   }), [normalizedPlanIds, roundCatalog, gameplayMode])
 
-  const { armed, buzzWinner, gameplayMode: socketGameplayMode, answerState, members, stealMode, hostReady, sessionCode, authState, submitAuth, handleArm, handleDismiss, handleWrongAndSteal, handleRearm, syncHostQuestion, timerControlSignal, invalidateAuth, ensureHostReady } = useGameSocket(
+  const { armed, buzzWinner, gameplayMode: socketGameplayMode, answerState, members, hostReady, sessionCode, authState, submitAuth, armBuzzers, resetBuzzers, syncHostQuestion, timerControlSignal, invalidateAuth, ensureHostReady } = useGameSocket(
     initialTeams,
     {
       onBuzzAttempt: handleBuzzAttempt,
@@ -200,14 +200,22 @@ export default function Scoreboard({
   const effectiveGameplayMode = normalizeGameplayMode(gameplayMode, socketGameplayMode)
   const hostlessModeActive = isHostlessMode(effectiveGameplayMode)
   const {
+    stealMode,
+    handleArm,
+    handleDismiss,
+    handleWrongAndSteal,
+    handleRearm,
     dismissHostedBuzz,
     dismissBuzzAndResetMultiplier,
     clearForCursorChange,
     markDoneWithMultiplierReset,
   } = useHostedRuntime({
     hostlessModeActive,
+    armed,
+    buzzWinner,
     clearDoublePoints,
-    resetBuzzState: handleDismiss,
+    armBuzzers,
+    resetBuzzers,
   })
 
   const commitGameplayModeSwitch = useCallback(async (nextMode, nextPlanIds, options = {}) => {
