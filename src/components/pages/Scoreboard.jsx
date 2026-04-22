@@ -23,6 +23,7 @@ import { useReactionStats } from '../../hooks/useReactionStats'
 import { useRuntimePersist } from '../../hooks/useRuntimePersist'
 import { useSessionActions } from '../../hooks/useSessionActions'
 import { useHostlessRuntime } from '../../hooks/useHostlessRuntime'
+import { useHostedRuntime } from '../../hooks/useHostedRuntime'
 import { clearAll } from '../../core/storage'
 import { playGameStart, playCorrect } from '../../core/sounds'
 import { normalizeGameplayMode, isHostlessMode, isRoundSupportedInMode, gameplayModeLabel } from '../../core/gameplayMode'
@@ -198,6 +199,16 @@ export default function Scoreboard({
   )
   const effectiveGameplayMode = normalizeGameplayMode(gameplayMode, socketGameplayMode)
   const hostlessModeActive = isHostlessMode(effectiveGameplayMode)
+  const {
+    dismissHostedBuzz,
+    dismissBuzzAndResetMultiplier,
+    clearForCursorChange,
+    markDoneWithMultiplierReset,
+  } = useHostedRuntime({
+    hostlessModeActive,
+    clearDoublePoints,
+    resetBuzzState: handleDismiss,
+  })
 
   const commitGameplayModeSwitch = useCallback(async (nextMode, nextPlanIds, options = {}) => {
     if (gameplayModeSwitching) return false
@@ -437,7 +448,7 @@ export default function Scoreboard({
   } = useSessionActions({
     invalidateAuth,
     clearDoublePoints,
-    handleDismiss,
+    handleDismiss: dismissHostedBuzz,
     resetStats,
     onReset,
     onEndSession,
@@ -490,21 +501,13 @@ export default function Scoreboard({
   const buzzerUrl = `${ENDPOINT || window.location.origin}/buzz${sessionCode ? `?s=${sessionCode}` : ''}`
   const hostCompanionUrl = `${ENDPOINT || window.location.origin}/host-mobile`
 
-  function dismissBuzzAndResetMultiplier() {
-    clearDoublePoints()
-    if (!hostlessModeActive) handleDismiss()
-  }
-
   function navigateToCursor(nextCursorId, options = {}) {
     const { clearBuzz = true, transitionRound = null, silent = false } = options
     const currentQuestionId = activeItem?.type === 'question' ? activeItem.id : null
     const nextItem = nextCursorId ? planCatalog.byId.get(nextCursorId) : null
     const nextQuestionId = nextItem?.type === 'question' ? nextItem.id : null
     if (currentQuestionId !== nextQuestionId) clearQuestionLast()
-    if (clearBuzz) {
-      clearDoublePoints()
-      if (!hostlessModeActive) handleDismiss()
-    }
+    clearForCursorChange(clearBuzz)
     clearHostlessTransient()
     navigate(nextCursorId, { transitionRound, silent })
   }
@@ -538,7 +541,7 @@ export default function Scoreboard({
 
   function handleSuddenDeathAward(teamIndex) {
     adjust(teamIndex, 1)
-    handleDismiss()
+    dismissHostedBuzz()
     setSuddenDeath(false)
     setShowWinner(true)
   }
@@ -548,7 +551,7 @@ export default function Scoreboard({
   }
 
   function handleSuddenDeathCancel() {
-    handleDismiss()
+    dismissHostedBuzz()
     setSuddenDeath(false)
     setTiedTeams([])
     setShowWinner(true)
@@ -655,7 +658,7 @@ export default function Scoreboard({
           }}
           stealMode={stealMode}
           onWrongAndSteal={(allowedTeamIndices) => handleWrongAndSteal(allowedTeamIndices)}
-          onMarkDone={() => { clearDoublePoints(); markDone(activeItem.id) }}
+          onMarkDone={() => markDoneWithMultiplierReset(activeItem.id, markDone)}
           onNavigate={navigateWithReset}
           onBack={goBack}
           onNext={() => {
