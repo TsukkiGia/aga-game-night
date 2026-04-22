@@ -1,5 +1,5 @@
 import CodesPanel from './CodesPanel'
-import { isHostlessMode, GAMEPLAY_MODE_HOSTED, GAMEPLAY_MODE_HOSTLESS } from '../../core/gameplayMode'
+import { isHostlessMode } from '../../core/gameplayMode'
 
 export default function HomeLobbyView({
   teams,
@@ -26,7 +26,14 @@ export default function HomeLobbyView({
   const hostlessModeActive = isHostlessMode(gameplayMode)
   return (
     <div className={`home-screen${launching ? ' launching' : ''}`}>
-      <CodesPanel teams={teams} members={members} buzzerUrl={buzzerUrl} />
+      <CodesPanel
+        teams={teams}
+        members={members}
+        buzzerUrl={buzzerUrl}
+        gameplayMode={gameplayMode}
+        onGameplayModeChange={onGameplayModeChange}
+        gameplayModeSwitching={gameplayModeSwitching}
+      />
 
       <div className="home-actions-bar">
         <div className="home-actions-secondary">
@@ -40,40 +47,18 @@ export default function HomeLobbyView({
         </div>
         {newGameError && <div className="host-auth-error">{newGameError}</div>}
         <div className="home-actions-primary">
-          <div className="home-mode-toggle" role="group" aria-label="Gameplay mode">
+          <div className="home-arm-row" style={hostlessModeActive ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}>
             <button
-              type="button"
-              className={`home-mode-toggle-btn${!hostlessModeActive ? ' active' : ''}`}
-              onClick={() => onGameplayModeChange(GAMEPLAY_MODE_HOSTED)}
-              disabled={gameplayModeSwitching}
+              className={`arm-btn ${armed ? 'armed' : ''}`}
+              onClick={onArm}
+              disabled={armed || buzzWinner !== null || gameplayModeSwitching}
             >
-              Hosted
+              {armed ? '🔴 Listening…' : '🎯 Arm Buzzers'}
             </button>
-            <button
-              type="button"
-              className={`home-mode-toggle-btn${hostlessModeActive ? ' active' : ''}`}
-              onClick={() => onGameplayModeChange(GAMEPLAY_MODE_HOSTLESS)}
-              disabled={gameplayModeSwitching}
-            >
-              Host-less
-            </button>
+            {armed && (
+              <button className="arm-cancel-btn" onClick={onDismiss}>Cancel</button>
+            )}
           </div>
-          {hostlessModeActive ? (
-            <div className="home-hostless-pill">{gameplayModeSwitching ? 'Switching mode…' : 'Host-less mode active'}</div>
-          ) : (
-            <>
-              <button
-                className={`arm-btn ${armed ? 'armed' : ''}`}
-                onClick={onArm}
-                disabled={armed || buzzWinner !== null || gameplayModeSwitching}
-              >
-                {armed ? '🔴 Listening…' : '🎯 Arm Buzzers'}
-              </button>
-              {armed && (
-                <button className="arm-cancel-btn" onClick={onDismiss}>Cancel</button>
-              )}
-            </>
-          )}
           <button className="home-start-game-btn" onClick={onStart} disabled={startDisabled || gameplayModeSwitching}>▶ Start Game</button>
         </div>
       </div>

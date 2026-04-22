@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
+import { isHostlessMode, GAMEPLAY_MODE_HOSTED, GAMEPLAY_MODE_HOSTLESS } from '../../core/gameplayMode'
 
-export default function CodesPanel({ teams, members, buzzerUrl }) {
+export default function CodesPanel({
+  teams,
+  members,
+  buzzerUrl,
+  gameplayMode = GAMEPLAY_MODE_HOSTED,
+  onGameplayModeChange = () => {},
+  gameplayModeSwitching = false,
+}) {
   const [qrSrc, setQrSrc] = useState('')
   const [copyState, setCopyState] = useState('idle')
+  const hostlessModeActive = isHostlessMode(gameplayMode)
 
   useEffect(() => {
     QRCode.toDataURL(buzzerUrl, { width: 300, margin: 1 }).then(setQrSrc)
@@ -86,9 +95,33 @@ export default function CodesPanel({ teams, members, buzzerUrl }) {
               {joinedCount} {joinedCount === 1 ? 'player' : 'players'} joined · {teams.length} teams
             </div>
           </div>
-          <div className="codes-live-pill">
-            <span className="codes-live-dot" aria-hidden="true" />
-            <span>Live</span>
+          <div className="codes-main-head-right">
+            <div
+              className={`home-mode-toggle${hostlessModeActive ? ' hostless' : ''}${gameplayModeSwitching ? ' switching' : ''}`}
+              role="group"
+              aria-label="Gameplay mode"
+            >
+              <button
+                type="button"
+                className={`home-mode-toggle-btn${!hostlessModeActive ? ' active' : ''}`}
+                onClick={() => { if (!gameplayModeSwitching) onGameplayModeChange(GAMEPLAY_MODE_HOSTED) }}
+                aria-disabled={gameplayModeSwitching}
+              >
+                Hosted
+              </button>
+              <button
+                type="button"
+                className={`home-mode-toggle-btn${hostlessModeActive ? ' active' : ''}`}
+                onClick={() => { if (!gameplayModeSwitching) onGameplayModeChange(GAMEPLAY_MODE_HOSTLESS) }}
+                aria-disabled={gameplayModeSwitching}
+              >
+                Host-less
+              </button>
+            </div>
+            <div className="codes-live-pill">
+              <span className="codes-live-dot" aria-hidden="true" />
+              <span>Live</span>
+            </div>
           </div>
         </div>
 

@@ -64,13 +64,30 @@
   gap: 12px;
 }
 .home-mode-toggle {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
   align-items: center;
-  gap: 4px;
   padding: 4px;
   border-radius: 12px;
   border: 1.5px solid var(--border);
   background: #fff;
+  position: relative;
+  overflow: hidden;
+}
+.home-mode-toggle::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / 2);
+  border-radius: 9px;
+  background: var(--teal-bg);
+  transform: translateX(0);
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.home-mode-toggle.hostless::before {
+  transform: translateX(100%);
 }
 .home-mode-toggle-btn {
   border: none;
@@ -82,32 +99,24 @@
   font-weight: 800;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-.home-mode-toggle-btn:hover:not(:disabled) {
-  background: #f5efe8;
-  color: var(--text);
+  transition: color 0.2s ease;
+  position: relative;
+  z-index: 1;
 }
 .home-mode-toggle-btn.active {
-  background: var(--teal-bg);
   color: var(--teal);
 }
 .home-mode-toggle-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.home-hostless-pill {
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 1.5px solid rgba(0,85,72,0.28);
-  background: var(--teal-bg);
-  color: var(--teal);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
+.home-mode-toggle.switching .home-mode-toggle-btn {
+  pointer-events: none;
+  opacity: 0.5;
 }
-
+.home-arm-row {
+  display: contents;
+}
 .home-start-game-btn {
   padding: 10px 24px;
   font-size: 14px;
@@ -837,6 +846,13 @@
   justify-content: space-between;
   gap: 10px;
 }
+.codes-main-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 
 .codes-main-title-wrap {
   display: flex;
@@ -1085,6 +1101,14 @@
 }
 
 @media (max-width: 640px) {
+  .codes-main-head {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .codes-main-head-right {
+    width: 100%;
+    justify-content: space-between;
+  }
   .codes-rail-content {
     padding: 20px 16px 12px;
   }

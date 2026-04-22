@@ -1,4 +1,42 @@
 /* ══════════════════════════════════════════
+   SHARED MEDIA
+══════════════════════════════════════════ */
+.prompt-media-image-wrap {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  min-height: 96px;
+}
+
+.prompt-media-image-wrap.is-loading img {
+  opacity: 0.2;
+}
+
+.prompt-media-image-loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.prompt-media-image-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--teal);
+  animation: promptMediaSpin 0.8s linear infinite;
+}
+
+@keyframes promptMediaSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ══════════════════════════════════════════
    VIDEO BODY
 ══════════════════════════════════════════ */
 .qv-video-wrap {

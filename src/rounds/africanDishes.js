@@ -21,7 +21,7 @@ const DISHES = [
     id: 'dish-03',
     promptType: 'image',
     promptText: 'Name this African dish.',
-    mediaUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Original_Nigerian_Egusi_soup_%28cropped%29.jpg',
+    mediaUrl: 'https://popmenucloud.com/cdn-cgi/image/width=1920,height=1920,format=auto,fit=scale-down/gawbqmed/43462d92-f9fa-4157-892d-5a983fdebc87.jpg',
     answer: 'Egusi Soup',
     explanation: 'Egusi soup is a thick, hearty Nigerian soup made from ground melon seeds, leafy vegetables, and palm oil.',
   },

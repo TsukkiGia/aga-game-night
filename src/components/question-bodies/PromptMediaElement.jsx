@@ -1,4 +1,48 @@
+import { useState } from 'react'
 import { cleanUrl, resolveVideoSource } from '../../utils/mediaPrompt'
+
+function PromptImageElement({
+  url,
+  imageRef,
+  imageClassName,
+  imageAlt,
+  imageReferrerPolicy,
+  loading,
+  onImageLoad,
+  onImageError,
+}) {
+  const [imageLoading, setImageLoading] = useState(true)
+
+  function handleImageLoad(event) {
+    setImageLoading(false)
+    if (typeof onImageLoad === 'function') onImageLoad(event)
+  }
+
+  function handleImageError(event) {
+    setImageLoading(false)
+    if (typeof onImageError === 'function') onImageError(event)
+  }
+
+  return (
+    <div className={`prompt-media-image-wrap${imageLoading ? ' is-loading' : ''}`}>
+      {imageLoading && (
+        <div className="prompt-media-image-loader" role="status" aria-label="Loading image">
+          <span className="prompt-media-image-spinner" />
+        </div>
+      )}
+      <img
+        ref={imageRef}
+        className={imageClassName}
+        src={url}
+        alt={imageAlt}
+        referrerPolicy={imageReferrerPolicy}
+        loading={loading}
+        onLoad={handleImageLoad}
+        onError={handleImageError}
+      />
+    </div>
+  )
+}
 
 export default function PromptMediaElement({
   mediaType,
@@ -30,19 +74,21 @@ export default function PromptMediaElement({
 }) {
   const normalizedType = String(mediaType || '').trim().toLowerCase()
   const url = cleanUrl(mediaUrl)
+
   if (!url) return null
 
   if (normalizedType === 'image') {
     return (
-      <img
-        ref={imageRef}
-        className={imageClassName}
-        src={url}
-        alt={imageAlt}
-        referrerPolicy={imageReferrerPolicy}
+      <PromptImageElement
+        key={url}
+        url={url}
+        imageRef={imageRef}
+        imageClassName={imageClassName}
+        imageAlt={imageAlt}
+        imageReferrerPolicy={imageReferrerPolicy}
         loading={loading}
-        onLoad={onImageLoad}
-        onError={onImageError}
+        onImageLoad={onImageLoad}
+        onImageError={onImageError}
       />
     )
   }
