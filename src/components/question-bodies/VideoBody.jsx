@@ -15,6 +15,7 @@ export default function VideoBody({ question, paused, allowReveal = true, autopl
   const shouldAutoplay = (Number(autoplayTrigger) || 0) > 0
 
   const requestAutoplay = useCallback(() => {
+    if (!shouldAutoplay) return
     if (paused) return
     if (isYouTube) {
       iframeRef.current?.contentWindow?.postMessage(
@@ -26,7 +27,7 @@ export default function VideoBody({ question, paused, allowReveal = true, autopl
     const el = videoRef.current
     if (!el) return
     el.play().catch(() => {})
-  }, [paused, isYouTube])
+  }, [paused, isYouTube, shouldAutoplay])
 
   useEffect(() => {
     if (!paused) return
