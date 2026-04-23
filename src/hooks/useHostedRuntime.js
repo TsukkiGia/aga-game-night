@@ -1,13 +1,41 @@
 import { useCallback, useEffect, useReducer } from 'react'
-import { playArm } from '../core/sounds'
+import { socket } from '../core/socket'
+import { playArm, playBuzzIn } from '../core/sounds'
 
 const INITIAL_STATE = {
+  armed: false,
+  buzzWinner: null,
   stealMode: false,
   stealPending: false,
 }
 
 function hostedRuntimeReducer(state, action) {
   switch (action.type) {
+    case 'SOCKET_SYNC': {
+      const nextArmed = Boolean(action.payload?.armed)
+      const rawWinner = action.payload?.buzzWinner
+      const nextBuzzWinner = (
+        rawWinner
+        && typeof rawWinner.teamIndex === 'number'
+        && rawWinner.team
+        && typeof rawWinner.team === 'object'
+      )
+        ? rawWinner
+        : null
+      const shouldClearSteal = !nextArmed && !nextBuzzWinner && !state.stealPending
+      return {
+        ...state,
+        armed: nextArmed,
+        buzzWinner: nextBuzzWinner,
+        ...(shouldClearSteal ? { stealMode: false } : {}),
+      }
+    }
+    case 'BUZZ_ARMED':
+      return { ...state, armed: true, buzzWinner: null }
+    case 'BUZZ_RESET':
+      return { ...state, armed: false, buzzWinner: null, stealMode: false, stealPending: false }
+    case 'BUZZ_WINNER':
+      return { ...state, armed: false, buzzWinner: action.payload || null, stealPending: false }
     case 'ENTER_STEAL_PENDING':
       return { ...state, stealMode: true, stealPending: true }
     case 'STEAL_ARMED':
@@ -33,11 +61,7 @@ function resolveAllowedTeamIndices(config) {
 
 export function useHostedRuntime({
   hostlessModeActive = false,
-  armed = false,
-  buzzWinner = null,
   clearDoublePoints = () => {},
-  armBuzzers = async () => ({ ok: false, error: 'arm-unavailable' }),
-  resetBuzzers = async () => ({ ok: false, error: 'reset-unavailable' }),
   onArmSound = playArm,
 } = {}) {
   const [state, dispatch] = useReducer(hostedRuntimeReducer, INITIAL_STATE)
@@ -45,58 +69,85 @@ export function useHostedRuntime({
   useEffect(() => {
     if (hostlessModeActive) {
       dispatch({ type: 'RESET_ALL' })
-      return
     }
-    if (!armed && !buzzWinner && !state.stealPending) dispatch({ type: 'CLEAR_STEAL' })
-  }, [hostlessModeActive, armed, buzzWinner, state.stealPending])
+  }, [hostlessModeActive])
+
+  const emitArm = useCallback((options = {}) => {
+    const safeOptions = {}
+    if (options && typeof options === 'object' && !Array.isArray(options)) {
+      if (Array.isArray(options.allowedTeamIndices)) safeOptions.allowedTeamIndices = options.allowedTeamIndices
+    }
+    return new Promise((resolve) => {
+      socket.emit('host:arm', safeOptions, (result) => {
+        resolve(result || { ok: false, error: 'server-error' })
+      })
+    })
+  }, [])
+
+  const emitReset = useCallback(() => {
+    return new Promise((resolve) => {
+      socket.emit('host:reset', (result) => {
+        resolve(result || { ok: false, error: 'server-error' })
+      })
+    })
+  }, [])
 
   const handleArm = useCallback(async (options = {}) => {
     if (hostlessModeActive) return { ok: false, error: 'hostless-mode' }
-    const result = await armBuzzers(options)
-    if (result?.ok && typeof onArmSound === 'function') onArmSound()
+    const result = await emitArm(options)
+    if (result?.ok) {
+      dispatch({ type: 'BUZZ_ARMED' })
+      if (typeof onArmSound === 'function') onArmSound()
+    }
     return result
-  }, [hostlessModeActive, armBuzzers, onArmSound])
+  }, [hostlessModeActive, emitArm, onArmSound])
 
   const handleDismiss = useCallback(async () => {
     dispatch({ type: 'CLEAR_STEAL' })
     if (hostlessModeActive) return { ok: true, skipped: true }
-    const result = await resetBuzzers()
+    const result = await emitReset()
     if (!result?.ok) return result
-    dispatch({ type: 'CLEAR_STEAL' })
+    dispatch({ type: 'BUZZ_RESET' })
     return result
-  }, [hostlessModeActive, resetBuzzers])
+  }, [hostlessModeActive, emitReset])
 
   const handleWrongAndSteal = useCallback(async (config = null) => {
     if (hostlessModeActive) return { ok: false, error: 'hostless-mode' }
     const allowedTeamIndices = resolveAllowedTeamIndices(config)
 
-    const resetResult = await resetBuzzers()
+    const resetResult = await emitReset()
     if (!resetResult?.ok) return resetResult
 
+    dispatch({ type: 'BUZZ_RESET' })
     dispatch({ type: 'ENTER_STEAL_PENDING' })
     const armOptions = {}
     if (allowedTeamIndices) armOptions.allowedTeamIndices = allowedTeamIndices
-    const armResult = await armBuzzers(armOptions)
+    const armResult = await emitArm(armOptions)
     if (armResult?.ok) {
       dispatch({ type: 'STEAL_ARMED' })
+      dispatch({ type: 'BUZZ_ARMED' })
       if (typeof onArmSound === 'function') onArmSound()
       return armResult
     }
     dispatch({ type: 'CLEAR_STEAL' })
     return armResult
-  }, [hostlessModeActive, resetBuzzers, armBuzzers, onArmSound])
+  }, [hostlessModeActive, emitReset, emitArm, onArmSound])
 
   const handleRearm = useCallback(async (options = {}) => {
     dispatch({ type: 'CLEAR_STEAL' })
     if (hostlessModeActive) return { ok: false, error: 'hostless-mode' }
 
-    const resetResult = await resetBuzzers()
+    const resetResult = await emitReset()
     if (!resetResult?.ok) return resetResult
 
-    const armResult = await armBuzzers(options)
-    if (armResult?.ok && typeof onArmSound === 'function') onArmSound()
+    dispatch({ type: 'BUZZ_RESET' })
+    const armResult = await emitArm(options)
+    if (armResult?.ok) {
+      dispatch({ type: 'BUZZ_ARMED' })
+      if (typeof onArmSound === 'function') onArmSound()
+    }
     return armResult
-  }, [hostlessModeActive, resetBuzzers, armBuzzers, onArmSound])
+  }, [hostlessModeActive, emitReset, emitArm, onArmSound])
 
   const dismissHostedBuzz = useCallback(() => {
     void handleDismiss()
@@ -117,7 +168,40 @@ export function useHostedRuntime({
     if (typeof markDone === 'function') markDone(questionId)
   }, [clearDoublePoints])
 
+  const onSocketStateSync = useCallback((statePayload) => {
+    const buzzWinner = statePayload?.buzzedBy === null
+      ? null
+      : {
+          teamIndex: statePayload?.buzzedBy,
+          team: statePayload?.teams?.[statePayload?.buzzedBy],
+          memberName: statePayload?.buzzedMemberName,
+        }
+    dispatch({
+      type: 'SOCKET_SYNC',
+      payload: {
+        armed: Boolean(statePayload?.armed),
+        buzzWinner,
+      },
+    })
+  }, [])
+
+  const onSocketBuzzArmed = useCallback(() => {
+    dispatch({ type: 'BUZZ_ARMED' })
+  }, [])
+
+  const onSocketBuzzReset = useCallback(() => {
+    dispatch({ type: 'BUZZ_RESET' })
+  }, [])
+
+  const onSocketBuzzWinner = useCallback((data) => {
+    if (!data || typeof data.teamIndex !== 'number' || !data.team?.name || !data.team?.color) return
+    dispatch({ type: 'BUZZ_WINNER', payload: data })
+    playBuzzIn()
+  }, [])
+
   return {
+    armed: state.armed,
+    buzzWinner: state.buzzWinner,
     stealMode: state.stealMode,
     handleArm,
     handleDismiss,
@@ -127,5 +211,9 @@ export function useHostedRuntime({
     dismissBuzzAndResetMultiplier,
     clearForCursorChange,
     markDoneWithMultiplierReset,
+    onSocketStateSync,
+    onSocketBuzzArmed,
+    onSocketBuzzReset,
+    onSocketBuzzWinner,
   }
 }

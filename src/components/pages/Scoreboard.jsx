@@ -185,21 +185,9 @@ export default function Scoreboard({
     gameplayMode,
   }), [normalizedPlanIds, roundCatalog, gameplayMode])
 
-  const { armed, buzzWinner, gameplayMode: socketGameplayMode, answerState, members, hostReady, sessionCode, authState, submitAuth, armBuzzers, resetBuzzers, syncHostQuestion, timerControlSignal, invalidateAuth, ensureHostReady } = useGameSocket(
-    initialTeams,
-    {
-      onBuzzAttempt: handleBuzzAttempt,
-      onStateSync: handleRuntimeSync,
-      onAnswerAttempt: ingestHostlessAnswerAttempt,
-      onAnswerCorrect: ingestHostlessAnswerCorrect,
-      onAnswerTimeout: ingestHostlessAnswerTimeout,
-      onAnswerState: ingestHostlessAnswerState,
-      setupPayload,
-    }
-  )
-  const effectiveGameplayMode = normalizeGameplayMode(gameplayMode, socketGameplayMode)
-  const hostlessModeActive = isHostlessMode(effectiveGameplayMode)
   const {
+    armed,
+    buzzWinner,
     stealMode,
     handleArm,
     handleDismiss,
@@ -209,14 +197,37 @@ export default function Scoreboard({
     dismissBuzzAndResetMultiplier,
     clearForCursorChange,
     markDoneWithMultiplierReset,
+    onSocketStateSync,
+    onSocketBuzzArmed,
+    onSocketBuzzReset,
+    onSocketBuzzWinner,
   } = useHostedRuntime({
-    hostlessModeActive,
-    armed,
-    buzzWinner,
+    hostlessModeActive: isHostlessMode(gameplayMode),
     clearDoublePoints,
-    armBuzzers,
-    resetBuzzers,
   })
+
+  const handleSocketStateSync = useCallback((serverState) => {
+    onSocketStateSync(serverState)
+    handleRuntimeSync(serverState)
+  }, [onSocketStateSync, handleRuntimeSync])
+
+  const { gameplayMode: socketGameplayMode, answerState, members, hostReady, sessionCode, authState, submitAuth, syncHostQuestion, timerControlSignal, invalidateAuth, ensureHostReady } = useGameSocket(
+    initialTeams,
+    {
+      onBuzzAttempt: handleBuzzAttempt,
+      onStateSync: handleSocketStateSync,
+      onBuzzWinner: onSocketBuzzWinner,
+      onBuzzArmed: onSocketBuzzArmed,
+      onBuzzReset: onSocketBuzzReset,
+      onAnswerAttempt: ingestHostlessAnswerAttempt,
+      onAnswerCorrect: ingestHostlessAnswerCorrect,
+      onAnswerTimeout: ingestHostlessAnswerTimeout,
+      onAnswerState: ingestHostlessAnswerState,
+      setupPayload,
+    }
+  )
+  const effectiveGameplayMode = normalizeGameplayMode(gameplayMode, socketGameplayMode)
+  const hostlessModeActive = isHostlessMode(effectiveGameplayMode)
 
   const commitGameplayModeSwitch = useCallback(async (nextMode, nextPlanIds, options = {}) => {
     if (gameplayModeSwitching) return false

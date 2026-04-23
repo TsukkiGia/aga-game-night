@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { socket } from '../core/socket'
-import { playBuzzIn, playSoundBiteByKey, unlockAudio } from '../core/sounds'
+import { playSoundBiteByKey, unlockAudio } from '../core/sounds'
 import { mapHostAuthError } from '../core/auth'
 import { clearHostCredentials, readHostCredentials, writeHostCredentials } from '../core/storage'
 import { normalizeGameplayMode } from '../core/gameplayMode'
@@ -13,6 +13,8 @@ export function useGameSocket(initialTeams, options = {}) {
   const onAnswerCorrect = typeof options.onAnswerCorrect === 'function' ? options.onAnswerCorrect : null
   const onAnswerTimeout = typeof options.onAnswerTimeout === 'function' ? options.onAnswerTimeout : null
   const onAnswerState = typeof options.onAnswerState === 'function' ? options.onAnswerState : null
+  const onBuzzArmed = typeof options.onBuzzArmed === 'function' ? options.onBuzzArmed : null
+  const onBuzzReset = typeof options.onBuzzReset === 'function' ? options.onBuzzReset : null
   const setupPayload = (options.setupPayload && typeof options.setupPayload === 'object' && !Array.isArray(options.setupPayload))
     ? options.setupPayload
     : null
@@ -24,6 +26,8 @@ export function useGameSocket(initialTeams, options = {}) {
   const onAnswerCorrectRef = useRef(onAnswerCorrect)
   const onAnswerTimeoutRef = useRef(onAnswerTimeout)
   const onAnswerStateRef = useRef(onAnswerState)
+  const onBuzzArmedRef = useRef(onBuzzArmed)
+  const onBuzzResetRef = useRef(onBuzzReset)
   const authPromiseRef = useRef(null)
 
   useEffect(() => {
@@ -34,10 +38,10 @@ export function useGameSocket(initialTeams, options = {}) {
     onAnswerCorrectRef.current = onAnswerCorrect
     onAnswerTimeoutRef.current = onAnswerTimeout
     onAnswerStateRef.current = onAnswerState
+    onBuzzArmedRef.current = onBuzzArmed
+    onBuzzResetRef.current = onBuzzReset
     setupPayloadRef.current = setupPayload
-  }, [onBuzzWinner, onBuzzAttempt, onStateSync, setupPayload, onAnswerAttempt, onAnswerCorrect, onAnswerTimeout, onAnswerState])
-  const [armed, setArmed] = useState(false)
-  const [buzzWinner, setBuzzWinner] = useState(null)
+  }, [onBuzzWinner, onBuzzAttempt, onStateSync, setupPayload, onAnswerAttempt, onAnswerCorrect, onAnswerTimeout, onAnswerState, onBuzzArmed, onBuzzReset])
   const [gameplayMode, setGameplayMode] = useState(() => normalizeGameplayMode(setupPayload?.gameplayMode))
   const [answerState, setAnswerState] = useState(null)
   const [members, setMembers] = useState([])
@@ -220,18 +224,8 @@ export function useGameSocket(initialTeams, options = {}) {
     }
 
     function syncState(state) {
-      setArmed(Boolean(state.armed))
       setGameplayMode(normalizeGameplayMode(state?.gameplayMode, setupPayloadRef.current?.gameplayMode))
       setAnswerState(state?.answerState || null)
-      setBuzzWinner(
-        state.buzzedBy === null
-          ? null
-          : {
-              teamIndex: state.buzzedBy,
-              team: state.teams[state.buzzedBy],
-              memberName: state.buzzedMemberName,
-            }
-      )
       onStateSyncRef.current?.(state)
       if (state?.answerState) onAnswerStateRef.current?.(state.answerState)
     }
@@ -239,6 +233,7 @@ export function useGameSocket(initialTeams, options = {}) {
     function onDisconnect() {
       setHostReady(false)
       setAuthState((prev) => ({ ...prev, authenticating: false }))
+      onBuzzResetRef.current?.()
     }
 
     function onRemoteSound(payload) {
@@ -287,19 +282,15 @@ export function useGameSocket(initialTeams, options = {}) {
     }
 
     function onBuzzArmed() {
-      setArmed(true)
+      onBuzzArmedRef.current?.()
     }
 
     function onBuzzReset() {
-      setArmed(false)
-      setBuzzWinner(null)
+      onBuzzResetRef.current?.()
     }
 
     function onBuzzWinnerEvent(data) {
       if (!data || typeof data.teamIndex !== 'number' || !data.team?.name || !data.team?.color) return
-      setArmed(false)
-      setBuzzWinner(data)
-      playBuzzIn()
       onBuzzWinnerRef.current?.(data)
     }
 
@@ -390,26 +381,6 @@ export function useGameSocket(initialTeams, options = {}) {
     }
   }, [ensureHostReady])
 
-  const armBuzzers = useCallback((options = {}) => {
-    const safeOptions = {}
-    if (options && typeof options === 'object' && !Array.isArray(options)) {
-      if (Array.isArray(options.allowedTeamIndices)) safeOptions.allowedTeamIndices = options.allowedTeamIndices
-    }
-    return new Promise((resolve) => {
-      socket.emit('host:arm', safeOptions, (result) => {
-        resolve(result || { ok: false, error: 'server-error' })
-      })
-    })
-  }, [])
-
-  const resetBuzzers = useCallback(() => {
-    return new Promise((resolve) => {
-      socket.emit('host:reset', (result) => {
-        resolve(result || { ok: false, error: 'server-error' })
-      })
-    })
-  }, [])
-
   const invalidateAuth = useCallback((message = 'Host authorization expired. Sign in again.') => {
     setHostReady(false)
     setAuthState((prev) => ({
@@ -432,8 +403,6 @@ export function useGameSocket(initialTeams, options = {}) {
   }, [hostReady, invalidateAuth])
 
   return {
-    armed,
-    buzzWinner,
     gameplayMode,
     answerState,
     members,
@@ -441,8 +410,6 @@ export function useGameSocket(initialTeams, options = {}) {
     sessionCode,
     authState,
     submitAuth,
-    armBuzzers,
-    resetBuzzers,
     syncHostQuestion,
     timerControlSignal,
     invalidateAuth,
