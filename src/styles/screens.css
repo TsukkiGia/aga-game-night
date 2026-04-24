@@ -607,6 +607,25 @@
   color: #fff;
 }
 
+.sd-question {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-heavy);
+  color: #fff;
+  text-align: center;
+  line-height: 1.3;
+  padding: 16px 24px;
+  background: rgba(255,255,255,0.06);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.sd-waiting-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
 .sd-waiting {
   font-size: var(--text-sm);
   color: rgba(255,255,255,0.35);
@@ -615,11 +634,33 @@
   text-transform: uppercase;
 }
 
+@keyframes sd-pop-in {
+  0%   { opacity: 0; transform: scale(0.7); }
+  60%  { transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes sd-trophy-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  40%       { transform: translateY(-14px) scale(1.18); }
+  70%       { transform: translateY(-5px) scale(1.06); }
+}
+
 .sd-buzz-result {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
+}
+
+.sd-buzz-result--celebrate {
+  animation: sd-pop-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sd-winner-flash {
+  font-size: 52px;
+  animation: sd-trophy-bounce 0.9s ease-in-out 0.15s both;
+  margin-bottom: 4px;
 }
 
 .sd-buzzed-label {
@@ -666,6 +707,23 @@
   color: rgba(255,255,255,0.5);
 }
 .sd-wrong-btn:hover { border-color: var(--terra); color: var(--terra); }
+
+.sd-shuffle-btn {
+  background: transparent;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius-md);
+  font-family: var(--font);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  padding: 8px 18px;
+  transition: all 0.15s;
+}
+.sd-shuffle-btn:hover {
+  border-color: rgba(255,255,255,0.5);
+  color: #fff;
+}
 
 .sd-cancel-btn {
   background: transparent;

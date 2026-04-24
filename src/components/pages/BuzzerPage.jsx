@@ -38,6 +38,10 @@ function normalizeIdentity(value) {
   return String(value || '').trim().toLowerCase()
 }
 
+function normalizeQuestionId(value) {
+  return String(value || '').trim()
+}
+
 function describeCorrectEvent(payload, currentTeamIndex, currentMemberName) {
   const answerText = String(payload?.answer || '').trim()
   if (!payload || typeof payload !== 'object') {
@@ -111,10 +115,12 @@ export default function BuzzerPage() {
   const [attemptToasts, setAttemptToasts] = useState([])
   const [correctEvent, setCorrectEvent] = useState(null)
   const [timeoutEvent, setTimeoutEvent] = useState(null)
+  const [suddenDeathQuestion, setSuddenDeathQuestion] = useState(null)
   const teamIndexRef = useRef(teamIndex)
   const nameRef = useRef(name)
   const gameplayModeRef = useRef(gameplayMode)
   const answerQuestionIdRef = useRef('')
+  const terminalQuestionIdRef = useRef('')
   const guessInputRef = useRef(null)
 
   const hostlessModeActive = isHostlessMode(gameplayMode)
@@ -143,20 +149,31 @@ export default function BuzzerPage() {
     const nextMode = normalizeGameplayMode(sync?.gameplayMode)
     setGameplayMode(nextMode)
     if (sync?.answerState) {
-      const nextQuestionId = String(sync.answerState.questionId || '')
+      const nextQuestionId = normalizeQuestionId(sync.answerState.questionId)
       if (answerQuestionIdRef.current && answerQuestionIdRef.current !== nextQuestionId) {
         setAttemptToasts([])
         setCorrectEvent(null)
         setTimeoutEvent(null)
         setSubmitError('')
         setGuess('')
+        terminalQuestionIdRef.current = ''
       }
       answerQuestionIdRef.current = nextQuestionId
+      const nextStatus = String(sync.answerState.status || '').trim().toLowerCase()
+      if (nextStatus === 'open' && nextQuestionId && terminalQuestionIdRef.current === nextQuestionId) {
+        return isHostlessMode(nextMode) ? 'waiting' : deriveStatusFromSync(sync, fallbackTeamIndex, fallbackName)
+      }
       setAnswerState(sync.answerState)
-      if (sync.answerState.status === 'open') {
+      if (nextStatus === 'open') {
         setCorrectEvent(null)
         setTimeoutEvent(null)
+      } else if (nextStatus === 'locked' && nextQuestionId) {
+        terminalQuestionIdRef.current = nextQuestionId
       }
+    }
+
+    if (sync?.suddenDeathQuestion !== undefined) {
+      setSuddenDeathQuestion(sync.suddenDeathQuestion || null)
     }
 
     if (isHostlessMode(nextMode)) return 'waiting'
@@ -223,8 +240,14 @@ export default function BuzzerPage() {
       setAttemptToasts([])
       setCorrectEvent(null)
       setTimeoutEvent(null)
+      setSuddenDeathQuestion(null)
       answerQuestionIdRef.current = ''
+      terminalQuestionIdRef.current = ''
       refreshAvailableTeams()
+    }
+
+    function onSuddenDeathQuestion(payload) {
+      setSuddenDeathQuestion(payload && typeof payload === 'object' ? payload : null)
     }
 
     function onBuzzArmed(payload) {
@@ -261,35 +284,61 @@ export default function BuzzerPage() {
 
     function onAnswerCorrect(payload) {
       if (!payload || typeof payload !== 'object') return
+      const nextQuestionId = normalizeQuestionId(payload.questionId || answerQuestionIdRef.current)
+      if (nextQuestionId) terminalQuestionIdRef.current = nextQuestionId
+      setAnswerState((prev) => ({
+        questionId: nextQuestionId || normalizeQuestionId(prev?.questionId),
+        status: 'locked',
+        open: false,
+        winner: prev?.winner ?? null,
+        revealedAnswer: String(payload.answer || prev?.revealedAnswer || '').trim() || null,
+        recentAttempts: Array.isArray(prev?.recentAttempts) ? prev.recentAttempts : [],
+      }))
       setTimeoutEvent(null)
       setCorrectEvent(payload)
     }
 
     function onAnswerTimeout(payload) {
       if (!payload || typeof payload !== 'object') return
+      const nextQuestionId = normalizeQuestionId(payload.questionId || answerQuestionIdRef.current)
+      if (nextQuestionId) terminalQuestionIdRef.current = nextQuestionId
+      setAnswerState((prev) => ({
+        questionId: nextQuestionId || normalizeQuestionId(prev?.questionId),
+        status: 'locked',
+        open: false,
+        winner: null,
+        revealedAnswer: String(payload.answer || prev?.revealedAnswer || '').trim() || null,
+        recentAttempts: Array.isArray(prev?.recentAttempts) ? prev.recentAttempts : [],
+      }))
       setCorrectEvent(null)
       setTimeoutEvent(payload)
     }
 
     function onAnswerState(payload) {
       if (!payload || typeof payload !== 'object') return
-      const nextQuestionId = String(payload.questionId || '')
+      const nextQuestionId = normalizeQuestionId(payload.questionId)
       if (answerQuestionIdRef.current && answerQuestionIdRef.current !== nextQuestionId) {
         setAttemptToasts([])
         setCorrectEvent(null)
         setTimeoutEvent(null)
         setSubmitError('')
         setGuess('')
+        terminalQuestionIdRef.current = ''
       }
       answerQuestionIdRef.current = nextQuestionId
+      const nextStatus = String(payload.status || '').trim().toLowerCase()
+      if (nextStatus === 'open' && nextQuestionId && terminalQuestionIdRef.current === nextQuestionId) return
       setAnswerState(payload)
-      if (payload.status === 'open') {
+      if (nextStatus === 'open') {
         setCorrectEvent(null)
         setTimeoutEvent(null)
         return
       }
+      if (nextStatus === 'locked' && nextQuestionId) {
+        terminalQuestionIdRef.current = nextQuestionId
+      }
       const revealedAnswer = String(payload?.revealedAnswer || '').trim()
-      if (payload.status === 'locked' && !payload?.winner && revealedAnswer) {
+      if (nextStatus === 'locked' && !payload?.winner && revealedAnswer) {
         setCorrectEvent(null)
         setTimeoutEvent((prev) => (
           prev?.questionId === payload.questionId && String(prev?.answer || '').trim() === revealedAnswer
@@ -318,6 +367,7 @@ export default function BuzzerPage() {
     socket.on('answer:correct', onAnswerCorrect)
     socket.on('answer:timeout', onAnswerTimeout)
     socket.on('answer:state', onAnswerState)
+    socket.on('sudden-death:question', onSuddenDeathQuestion)
 
     if (socket.connected) onConnect()
 
@@ -333,6 +383,7 @@ export default function BuzzerPage() {
       socket.off('answer:correct', onAnswerCorrect)
       socket.off('answer:timeout', onAnswerTimeout)
       socket.off('answer:state', onAnswerState)
+      socket.off('sudden-death:question', onSuddenDeathQuestion)
       socket.disconnect()
     }
   }, [])
@@ -459,6 +510,7 @@ export default function BuzzerPage() {
     setCorrectEvent(null)
     setTimeoutEvent(null)
     answerQuestionIdRef.current = ''
+    terminalQuestionIdRef.current = ''
   }
 
   if (status === 'loading') {
@@ -538,6 +590,12 @@ export default function BuzzerPage() {
         {!connected && (
           <div className="buzzer-reconnect-banner">Reconnecting…</div>
         )}
+        {suddenDeathQuestion && (
+          <div className="buzzer-sudden-death-banner">
+            <div className="buzzer-sudden-death-label">⚔ SUDDEN DEATH</div>
+            <div className="buzzer-sudden-death-text">{suddenDeathQuestion.text}</div>
+          </div>
+        )}
         <div className="buzzer-team-header">
           <div className={`buzzer-team-dot color-${team.color}`} />
           <div className="buzzer-team-info">
@@ -614,6 +672,12 @@ export default function BuzzerPage() {
     <div className={`buzzer-page buzzer-active color-${team.color}`}>
       {!connected && (
         <div className="buzzer-reconnect-banner">Reconnecting…</div>
+      )}
+      {suddenDeathQuestion && (
+        <div className="buzzer-sudden-death-banner">
+          <div className="buzzer-sudden-death-label">⚔ SUDDEN DEATH</div>
+          <div className="buzzer-sudden-death-text">{suddenDeathQuestion.text}</div>
+        </div>
       )}
       <div className="buzzer-team-header">
         <div className={`buzzer-team-dot color-${team.color}`} />

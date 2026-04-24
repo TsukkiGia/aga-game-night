@@ -486,3 +486,28 @@
   letter-spacing: 0.05em;
   padding: 10px;
 }
+
+/* Sudden death question banner */
+.buzzer-sudden-death-banner {
+  width: 100%;
+  background: #1a1a1a;
+  border: 2px solid #c0392b;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.buzzer-sudden-death-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #c0392b;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.buzzer-sudden-death-text {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.35;
+}

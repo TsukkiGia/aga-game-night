@@ -439,6 +439,24 @@
   color: var(--text-muted);
 }
 
+.sudden-death-btn {
+  background: transparent;
+  border: 1.5px solid #c0392b;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  color: #c0392b;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: auto;
+}
+.sudden-death-btn:hover,
+.sudden-death-btn.active {
+  background: rgba(192, 57, 43, 0.08);
+}
+
 .steal-open-btn {
   background: transparent;
   border: 1.5px solid var(--border);

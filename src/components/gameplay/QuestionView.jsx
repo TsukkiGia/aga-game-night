@@ -37,6 +37,8 @@ export default function QuestionView({
   getQuestionTotal = (ri) => rounds[ri]?.questions?.length || 0,
   savedSidebarScrollTop = 0,
   onRememberSidebarScroll = null,
+  onSuddenDeath = () => {},
+  suddenDeathQuestion = null,
 }) {
   const round = rounds[roundIndex]
   const question = round?.questions?.[questionIndex]
@@ -360,35 +362,40 @@ export default function QuestionView({
       </div>
 
       {/* ── Arm row ──────────────────────────────────── */}
-      {!hostlessModeActive && (
-        <div className="qv-arm-row arm-row">
+      <div className="qv-arm-row arm-row" style={hostlessModeActive ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}>
+        <button
+          className={`double-pts-btn${doublePoints ? ' active' : ''}`}
+          onClick={() => { if (!doublePoints) playPower(); onToggleDouble() }}
+          title="Double points for this question"
+        >
+          {doublePoints ? '2× ON' : '2×'}
+        </button>
+        <button
+          className={`arm-btn ${armed ? 'armed' : ''}`}
+          onClick={onArm}
+          disabled={armed || buzzWinner !== null}
+        >
+          {armed ? `🔴 Listening…${doublePoints ? ' (2×)' : ''}` : '🎯 Arm Buzzers'}
+        </button>
+        {armed && (
+          <button className="arm-cancel-btn" onClick={onDismiss}>Cancel</button>
+        )}
+        {!armed && !buzzWinner && !correctGiven && isCharades && (
           <button
-            className={`double-pts-btn${doublePoints ? ' active' : ''}`}
-            onClick={() => { if (!doublePoints) playPower(); onToggleDouble() }}
-            title="Double points for this question"
+            className={`steal-open-btn${stealPickerOpen ? ' active' : ''}`}
+            onClick={() => setStealPickerOpen((open) => !open)}
           >
-            {doublePoints ? '2× ON' : '2×'}
+            🔀 Open Steal
           </button>
-          <button
-            className={`arm-btn ${armed ? 'armed' : ''}`}
-            onClick={onArm}
-            disabled={armed || buzzWinner !== null}
-          >
-            {armed ? `🔴 Listening…${doublePoints ? ' (2×)' : ''}` : '🎯 Arm Buzzers'}
-          </button>
-          {armed && (
-            <button className="arm-cancel-btn" onClick={onDismiss}>Cancel</button>
-          )}
-          {!armed && !buzzWinner && !correctGiven && isCharades && (
-            <button
-              className={`steal-open-btn${stealPickerOpen ? ' active' : ''}`}
-              onClick={() => setStealPickerOpen((open) => !open)}
-            >
-              🔀 Open Steal
-            </button>
-          )}
-        </div>
-      )}
+        )}
+        <button
+          className={`sudden-death-btn${suddenDeathQuestion ? ' active' : ''}`}
+          onClick={onSuddenDeath}
+          title="Show a sudden death question on all player screens"
+        >
+          ⚔ {suddenDeathQuestion ? 'New Q' : 'Sudden Death'}
+        </button>
+      </div>
 
       <JoinQrModal
         open={showJoinQr}
