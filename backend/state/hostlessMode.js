@@ -397,6 +397,27 @@ export function recordWrongAttempt(st, attemptPayload) {
   }
 }
 
+export function resolveHostlessSuddenDeathContext(st) {
+  const q = st?.suddenDeathQuestion
+  if (!q || !q.id || !q.answer) return null
+  const questionId = String(q.id)
+  return {
+    itemType: 'question',
+    round: null,
+    roundIndex: null,
+    question: null,
+    questionIndex: null,
+    questionId,
+    cursorId: questionId,
+    roundType: 'custom-buzz',
+    supportedRound: true,
+    expectedAnswer: String(q.answer),
+    expectedAnswers: [String(q.answer)],
+    canAcceptAnswers: true,
+    unsupportedReason: '',
+  }
+}
+
 export function resolveHostlessPoints(round) {
   const scoring = round?.scoring
   if (scoring && typeof scoring === 'object' && !Array.isArray(scoring)) {

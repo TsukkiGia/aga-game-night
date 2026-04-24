@@ -28,6 +28,7 @@ export function initialState() {
     roundCatalog: [],
     reactionStats: {},
     answerState: buildInitialAnswerState(),
+    suddenDeathQuestion: null,
   }
 }
 
@@ -42,6 +43,9 @@ export function serializeMemberSyncState(st) {
     armed: st.armed,
     buzzedBy: st.buzzedBy,
     buzzedMemberName: st.buzzedMemberName,
+    suddenDeathQuestion: st.suddenDeathQuestion
+      ? { id: st.suddenDeathQuestion.id, text: st.suddenDeathQuestion.text }
+      : null,
     ...serializeEligibilityState(st),
   }
 }

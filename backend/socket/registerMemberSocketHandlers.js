@@ -12,6 +12,7 @@ export function registerMemberSocketHandlers(socket, ctx) {
     serializeMemberSyncState,
     serializeEligibilityState,
     resolveHostlessQuestionContext,
+    resolveHostlessSuddenDeathContext,
     recordWrongAttempt,
     lockAnswerState,
     resolveHostlessPoints,
@@ -261,7 +262,11 @@ export function registerMemberSocketHandlers(socket, ctx) {
       return
     }
 
-    const context = resolveHostlessQuestionContext(st)
+    const sdContext = st.suddenDeathQuestion && submittedQuestionId === st.suddenDeathQuestion.id
+      ? resolveHostlessSuddenDeathContext(st)
+      : null
+
+    const context = sdContext || resolveHostlessQuestionContext(st)
     if (context.itemType !== 'question' || !context.cursorId) {
       respond({ ok: false, error: 'question-locked' })
       return
@@ -270,7 +275,7 @@ export function registerMemberSocketHandlers(socket, ctx) {
       respond({ ok: false, error: 'stale-question' })
       return
     }
-    if (!isHostlessRoundSupported(context.roundType) || !Array.isArray(context.expectedAnswers) || context.expectedAnswers.length === 0) {
+    if (!sdContext && (!isHostlessRoundSupported(context.roundType) || !Array.isArray(context.expectedAnswers) || context.expectedAnswers.length === 0)) {
       respond({ ok: false, error: 'unsupported-round' })
       return
     }
@@ -320,7 +325,7 @@ export function registerMemberSocketHandlers(socket, ctx) {
     }
 
     if (isGuessCorrect(guess, context.expectedAnswer, context.expectedAnswers)) {
-      const points = resolveHostlessPoints(context.round)
+      const points = sdContext ? 1 : resolveHostlessPoints(context.round)
       st.teams[idx].score = Number(st.teams[idx].score || 0) + points
       lockAnswerState(st, {
         teamIndex: idx,

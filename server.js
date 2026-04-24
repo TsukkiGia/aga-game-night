@@ -28,8 +28,10 @@ import { hostRoom, ctrlRoom, memberTeamRoom } from './backend/socket/rooms.js'
 import { removeFromMembers, leaveTeamRooms, broadcastMembers } from './backend/socket/memberRegistry.js'
 import { normalizeRoundTemplatePayload, roundFromTemplateRow } from './backend/state/roundCatalog.js'
 import {
+  buildInitialAnswerState,
   resetAnswerStateForCursor,
   resolveHostlessQuestionContext,
+  resolveHostlessSuddenDeathContext,
   recordWrongAttempt,
   lockAnswerState,
   resolveHostlessPoints,
@@ -292,8 +294,10 @@ export function createBuzzServer({ queryFn = query, withTransactionFn = withTran
       normalizeGameplayMode,
       serializeHostSyncState,
       serializeMemberSyncState,
+      buildInitialAnswerState,
       resetAnswerStateForCursor,
       resolveHostlessQuestionContext,
+      resolveHostlessSuddenDeathContext,
       isHostlessMode,
       hostlessSubmitGuards,
       controllerLeases,
@@ -324,6 +328,7 @@ export function createBuzzServer({ queryFn = query, withTransactionFn = withTran
       serializeMemberSyncState,
       serializeEligibilityState,
       resolveHostlessQuestionContext,
+      resolveHostlessSuddenDeathContext,
       recordWrongAttempt,
       lockAnswerState,
       resolveHostlessPoints,

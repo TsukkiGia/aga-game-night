@@ -1,4 +1,5 @@
 import { emitAnswerState, emitAnswerTimeout } from './answerEvents.js'
+import { SUDDEN_DEATH_QUESTIONS } from '../../shared/suddenDeathQuestions.js'
 
 export function registerHostSocketHandlers(socket, ctx) {
   const {
@@ -22,6 +23,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     normalizeGameplayMode,
     serializeHostSyncState,
     serializeMemberSyncState,
+    buildInitialAnswerState,
     resetAnswerStateForCursor,
     resolveHostlessQuestionContext,
     isHostlessMode,
@@ -490,6 +492,25 @@ export function registerHostSocketHandlers(socket, ctx) {
       ? normalizeGameplayMode(payload.gameplayMode, previousGameplayMode)
       : previousGameplayMode
     const gameplayModeChanged = normalizedGameplayMode !== previousGameplayMode
+    const hasIncomingHostQuestionCursor = Object.hasOwn(payload, 'hostQuestionCursor')
+    const previousHostQuestionCursor = normalizeQuestionCursor(st.hostQuestionCursor)
+    const normalizedHostQuestionCursor = hasIncomingHostQuestionCursor
+      ? normalizeQuestionCursor(payload.hostQuestionCursor)
+      : previousHostQuestionCursor
+    if (hasIncomingHostQuestionCursor && normalizedHostQuestionCursor === null && payload.hostQuestionCursor !== null) {
+      respondCommand({
+        code,
+        command: 'host:runtime:update',
+        meta,
+        st,
+        respond,
+        response: { ok: false, error: 'invalid-cursor' },
+      })
+      return
+    }
+    const cursorChanged = hasIncomingHostQuestionCursor
+      ? JSON.stringify(normalizedHostQuestionCursor) !== JSON.stringify(previousHostQuestionCursor)
+      : false
 
     st.teams = normalizedTeams.map((team, index) => ({
       ...team,
@@ -502,6 +523,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     st.roundCatalog = normalizedRoundCatalog
     st.reactionStats = normalizedReactionStats
     st.gameplayMode = normalizedGameplayMode
+    st.hostQuestionCursor = normalizedHostQuestionCursor
     if (gameplayModeChanged) {
       st.armed = false
       st.armedAtMs = null
@@ -514,7 +536,8 @@ export function registerHostSocketHandlers(socket, ctx) {
       ensureAnswerStateForMode(st, { forceReset: true })
       hostlessSubmitGuards.delete(code)
     } else {
-      ensureAnswerStateForMode(st)
+      ensureAnswerStateForMode(st, { forceReset: cursorChanged })
+      if (cursorChanged) hostlessSubmitGuards.delete(code)
     }
 
     try {
@@ -525,6 +548,9 @@ export function registerHostSocketHandlers(socket, ctx) {
         io.to(hostRoom(code)).emit('host:question', st.hostQuestionCursor)
         io.to(`${code}:members`).emit('buzz:reset')
         io.to(`${code}:members`).emit('member:sync', serializeMemberSyncState(st))
+        broadcastAnswerState(code, st)
+      } else if (cursorChanged) {
+        io.to(hostRoom(code)).emit('host:question', st.hostQuestionCursor)
         broadcastAnswerState(code, st)
       }
       respondCommand({
@@ -1068,5 +1094,53 @@ export function registerHostSocketHandlers(socket, ctx) {
         cache: false,
       })
     }
+  })
+
+  socket.on('host:sudden-death:pick', async (callback) => {
+    const respond = typeof callback === 'function' ? callback : () => {}
+    const code = requireControllerAccess(respond)
+    if (!code) return
+    let st
+    try {
+      st = await ensureState(code)
+    } catch (err) {
+      console.error('[host:sudden-death:pick]', err)
+      respond({ ok: false, error: 'server-error' })
+      return
+    }
+    if (!st) {
+      respond({ ok: false, error: 'session-not-found' })
+      return
+    }
+    const question = SUDDEN_DEATH_QUESTIONS[Math.floor(Math.random() * SUDDEN_DEATH_QUESTIONS.length)]
+    st.suddenDeathQuestion = { id: question.id, text: question.text, answer: question.answer }
+    if (isHostlessMode(st.gameplayMode)) {
+      st.answerState = buildInitialAnswerState({ questionId: question.id, open: true })
+      hostlessSubmitGuards.delete(code)
+      broadcastAnswerState(code, st)
+    }
+    const publicQuestion = { id: question.id, text: question.text }
+    io.to(`${code}:members`).emit('sudden-death:question', publicQuestion)
+    respond({ ok: true, question: publicQuestion })
+  })
+
+  socket.on('host:sudden-death:clear', async (callback) => {
+    const respond = typeof callback === 'function' ? callback : () => {}
+    const code = requireControllerAccess(respond)
+    if (!code) return
+    let st
+    try {
+      st = await ensureState(code)
+    } catch {
+      respond({ ok: false, error: 'server-error' })
+      return
+    }
+    if (!st) {
+      respond({ ok: false, error: 'session-not-found' })
+      return
+    }
+    st.suddenDeathQuestion = null
+    io.to(`${code}:members`).emit('sudden-death:question', null)
+    respond({ ok: true })
   })
 }
