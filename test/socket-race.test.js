@@ -734,6 +734,7 @@ test('state hydrates from database after in-memory cache is cleared', async () =
     await emitAck(host, 'host:arm')
 
     harness.getSessions().clear()
+    host.disconnect()
 
     const hostAfterClear = await harness.connect()
     await authHost(hostAfterClear, sessionCode, pin)
@@ -796,6 +797,7 @@ test('runtime scoreboard state persists and rehydrates after reconnect', async (
     assert.equal(runtimeUpdate.ok, true)
 
     harness.getSessions().delete(sessionCode)
+    host1.disconnect()
 
     const host2 = await harness.connect()
     await authHost(host2, sessionCode, pin)
@@ -1141,7 +1143,7 @@ test('host question cursor sync requires auth and broadcasts updates', async () 
     assert.equal(unauthorizedSet.ok, false)
     assert.equal(unauthorizedSet.error, 'unauthorized')
 
-    await authHost(other, sessionCode, pin)
+    await authCompanion(other, sessionCode, pin)
 
     const cursorPromise = once(other, 'host:question')
     const setResult = await emitAck(host, 'host:question:set', [1, 2])

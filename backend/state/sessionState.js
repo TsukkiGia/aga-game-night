@@ -9,6 +9,7 @@ import {
 
 export function initialState() {
   return {
+    runtimeVersion: 0,
     teams: [],
     gameplayMode: 'hosted',
     armed: false,
@@ -58,6 +59,9 @@ export function serializeHostSyncState(st) {
     : []
 
   return {
+    sessionVersion: Number.isInteger(Number.parseInt(st?.runtimeVersion, 10))
+      ? Number.parseInt(st.runtimeVersion, 10)
+      : 0,
     teams,
     gameplayMode: normalizeGameplayMode(st?.gameplayMode),
     answerState: serializeAnswerState(st?.answerState, teams),

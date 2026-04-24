@@ -70,6 +70,12 @@ function getAuthMaxAttempts() {
   return raw
 }
 
+function getCommandReplayTtlMs() {
+  const raw = Number.parseInt(process.env.HOST_COMMAND_REPLAY_TTL_MS || '', 10)
+  if (!Number.isInteger(raw) || raw < 1000) return 90_000
+  return raw
+}
+
 export function createBuzzServer({ queryFn = query, withTransactionFn = withTransaction } = {}) {
   const app = express()
   app.use(express.json())
@@ -81,6 +87,8 @@ export function createBuzzServer({ queryFn = query, withTransactionFn = withTran
   const pendingSoundResults = new Map()
   const authAttempts = new Map()
   const hostlessSubmitGuards = new Map()
+  const controllerLeases = new Map()
+  const commandReplayCache = new Map()
 
   async function authenticateHostRequest(sessionCodeRaw, pinRaw) {
     const sessionCode = String(sessionCodeRaw || '').trim().toUpperCase()
@@ -288,6 +296,8 @@ export function createBuzzServer({ queryFn = query, withTransactionFn = withTran
       resolveHostlessQuestionContext,
       isHostlessMode,
       hostlessSubmitGuards,
+      controllerLeases,
+      commandReplayCache,
       serializeEligibilityState,
       isHostAuthorized,
       isHostController,
@@ -297,6 +307,7 @@ export function createBuzzServer({ queryFn = query, withTransactionFn = withTran
       debugLog,
       ALLOWED_SOUND_KEYS,
       getSoundResultTimeoutMs,
+      getCommandReplayTtlMs,
       bcrypt,
       removeFromMembers,
       broadcastMembers: broadcastSessionMembers,

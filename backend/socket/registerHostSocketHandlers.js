@@ -26,6 +26,8 @@ export function registerHostSocketHandlers(socket, ctx) {
     resolveHostlessQuestionContext,
     isHostlessMode,
     hostlessSubmitGuards,
+    controllerLeases,
+    commandReplayCache,
     serializeEligibilityState,
     isHostAuthorized,
     isHostController,
@@ -35,16 +37,23 @@ export function registerHostSocketHandlers(socket, ctx) {
     debugLog,
     ALLOWED_SOUND_KEYS,
     getSoundResultTimeoutMs,
+    getCommandReplayTtlMs,
     bcrypt,
     removeFromMembers,
     broadcastMembers,
   } = ctx
 
+  const MAX_COMMAND_REPLAY_ENTRIES_PER_SESSION = 400
+
   function clearHostAuthorization(targetSocket) {
     const code = String(targetSocket?.data?.sessionCode || '').trim().toUpperCase()
     if (code) {
-      targetSocket.leave(hostRoom(code))
-      targetSocket.leave(ctrlRoom(code))
+      if (targetSocket.connected) {
+        targetSocket.leave(hostRoom(code))
+        targetSocket.leave(ctrlRoom(code))
+      }
+      const lease = controllerLeases.get(code)
+      if (lease?.socketId === targetSocket.id) controllerLeases.delete(code)
     }
     targetSocket.data.isHost = false
     targetSocket.data.hostRole = null
@@ -108,6 +117,159 @@ export function registerHostSocketHandlers(socket, ctx) {
     }
   }
 
+  function normalizeSessionVersion(st) {
+    const parsed = Number.parseInt(st?.runtimeVersion, 10)
+    if (Number.isInteger(parsed) && parsed >= 0) {
+      st.runtimeVersion = parsed
+      return parsed
+    }
+    st.runtimeVersion = 0
+    return 0
+  }
+
+  function bumpSessionVersion(st) {
+    st.runtimeVersion = normalizeSessionVersion(st) + 1
+    return st.runtimeVersion
+  }
+
+  function parseCommandMeta(payloadObj) {
+    const payload = (payloadObj && typeof payloadObj === 'object' && !Array.isArray(payloadObj))
+      ? payloadObj
+      : null
+    const metaObj = (payload && payload._meta && typeof payload._meta === 'object' && !Array.isArray(payload._meta))
+      ? payload._meta
+      : ((payload && payload.meta && typeof payload.meta === 'object' && !Array.isArray(payload.meta)) ? payload.meta : null)
+    const requestId = String(metaObj?.requestId ?? payload?.requestId ?? '').trim().slice(0, 120)
+    const rawVersion = metaObj?.sessionVersion ?? payload?.sessionVersion
+    const parsedVersion = Number.parseInt(rawVersion, 10)
+    const sessionVersion = Number.isInteger(parsedVersion) && parsedVersion >= 0 ? parsedVersion : null
+    const questionId = String(metaObj?.questionId ?? payload?.questionId ?? '').trim()
+    return {
+      requestId,
+      sessionVersion,
+      questionId,
+    }
+  }
+
+  function replayKey(command, requestId) {
+    return `${command}:${requestId}`
+  }
+
+  function getSessionReplayMap(code) {
+    if (!commandReplayCache.has(code)) commandReplayCache.set(code, new Map())
+    return commandReplayCache.get(code)
+  }
+
+  function pruneSessionReplay(code) {
+    const replayMap = getSessionReplayMap(code)
+    const ttlMs = getCommandReplayTtlMs()
+    const now = Date.now()
+    for (const [key, entry] of replayMap.entries()) {
+      if (!entry || (now - Number(entry.timestamp || 0)) > ttlMs) replayMap.delete(key)
+    }
+    if (replayMap.size <= MAX_COMMAND_REPLAY_ENTRIES_PER_SESSION) return
+    const entries = [...replayMap.entries()].sort((a, b) => Number(a[1]?.timestamp || 0) - Number(b[1]?.timestamp || 0))
+    for (let i = 0; i < entries.length - MAX_COMMAND_REPLAY_ENTRIES_PER_SESSION; i += 1) {
+      replayMap.delete(entries[i][0])
+    }
+  }
+
+  function getCachedCommandResponse(code, command, requestId) {
+    if (!requestId) return null
+    pruneSessionReplay(code)
+    const replayMap = getSessionReplayMap(code)
+    const entry = replayMap.get(replayKey(command, requestId))
+    return entry?.response || null
+  }
+
+  function cacheCommandResponse(code, command, requestId, response) {
+    if (!requestId) return
+    const replayMap = getSessionReplayMap(code)
+    replayMap.set(replayKey(command, requestId), {
+      timestamp: Date.now(),
+      response,
+    })
+    pruneSessionReplay(code)
+  }
+
+  function withSessionVersion(st, response) {
+    const safeResponse = (response && typeof response === 'object') ? { ...response } : { ok: Boolean(response) }
+    if (!Object.hasOwn(safeResponse, 'sessionVersion')) {
+      safeResponse.sessionVersion = normalizeSessionVersion(st)
+    }
+    return safeResponse
+  }
+
+  function guardCommandExecution({ code, command, meta, st, respond }) {
+    const replayed = getCachedCommandResponse(code, command, meta.requestId)
+    if (replayed) {
+      respond(replayed)
+      return false
+    }
+    const currentVersion = normalizeSessionVersion(st)
+    if (meta.sessionVersion !== null && meta.sessionVersion !== currentVersion) {
+      const staleResponse = { ok: false, error: 'stale-session-version', sessionVersion: currentVersion }
+      cacheCommandResponse(code, command, meta.requestId, staleResponse)
+      respond(staleResponse)
+      return false
+    }
+    return true
+  }
+
+  function respondCommand({ code, command, meta, st, respond, response, bumpVersion = false, cache = true }) {
+    if (bumpVersion) bumpSessionVersion(st)
+    const payload = withSessionVersion(st, response)
+    if (cache) cacheCommandResponse(code, command, meta.requestId, payload)
+    respond(payload)
+    return payload
+  }
+
+  function currentControllerLease(code) {
+    const lease = controllerLeases.get(code)
+    if (!lease?.socketId) return null
+    const holder = io.sockets.sockets.get(lease.socketId)
+    const valid = (
+      holder
+      && holder.connected
+      && holder.data?.isHost === true
+      && holder.data?.hostRole === 'controller'
+      && String(holder.data?.sessionCode || '').trim().toUpperCase() === code
+    )
+    if (!valid) {
+      controllerLeases.delete(code)
+      return null
+    }
+    return lease
+  }
+
+  function claimControllerLease(code, socketId) {
+    const lease = currentControllerLease(code)
+    if (lease && lease.socketId !== socketId) return false
+    controllerLeases.set(code, { socketId, touchedAtMs: Date.now() })
+    return true
+  }
+
+  function requireControllerAccess(respond) {
+    if (!isHostController(socket)) {
+      respond({ ok: false, error: 'unauthorized' })
+      return null
+    }
+    const code = String(socket.data.sessionCode || '').trim().toUpperCase()
+    if (!code) {
+      respond({ ok: false, error: 'unauthorized' })
+      return null
+    }
+    if (!claimControllerLease(code, socket.id)) {
+      respond({ ok: false, error: 'controller-active' })
+      return null
+    }
+    return code
+  }
+
+  socket.on('disconnect', () => {
+    clearHostAuthorization(socket)
+  })
+
   // ── Host: authenticate ──────────────────────────────────────────────
   socket.on('host:auth', async (payload, callback) => {
     const respond = typeof callback === 'function' ? callback : () => {}
@@ -146,6 +308,13 @@ export function registerHostSocketHandlers(socket, ctx) {
         respond({ ok: false, error: 'unauthorized' })
         return
       }
+      if (role === 'controller') {
+        const existing = currentControllerLease(code)
+        if (existing && existing.socketId !== socket.id) {
+          respond({ ok: false, error: 'controller-active' })
+          return
+        }
+      }
 
       clearMemberIdentity(socket)
       clearHostAuthorization(socket)
@@ -155,6 +324,7 @@ export function registerHostSocketHandlers(socket, ctx) {
       socket.join(hostRoom(code))
       socket.leave(ctrlRoom(code))
       if (role === 'controller') socket.join(ctrlRoom(code))
+      if (role === 'controller') controllerLeases.set(code, { socketId: socket.id, touchedAtMs: Date.now() })
       noteAuthAttempt(socket, true)
       respond({ ok: true })
     } catch (err) {
@@ -166,11 +336,8 @@ export function registerHostSocketHandlers(socket, ctx) {
   // ── Host: register teams ────────────────────────────────────────────
   socket.on('host:setup', async (payload, callback) => {
     const respond = typeof callback === 'function' ? callback : () => {}
-    if (!isHostController(socket)) {
-      respond({ ok: false, error: 'unauthorized' })
-      return
-    }
-    const code = socket.data.sessionCode
+    const code = requireControllerAccess(respond)
+    if (!code) return
     const payloadObj = (payload && typeof payload === 'object' && !Array.isArray(payload))
       ? payload
       : null
@@ -241,7 +408,10 @@ export function registerHostSocketHandlers(socket, ctx) {
       }
       const gameplayModeChanged = normalizeGameplayMode(st.gameplayMode) !== previousGameplayMode
       ensureAnswerStateForMode(st, { forceReset: isNewGame || gameplayModeChanged })
-      if (isNewGame || gameplayModeChanged) hostlessSubmitGuards.delete(code)
+      if (isNewGame || gameplayModeChanged) {
+        hostlessSubmitGuards.delete(code)
+        if (isNewGame) commandReplayCache.delete(code)
+      }
 
       await persistTeams(code, st.teams)
       await persistRuntimeState(code, st)
@@ -260,16 +430,14 @@ export function registerHostSocketHandlers(socket, ctx) {
 
   socket.on('host:runtime:update', async (payload, callback) => {
     const respond = typeof callback === 'function' ? callback : () => {}
-    if (!isHostController(socket)) {
-      respond({ ok: false, error: 'unauthorized' })
-      return
-    }
+    const code = requireControllerAccess(respond)
+    if (!code) return
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
       respond({ ok: false, error: 'invalid-payload' })
       return
     }
+    const meta = parseCommandMeta(payload)
 
-    const code = socket.data.sessionCode
     let st
     try {
       st = await ensureState(code)
@@ -282,10 +450,18 @@ export function registerHostSocketHandlers(socket, ctx) {
       respond({ ok: false, error: 'session-not-found' })
       return
     }
+    if (!guardCommandExecution({ code, command: 'host:runtime:update', meta, st, respond })) return
 
     const normalizedTeams = normalizeTeams(payload.teams)
     if (!normalizedTeams || normalizedTeams.length !== st.teams.length) {
-      respond({ ok: false, error: 'invalid-teams' })
+      respondCommand({
+        code,
+        command: 'host:runtime:update',
+        meta,
+        st,
+        respond,
+        response: { ok: false, error: 'invalid-teams' },
+      })
       return
     }
 
@@ -351,26 +527,52 @@ export function registerHostSocketHandlers(socket, ctx) {
         io.to(`${code}:members`).emit('member:sync', serializeMemberSyncState(st))
         broadcastAnswerState(code, st)
       }
-      respond({ ok: true })
+      respondCommand({
+        code,
+        command: 'host:runtime:update',
+        meta,
+        st,
+        respond,
+        response: { ok: true },
+        bumpVersion: true,
+      })
     } catch (err) {
       console.error('[host:runtime:update]', err)
-      respond({ ok: false, error: 'server-error' })
+      respondCommand({
+        code,
+        command: 'host:runtime:update',
+        meta,
+        st,
+        respond,
+        response: { ok: false, error: 'server-error' },
+        cache: false,
+      })
     }
   })
 
   // ── Host: question cursor ───────────────────────────────────────────
-  socket.on('host:question:set', async (rawCursor, callback) => {
-    const respond = typeof callback === 'function' ? callback : () => {}
-    if (!isHostController(socket)) {
-      respond({ ok: false, error: 'unauthorized' })
-      return
-    }
-    const cursor = normalizeQuestionCursor(rawCursor)
-    if (cursor === null && rawCursor !== null) {
+  socket.on('host:question:set', async (arg1, arg2) => {
+    const payload = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : null
+    const respond = typeof arg1 === 'function' ? arg1 : (typeof arg2 === 'function' ? arg2 : () => {})
+    const code = requireControllerAccess(respond)
+    if (!code) return
+    const hasEnvelope = Boolean(payload && (
+      Object.hasOwn(payload, 'cursor')
+      || Object.hasOwn(payload, 'questionCursor')
+      || Object.hasOwn(payload, '_meta')
+      || Object.hasOwn(payload, 'meta')
+      || Object.hasOwn(payload, 'requestId')
+      || Object.hasOwn(payload, 'sessionVersion')
+    ))
+    const cursorInput = hasEnvelope
+      ? (Object.hasOwn(payload, 'cursor') ? payload.cursor : payload.questionCursor)
+      : arg1
+    const cursor = normalizeQuestionCursor(cursorInput)
+    if (cursor === null && cursorInput !== null) {
       respond({ ok: false, error: 'invalid-cursor' })
       return
     }
-    const code = socket.data.sessionCode
+    const meta = parseCommandMeta(hasEnvelope ? payload : null)
     let st
     try {
       st = await ensureState(code)
@@ -383,6 +585,7 @@ export function registerHostSocketHandlers(socket, ctx) {
       respond({ ok: false, error: 'session-not-found' })
       return
     }
+    if (!guardCommandExecution({ code, command: 'host:question:set', meta, st, respond })) return
     st.hostQuestionCursor = cursor
     ensureAnswerStateForMode(st, { forceReset: true })
     hostlessSubmitGuards.delete(code)
@@ -390,10 +593,26 @@ export function registerHostSocketHandlers(socket, ctx) {
       await persistRuntimeState(code, st)
       io.to(hostRoom(code)).emit('host:question', cursor)
       broadcastAnswerState(code, st)
-      respond({ ok: true })
+      respondCommand({
+        code,
+        command: 'host:question:set',
+        meta,
+        st,
+        respond,
+        response: { ok: true },
+        bumpVersion: true,
+      })
     } catch (err) {
       console.error('[host:question:set]', err)
-      respond({ ok: false, error: 'server-error' })
+      respondCommand({
+        code,
+        command: 'host:question:set',
+        meta,
+        st,
+        respond,
+        response: { ok: false, error: 'server-error' },
+        cache: false,
+      })
     }
   })
 
@@ -428,11 +647,8 @@ export function registerHostSocketHandlers(socket, ctx) {
 
   socket.on('host:end-session', async (callback) => {
     const respond = typeof callback === 'function' ? callback : () => {}
-    if (!isHostController(socket)) {
-      respond({ ok: false, error: 'unauthorized' })
-      return
-    }
-    const code = socket.data.sessionCode
+    const code = requireControllerAccess(respond)
+    if (!code) return
     try {
       const result = await queryFn("UPDATE sessions SET status = 'ended' WHERE id = $1 AND status = 'active'", [code])
       if (result.rowCount === 0) {
@@ -441,6 +657,8 @@ export function registerHostSocketHandlers(socket, ctx) {
         return
       }
       hostlessSubmitGuards.delete(code)
+      commandReplayCache.delete(code)
+      controllerLeases.delete(code)
       sessions.delete(code)
       const hostSockets = await io.in(hostRoom(code)).fetchSockets()
       io.to(hostRoom(code)).emit('game:reset')
@@ -455,11 +673,8 @@ export function registerHostSocketHandlers(socket, ctx) {
 
   socket.on('host:new-game', async (callback) => {
     const respond = typeof callback === 'function' ? callback : () => {}
-    if (!isHostController(socket)) {
-      respond({ ok: false, error: 'unauthorized' })
-      return
-    }
-    const code = socket.data.sessionCode
+    const code = requireControllerAccess(respond)
+    if (!code) return
     let existing
     try {
       existing = await ensureState(code)
@@ -476,6 +691,7 @@ export function registerHostSocketHandlers(socket, ctx) {
     nextState.gameplayMode = normalizeGameplayMode(existing.gameplayMode)
     sessions.set(code, nextState)
     hostlessSubmitGuards.delete(code)
+    commandReplayCache.delete(code)
     const st = sessions.get(code)
     try {
       await persistTeams(code, st.teams)
@@ -495,11 +711,8 @@ export function registerHostSocketHandlers(socket, ctx) {
 
   socket.on('host:streak', async (payload, callback) => {
     const respond = typeof callback === 'function' ? callback : () => {}
-    if (!isHostController(socket)) {
-      respond({ ok: false, error: 'unauthorized' })
-      return
-    }
-    const code = socket.data.sessionCode
+    const code = requireControllerAccess(respond)
+    if (!code) return
     let st
     try {
       st = await ensureState(code)
@@ -593,11 +806,9 @@ export function registerHostSocketHandlers(socket, ctx) {
   socket.on('host:timer:expired', async (arg1, arg2) => {
     const payload = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}
     const respond = typeof arg1 === 'function' ? arg1 : (typeof arg2 === 'function' ? arg2 : () => {})
-    if (!isHostController(socket)) {
-      respond({ ok: false, accepted: false, error: 'unauthorized' })
-      return
-    }
-    const code = socket.data.sessionCode
+    const code = requireControllerAccess(respond)
+    if (!code) return
+    const meta = parseCommandMeta(payload)
     const timerQuestionId = String(payload.questionId || '').trim()
     let st
     try {
@@ -611,21 +822,43 @@ export function registerHostSocketHandlers(socket, ctx) {
       respond({ ok: false, accepted: false, error: 'session-not-found' })
       return
     }
+    if (!guardCommandExecution({ code, command: 'host:timer:expired', meta, st, respond })) return
     if (isHostlessMode(st.gameplayMode)) {
       const context = resolveHostlessQuestionContext(st)
       if (context.itemType !== 'question' || !context.cursorId) {
-        respond({ ok: true, accepted: false, reason: 'no-active-question' })
+        respondCommand({
+          code,
+          command: 'host:timer:expired',
+          meta,
+          st,
+          respond,
+          response: { ok: true, accepted: false, reason: 'no-active-question' },
+        })
         return
       }
       if (timerQuestionId && timerQuestionId !== context.cursorId) {
-        respond({ ok: true, accepted: false, reason: 'stale-question-id' })
+        respondCommand({
+          code,
+          command: 'host:timer:expired',
+          meta,
+          st,
+          respond,
+          response: { ok: true, accepted: false, reason: 'stale-question-id' },
+        })
         return
       }
       if (String(st?.answerState?.questionId || '') !== context.cursorId) {
         resetAnswerStateForCursor(st)
       }
       if (st?.answerState?.status !== 'open' || st?.answerState?.winner) {
-        respond({ ok: true, accepted: false, reason: 'question-locked' })
+        respondCommand({
+          code,
+          command: 'host:timer:expired',
+          meta,
+          st,
+          respond,
+          response: { ok: true, accepted: false, reason: 'question-locked' },
+        })
         return
       }
 
@@ -648,7 +881,15 @@ export function registerHostSocketHandlers(socket, ctx) {
       emitAnswerTimeout(io, hostRoom, code, timeoutPayload)
       broadcastAnswerState(code, st)
       persistRuntimeStateInBackground(code, st)
-      respond({ ok: true, accepted: true })
+      respondCommand({
+        code,
+        command: 'host:timer:expired',
+        meta,
+        st,
+        respond,
+        response: { ok: true, accepted: true },
+        bumpVersion: true,
+      })
       return
     }
     // Timer expiry should stop countdown flow, but keep current buzz winner
@@ -659,18 +900,24 @@ export function registerHostSocketHandlers(socket, ctx) {
     st.attemptedSocketIds = new Set()
     io.to(hostRoom(code)).emit('host:timer:expired')
     persistRuntimeStateInBackground(code, st)
-    respond({ ok: true, accepted: true })
+    respondCommand({
+      code,
+      command: 'host:timer:expired',
+      meta,
+      st,
+      respond,
+      response: { ok: true, accepted: true },
+      bumpVersion: true,
+    })
   })
 
   // ── Buzzers ─────────────────────────────────────────────────────────
   socket.on('host:arm', async (arg1, arg2) => {
     const options = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}
     const respond = typeof arg1 === 'function' ? arg1 : (typeof arg2 === 'function' ? arg2 : () => {})
-    if (!isHostController(socket)) {
-      respond({ ok: false, error: 'unauthorized' })
-      return
-    }
-    const code = socket.data.sessionCode
+    const code = requireControllerAccess(respond)
+    if (!code) return
+    const meta = parseCommandMeta(options)
     let st
     try {
       st = await ensureState(code)
@@ -683,14 +930,29 @@ export function registerHostSocketHandlers(socket, ctx) {
       respond({ ok: false, error: 'session-not-found' })
       return
     }
+    if (!guardCommandExecution({ code, command: 'host:arm', meta, st, respond })) return
     if (isHostlessMode(st.gameplayMode)) {
-      respond({ ok: false, error: 'unsupported-mode' })
+      respondCommand({
+        code,
+        command: 'host:arm',
+        meta,
+        st,
+        respond,
+        response: { ok: false, error: 'unsupported-mode' },
+      })
       return
     }
     const allowedIndices = normalizeAllowedTeamIndices(options.allowedTeamIndices, st.teams.length)
     debugLog(`[host:arm] armed=${st.armed} buzzedBy=${st.buzzedBy}`)
     if (st.buzzedBy !== null) {
-      respond({ ok: false, error: 'buzz-locked' })
+      respondCommand({
+        code,
+        command: 'host:arm',
+        meta,
+        st,
+        respond,
+        response: { ok: false, error: 'buzz-locked' },
+      })
       return
     }
     st.armed = true
@@ -702,20 +964,35 @@ export function registerHostSocketHandlers(socket, ctx) {
     io.to(`${code}:members`).emit('buzz:armed', serializeEligibilityState(st))
     try {
       await persistRuntimeState(code, st)
-      respond({ ok: true })
+      respondCommand({
+        code,
+        command: 'host:arm',
+        meta,
+        st,
+        respond,
+        response: { ok: true },
+        bumpVersion: true,
+      })
     } catch (err) {
       console.error('[host:arm]', err)
-      respond({ ok: false, error: 'server-error' })
+      respondCommand({
+        code,
+        command: 'host:arm',
+        meta,
+        st,
+        respond,
+        response: { ok: false, error: 'server-error' },
+        cache: false,
+      })
     }
   })
 
-  socket.on('host:reset', async (callback) => {
-    const respond = typeof callback === 'function' ? callback : () => {}
-    if (!isHostController(socket)) {
-      respond({ ok: false, error: 'unauthorized' })
-      return
-    }
-    const code = socket.data.sessionCode
+  socket.on('host:reset', async (arg1, arg2) => {
+    const payload = (arg1 && typeof arg1 === 'object' && !Array.isArray(arg1)) ? arg1 : {}
+    const respond = typeof arg1 === 'function' ? arg1 : (typeof arg2 === 'function' ? arg2 : () => {})
+    const code = requireControllerAccess(respond)
+    if (!code) return
+    const meta = parseCommandMeta(payload)
     let st
     try {
       st = await ensureState(code)
@@ -728,6 +1005,7 @@ export function registerHostSocketHandlers(socket, ctx) {
       respond({ ok: false, error: 'session-not-found' })
       return
     }
+    if (!guardCommandExecution({ code, command: 'host:reset', meta, st, respond })) return
     debugLog('[host:reset]')
     if (isHostlessMode(st.gameplayMode)) {
       ensureAnswerStateForMode(st, { forceReset: true })
@@ -735,10 +1013,26 @@ export function registerHostSocketHandlers(socket, ctx) {
       broadcastAnswerState(code, st)
       try {
         await persistRuntimeState(code, st)
-        respond({ ok: true })
+        respondCommand({
+          code,
+          command: 'host:reset',
+          meta,
+          st,
+          respond,
+          response: { ok: true },
+          bumpVersion: true,
+        })
       } catch (err) {
         console.error('[host:reset]', err)
-        respond({ ok: false, error: 'server-error' })
+        respondCommand({
+          code,
+          command: 'host:reset',
+          meta,
+          st,
+          respond,
+          response: { ok: false, error: 'server-error' },
+          cache: false,
+        })
       }
       return
     }
@@ -753,10 +1047,26 @@ export function registerHostSocketHandlers(socket, ctx) {
     io.to(`${code}:members`).emit('buzz:reset')
     try {
       await persistRuntimeState(code, st)
-      respond({ ok: true })
+      respondCommand({
+        code,
+        command: 'host:reset',
+        meta,
+        st,
+        respond,
+        response: { ok: true },
+        bumpVersion: true,
+      })
     } catch (err) {
       console.error('[host:reset]', err)
-      respond({ ok: false, error: 'server-error' })
+      respondCommand({
+        code,
+        command: 'host:reset',
+        meta,
+        st,
+        respond,
+        response: { ok: false, error: 'server-error' },
+        cache: false,
+      })
     }
   })
 }
