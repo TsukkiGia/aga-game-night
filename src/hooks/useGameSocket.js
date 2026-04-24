@@ -4,6 +4,7 @@ import { playSoundBiteByKey, unlockAudio } from '../core/sounds'
 import { mapHostAuthError } from '../core/auth'
 import { clearHostCredentials, readHostCredentials, writeHostCredentials } from '../core/storage'
 import { normalizeGameplayMode } from '../core/gameplayMode'
+import { setKnownHostSessionVersion, syncHostSessionVersionFromAck, withHostCommandMeta } from '../core/hostCommandMeta'
 
 export function useGameSocket(initialTeams, options = {}) {
   const onBuzzWinner = typeof options.onBuzzWinner === 'function' ? options.onBuzzWinner : null
@@ -224,6 +225,7 @@ export function useGameSocket(initialTeams, options = {}) {
     }
 
     function syncState(state) {
+      setKnownHostSessionVersion(state?.sessionVersion)
       setGameplayMode(normalizeGameplayMode(state?.gameplayMode, setupPayloadRef.current?.gameplayMode))
       setAnswerState(state?.answerState || null)
       onStateSyncRef.current?.(state)
@@ -393,8 +395,14 @@ export function useGameSocket(initialTeams, options = {}) {
 
   const syncHostQuestion = useCallback((activeQuestion) => {
     if (!hostReady) return
-    socket.timeout(3000).emit('host:question:set', activeQuestion, (err, ack) => {
+    const questionId = typeof activeQuestion === 'string' ? activeQuestion : ''
+    const payload = withHostCommandMeta(
+      { cursor: activeQuestion },
+      questionId ? { questionId } : undefined
+    )
+    socket.timeout(3000).emit('host:question:set', payload, (err, ack) => {
       if (err) return
+      syncHostSessionVersionFromAck(ack)
       if (ack?.ok) return
       if (ack?.error === 'unauthorized') {
         invalidateAuth('Host authorization expired while syncing question state. Sign in again.')

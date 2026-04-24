@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer } from 'react'
 import { socket } from '../core/socket'
 import { playArm, playBuzzIn } from '../core/sounds'
+import { syncHostSessionVersionFromAck, withHostCommandMeta } from '../core/hostCommandMeta'
 
 const INITIAL_STATE = {
   armed: false,
@@ -77,16 +78,20 @@ export function useHostedRuntime({
     if (options && typeof options === 'object' && !Array.isArray(options)) {
       if (Array.isArray(options.allowedTeamIndices)) safeOptions.allowedTeamIndices = options.allowedTeamIndices
     }
+    const payload = withHostCommandMeta(safeOptions)
     return new Promise((resolve) => {
-      socket.emit('host:arm', safeOptions, (result) => {
+      socket.emit('host:arm', payload, (result) => {
+        syncHostSessionVersionFromAck(result)
         resolve(result || { ok: false, error: 'server-error' })
       })
     })
   }, [])
 
   const emitReset = useCallback(() => {
+    const payload = withHostCommandMeta()
     return new Promise((resolve) => {
-      socket.emit('host:reset', (result) => {
+      socket.emit('host:reset', payload, (result) => {
+        syncHostSessionVersionFromAck(result)
         resolve(result || { ok: false, error: 'server-error' })
       })
     })

@@ -1,105 +1,5 @@
 import { useCallback, useReducer, useRef } from 'react'
-
-const INITIAL_STATE = {
-  attemptFeed: [],
-  correctEvent: null,
-  answerState: null,
-  timeoutEvent: null,
-  activeQuestionId: '',
-}
-
-function hostlessRuntimeReducer(state, action) {
-  switch (action.type) {
-    case 'ANSWER_ATTEMPT': {
-      if (!action.payload || typeof action.payload !== 'object') return state
-      return {
-        ...state,
-        attemptFeed: [...state.attemptFeed, action.payload].slice(-8),
-      }
-    }
-    case 'ANSWER_CORRECT': {
-      if (!action.payload || typeof action.payload !== 'object') return state
-      return {
-        ...state,
-        correctEvent: action.payload,
-        timeoutEvent: null,
-      }
-    }
-    case 'ANSWER_TIMEOUT': {
-      if (!action.payload || typeof action.payload !== 'object') return state
-      return {
-        ...state,
-        correctEvent: null,
-        timeoutEvent: action.payload,
-      }
-    }
-    case 'ANSWER_STATE': {
-      const payload = (action.payload && typeof action.payload === 'object') ? action.payload : null
-      const nextState = {
-        ...state,
-        answerState: payload,
-      }
-      if (!payload) return nextState
-      if (payload.status === 'open') {
-        return {
-          ...nextState,
-          timeoutEvent: null,
-        }
-      }
-      const revealedAnswer = String(payload.revealedAnswer || '').trim()
-      if (payload.status === 'locked' && !payload.winner && revealedAnswer) {
-        const matchesExistingTimeout = (
-          nextState.timeoutEvent?.questionId === payload.questionId
-          && String(nextState.timeoutEvent?.answer || '').trim() === revealedAnswer
-        )
-        return {
-          ...nextState,
-          correctEvent: null,
-          timeoutEvent: matchesExistingTimeout
-            ? nextState.timeoutEvent
-            : { questionId: payload.questionId, answer: revealedAnswer },
-        }
-      }
-      return nextState
-    }
-    case 'QUESTION_BOUNDARY': {
-      const questionId = String(action.questionId || '').trim()
-      if (!questionId || questionId === state.activeQuestionId) return state
-      return {
-        ...state,
-        activeQuestionId: questionId,
-        attemptFeed: [],
-        correctEvent: null,
-        timeoutEvent: null,
-      }
-    }
-    case 'CLEAR_TRANSIENT': {
-      return {
-        ...state,
-        attemptFeed: [],
-        correctEvent: null,
-        timeoutEvent: null,
-      }
-    }
-    case 'DISMISS_CORRECT': {
-      return {
-        ...state,
-        correctEvent: null,
-      }
-    }
-    case 'DISMISS_TIMEOUT': {
-      return {
-        ...state,
-        timeoutEvent: null,
-      }
-    }
-    case 'RESET_ALL': {
-      return { ...INITIAL_STATE }
-    }
-    default:
-      return state
-  }
-}
+import { INITIAL_HOSTLESS_RUNTIME_STATE, hostlessRuntimeReducer } from './hostlessRuntimeState'
 
 function buildCorrectSoundKey(payload) {
   return [
@@ -111,7 +11,7 @@ function buildCorrectSoundKey(payload) {
 
 export function useHostlessRuntime({ onCorrectSound = null } = {}) {
   const lastCorrectSoundKeyRef = useRef('')
-  const [state, dispatch] = useReducer(hostlessRuntimeReducer, INITIAL_STATE)
+  const [state, dispatch] = useReducer(hostlessRuntimeReducer, INITIAL_HOSTLESS_RUNTIME_STATE)
 
   const ingestHostlessAnswerAttempt = useCallback((payload) => {
     dispatch({ type: 'ANSWER_ATTEMPT', payload })

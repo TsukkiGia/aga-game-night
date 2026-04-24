@@ -36,6 +36,7 @@ import {
   firstQuestionIdInRound,
   questionItemIdFor,
 } from '../../core/gamePlan'
+import { syncHostSessionVersionFromAck, withHostCommandMeta } from '../../core/hostCommandMeta'
 
 const DEFAULT_ROUND_CATALOG = normalizeRoundCatalog(rounds)
 
@@ -113,6 +114,7 @@ export default function Scoreboard({
   const [launching, setLaunching] = useState(false)
   const [suddenDeath, setSuddenDeath] = useState(false)
   const [tiedTeams, setTiedTeams] = useState([])
+  const [suddenDeathQuestion, setSuddenDeathQuestion] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
   const [showReactionLeaderboard, setShowReactionLeaderboard] = useState(false)
   const [gameplayModeSwitching, setGameplayModeSwitching] = useState(false)
@@ -251,6 +253,7 @@ export default function Scoreboard({
     const nextCursorId = activeQuestionId && nextPlanSet.has(activeQuestionId)
       ? activeQuestionId
       : (nextPlanIds[0] || null)
+    const nextHostQuestionCursor = activeItem === null ? null : nextCursorId
     const payload = {
       teams: teams.map((team) => ({
         name: String(team.name || '').trim(),
@@ -262,16 +265,21 @@ export default function Scoreboard({
       streaks: [...streaks],
       doublePoints: false,
       gamePlan: nextPlanIds,
+      hostQuestionCursor: nextHostQuestionCursor,
       roundCatalog,
       reactionStats,
     }
+    const payloadWithMeta = withHostCommandMeta(payload)
 
     setGameplayModeSwitching(true)
     setGameplayModeError('')
     const result = await new Promise((resolve) => {
-      socket.timeout(3000).emit('host:runtime:update', payload, (err, ack) => {
+      socket.timeout(3000).emit('host:runtime:update', payloadWithMeta, (err, ack) => {
         if (err) resolve({ ok: false, error: 'timeout' })
-        else resolve(ack || { ok: false, error: 'server-error' })
+        else {
+          syncHostSessionVersionFromAck(ack)
+          resolve(ack || { ok: false, error: 'server-error' })
+        }
       })
     })
 
@@ -501,6 +509,11 @@ export default function Scoreboard({
   }, [hostlessModeActive, setShowStats])
 
   useEffect(() => {
+    if (!showWinner && !suddenDeath) return
+    clearHostlessTransient()
+  }, [showWinner, suddenDeath, clearHostlessTransient])
+
+  useEffect(() => {
     function onKey(e) {
       if (e.key === 'Escape') { setShowReactionLeaderboard(false); return }
       if (hostlessModeActive) return
@@ -551,18 +564,31 @@ export default function Scoreboard({
     navigateToCursor(null, { clearBuzz: false, silent: true })
   }
 
+  function pickSuddenDeathQuestion() {
+    socket.emit('host:sudden-death:pick', (res) => {
+      if (res?.ok && res?.question) setSuddenDeathQuestion(res.question)
+    })
+  }
+
+  function clearSuddenDeathQuestion() {
+    setSuddenDeathQuestion(null)
+    socket.emit('host:sudden-death:clear')
+  }
+
   function handleTiebreaker(winners) {
     setShowWinner(false)
     setTiedTeams(winners)
     setSuddenDeath(true)
     handleArm({ allowedTeamIndices: winners.map(w => w.originalIndex) })
+    pickSuddenDeathQuestion()
   }
 
   function handleSuddenDeathAward(teamIndex) {
-    adjust(teamIndex, 1)
+    if (!isHostlessMode(gameplayMode)) adjust(teamIndex, 1)
     dismissHostedBuzz()
     setSuddenDeath(false)
     setShowWinner(true)
+    clearSuddenDeathQuestion()
   }
 
   function handleSuddenDeathWrong() {
@@ -574,6 +600,7 @@ export default function Scoreboard({
     setSuddenDeath(false)
     setTiedTeams([])
     setShowWinner(true)
+    clearSuddenDeathQuestion()
   }
 
   function handleStart() {
@@ -599,6 +626,8 @@ export default function Scoreboard({
       const id = questionItemIdFor(roundIndex, questionIndex, planCatalog)
       return Boolean(id && planIdSet.has(id))
     }
+
+    const questionTimersPaused = showHalftime || showWinner || suddenDeath || Boolean(transition)
 
     if (activeItem.type === 'round-intro') {
       return (
@@ -654,26 +683,30 @@ export default function Scoreboard({
             if (safeQuestionId && fallbackQuestionId && safeQuestionId !== fallbackQuestionId) {
               return { accepted: false, reason: 'stale-local-question-id' }
             }
-
-            socket.timeout(4000).emit(
-              'host:timer:expired',
+            const payload = withHostCommandMeta(
               safeQuestionId ? { questionId: safeQuestionId } : {},
-              (err, ack) => {
+              safeQuestionId ? { questionId: safeQuestionId } : undefined
+            )
+            return new Promise((resolve) => {
+              socket.timeout(4000).emit('host:timer:expired', payload, (err, ack) => {
                 if (err) {
                   console.warn('[host:timer:expired] ack timeout/error', { safeQuestionId, err: String(err?.message || err || 'timeout') })
+                  resolve({ accepted: false, reason: 'timeout' })
                   return
                 }
+                syncHostSessionVersionFromAck(ack)
                 if (ack?.error === 'unauthorized') {
                   invalidateAuth('Host authorization expired. Sign in again.')
+                  resolve({ accepted: false, reason: 'unauthorized' })
                   return
                 }
-                if (!(ack?.ok && ack?.accepted !== false)) {
+                const accepted = Boolean(ack?.ok && ack?.accepted !== false)
+                if (!accepted) {
                   console.warn('[host:timer:expired] not accepted', { safeQuestionId, ack })
                 }
-              }
-            )
-
-            return { accepted: true, reason: 'local-immediate' }
+                resolve({ accepted, reason: String(ack?.reason || ack?.error || (accepted ? 'accepted' : 'rejected')) })
+              })
+            })
           }}
           stealMode={stealMode}
           onWrongAndSteal={(allowedTeamIndices) => handleWrongAndSteal(allowedTeamIndices)}
@@ -696,7 +729,7 @@ export default function Scoreboard({
           }}
           onHalftime={() => setShowHalftime(true)}
           onWinner={() => setShowWinner(true)}
-          pauseTimers={showHalftime}
+          pauseTimers={questionTimersPaused}
           onShowReactionLeaderboard={() => {
             if (hostlessModeActive) return
             setShowReactionLeaderboard(true)
@@ -704,7 +737,7 @@ export default function Scoreboard({
           doublePoints={doublePoints}
           onToggleDouble={() => setDoublePoints(d => !d)}
           gameplayMode={effectiveGameplayMode}
-          answerState={answerState || hostlessAnswerState}
+          answerState={hostlessModeActive ? (hostlessAnswerState || answerState) : answerState}
           hostlessAttemptFeed={hostlessAttemptFeed}
           hostlessCorrectEvent={hostlessCorrectEvent}
           hostlessTimeoutEvent={hostlessTimeoutEvent}
@@ -717,6 +750,8 @@ export default function Scoreboard({
           getQuestionTotal={getQuestionTotal}
           savedSidebarScrollTop={questionSidebarScrollTop}
           onRememberSidebarScroll={rememberQuestionSidebarScroll}
+          suddenDeathQuestion={suddenDeathQuestion}
+          onSuddenDeath={pickSuddenDeathQuestion}
         />
         {showHalftime && <HalftimeScreen teams={teams} onClose={() => setShowHalftime(false)} />}
         {showWinner && (
@@ -729,7 +764,7 @@ export default function Scoreboard({
           />
         )}
         {!hostlessModeActive && showStats && <StatsModal reactionStats={reactionStats} onClose={() => setShowStats(false)} />}
-        {suddenDeath && <SuddenDeathOverlay tiedTeams={tiedTeams} buzzWinner={buzzWinner} onAward={handleSuddenDeathAward} onWrong={handleSuddenDeathWrong} onCancel={handleSuddenDeathCancel} />}
+        {suddenDeath && <SuddenDeathOverlay tiedTeams={tiedTeams} buzzWinner={buzzWinner} hostlessCorrectEvent={hostlessCorrectEvent} isHostlessMode={isHostlessMode(gameplayMode)} suddenDeathQuestion={suddenDeathQuestion} onAward={handleSuddenDeathAward} onWrong={handleSuddenDeathWrong} onShuffle={pickSuddenDeathQuestion} onCancel={handleSuddenDeathCancel} />}
         {!hostlessModeActive && (
           <ReactionLeaderboardModal open={showReactionLeaderboard} rows={questionRaceRows} onClose={() => setShowReactionLeaderboard(false)} />
         )}
