@@ -305,5 +305,26 @@ export default {
       answer: 'Ethiopia',
       explanation: 'Ethiopia is Africa\'s second most populous country and the only African nation never colonised by a European power.',
     },
+    {
+      id: 'mam-senegal-02',
+      promptType: 'text',
+      promptText: 'In what year did Senegal gain independence from France?',
+      answer: '1960',
+      explanation: 'Senegal gained independence on April 4, 1960, and is known as one of Africa\'s most stable democracies.',
+    },
+    {
+      id: 'mam-togo-02',
+      promptType: 'text',
+      promptText: 'Togo gained independence from which European nation in 1960?',
+      answer: 'France',
+      explanation: 'Togo, formerly French Togoland, became independent on April 27, 1960.',
+    },
+    {
+      id: 'mam-mauritius-02',
+      promptType: 'text',
+      promptText: 'Mauritius, an island nation, gained independence from which country in 1968?',
+      answer: 'United Kingdom',
+      explanation: 'Mauritius became independent on March 12, 1968, and is known as a multicultural success story and economic powerhouse.',
+    },
   ],
 }
