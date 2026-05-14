@@ -51,7 +51,7 @@ export default function PromptMediaElement({
   imageClassName = '',
   videoClassName = '',
   iframeClassName = '',
-  imageAlt = 'Media prompt',
+  imageAlt = '',
   iframeTitle = 'Video prompt',
   imageReferrerPolicy = 'no-referrer',
   iframeReferrerPolicy = 'strict-origin-when-cross-origin',

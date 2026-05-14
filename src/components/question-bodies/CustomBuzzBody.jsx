@@ -50,7 +50,7 @@ export default function CustomBuzzBody({ question, paused = false, allowReveal =
               mediaType="image"
               mediaUrl={mediaUrl}
               imageClassName={`qv-custom-image${useDarkBackdrop ? ' dark-backdrop' : ''}`}
-              imageAlt="Custom buzz prompt"
+              imageAlt=""
               onImageLoad={() => console.log('[CustomBuzzBody] image loaded:', mediaUrl)}
               onImageError={() => {
                 console.log('[CustomBuzzBody] image failed to load:', mediaUrl)

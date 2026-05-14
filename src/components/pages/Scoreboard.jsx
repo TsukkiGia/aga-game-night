@@ -813,6 +813,13 @@ export default function Scoreboard({
               {authState.authenticating ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
+          <button
+            className="host-auth-reset-link"
+            type="button"
+            onClick={() => { clearAll(); onReset() }}
+          >
+            Forgot your PIN? Start a new session
+          </button>
         </ModalShell>
       )}
       {!hostlessModeActive && (
