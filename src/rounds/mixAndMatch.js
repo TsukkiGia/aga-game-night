@@ -1,6 +1,6 @@
 export default {
   id: 'mix-and-match',
-  name: 'Independence Celeb.',
+  name: 'Independence Celeb!',
   type: 'custom-buzz',
   intro: 'A curated selection of questions from across different rounds, featuring 15 featured African countries.',
   rules: [
