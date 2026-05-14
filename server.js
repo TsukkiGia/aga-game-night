@@ -380,7 +380,7 @@ export function createBuzzServer({ queryFn = query, withTransactionFn = withTran
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 
 if (isDirectRun) {
-  const PORT = process.env.PORT || 3001
+  const PORT = 3001
   runMigrations()
     .then(() => createBuzzServer().start(PORT, '0.0.0.0'))
     .then(() => console.log(`\n  Buzz server ->  http://localhost:${PORT}\n`))
