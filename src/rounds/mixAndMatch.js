@@ -8,6 +8,23 @@ function shuffleArray(array) {
   return shuffled;
 }
 
+// Organize questions: independence day questions first (shuffled), then others (shuffled)
+function organizeQuestions(questions) {
+  const independenceQuestions = questions.filter(q => q.id.includes('indep-'));
+  const otherQuestions = questions.filter(q => !q.id.includes('indep-'));
+  
+  const shuffledIndependence = shuffleArray(independenceQuestions);
+  const shuffledOthers = shuffleArray(otherQuestions);
+  
+  // Take first 20 from combined shuffled independence + enough others to fill 20
+  const first20 = shuffleArray([...shuffledIndependence, ...shuffledOthers.slice(0, Math.max(0, 20 - shuffledIndependence.length))]);
+  
+  // Remaining questions after the first 20
+  const remaining = shuffledOthers.slice(Math.max(0, 20 - shuffledIndependence.length));
+  
+  return [...first20, ...remaining];
+}
+
 const roundData = {
   id: 'mix-and-match',
   name: 'Africa Trivia',
@@ -563,7 +580,7 @@ const roundData = {
   ],
 };
 
-// Shuffle questions and export
-roundData.questions = shuffleArray(roundData.questions);
+// Organize and shuffle questions
+roundData.questions = organizeQuestions(roundData.questions);
 
 export default roundData;
