@@ -463,6 +463,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on February 18, 1965?',
       answer: 'Gambia',
+      options: ['Gambia', 'Ghana', 'Senegal', 'Ethiopia'],
       explanation: 'The Gambia gained independence from the United Kingdom on February 18, 1965.',
     },
     {
@@ -470,6 +471,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on March 2, 1956?',
       answer: 'Morocco',
+      options: ['Morocco', 'Tunisia', 'Egypt', 'Ethiopia'],
       explanation: 'Morocco gained independence from France on March 2, 1956.',
     },
     {
@@ -477,6 +479,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on March 20, 1956?',
       answer: 'Tunisia',
+      options: ['Tunisia', 'Morocco', 'Senegal', 'Ethiopia'],
       explanation: 'Tunisia gained independence from France on March 20, 1956.',
     },
     {
@@ -484,6 +487,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on March 6, 1957?',
       answer: 'Ghana',
+      options: ['Ghana', 'Gambia', 'Senegal', 'Ethiopia'],
       explanation: 'Ghana became the first sub-Saharan African country to gain independence on March 6, 1957.',
     },
     {
@@ -491,6 +495,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on June 18, 1953?',
       answer: 'Egypt',
+      options: ['Egypt', 'Morocco', 'Tunisia', 'Ethiopia'],
       explanation: 'Egypt gained independence from the United Kingdom on June 18, 1953.',
     },
     {
@@ -498,6 +503,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on April 4, 1960?',
       answer: 'Senegal',
+      options: ['Senegal', 'Gambia', 'Togo', 'Ethiopia'],
       explanation: 'Senegal gained independence from France on April 4, 1960.',
     },
     {
@@ -505,6 +511,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on April 27, 1960?',
       answer: 'Togo',
+      options: ['Togo', 'Senegal', 'Sierra Leone', 'Ethiopia'],
       explanation: 'Togo gained independence from France on April 27, 1960.',
     },
     {
@@ -512,6 +519,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on April 27, 1961?',
       answer: 'Sierra Leone',
+      options: ['Sierra Leone', 'Togo', 'Gambia', 'Ethiopia'],
       explanation: 'Sierra Leone gained independence from the United Kingdom on April 27, 1961.',
     },
     {
@@ -519,6 +527,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on March 12, 1968?',
       answer: 'Mauritius',
+      options: ['Mauritius', 'Namibia', 'Eritrea', 'Ethiopia'],
       explanation: 'Mauritius gained independence from the United Kingdom on March 12, 1968.',
     },
     {
@@ -526,6 +535,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on April 18, 1980?',
       answer: 'Zimbabwe',
+      options: ['Zimbabwe', 'Namibia', 'Eritrea', 'Ethiopia'],
       explanation: 'Zimbabwe gained independence from the United Kingdom on April 18, 1980.',
     },
     {
@@ -533,6 +543,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on May 24, 1993?',
       answer: 'Eritrea',
+      options: ['Eritrea', 'Zimbabwe', 'Namibia', 'Ethiopia'],
       explanation: 'Eritrea gained independence from Ethiopia on May 24, 1993.',
     },
     {
@@ -540,6 +551,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on March 21, 1990?',
       answer: 'Namibia',
+      options: ['Namibia', 'Zimbabwe', 'Eritrea', 'Ethiopia'],
       explanation: 'Namibia gained independence from South Africa on March 21, 1990.',
     },
     {
@@ -547,6 +559,7 @@ export default {
       promptType: 'text',
       promptText: 'Which country gained independence on May 31, 1910?',
       answer: 'South Africa',
+      options: ['South Africa', 'Namibia', 'Zimbabwe', 'Ethiopia'],
       explanation: 'The Union of South Africa gained independence from the United Kingdom on May 31, 1910.',
     },
 
