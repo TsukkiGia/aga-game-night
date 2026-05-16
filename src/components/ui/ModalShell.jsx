@@ -3,7 +3,7 @@ export default function ModalShell({
   children,
   overlayClassName = 'help-overlay',
   dialogClassName = '',
-  closeOnOverlayClick = true,
+  closeOnOverlayClick = false,
   role = 'dialog',
   ariaModal = true,
 }) {
