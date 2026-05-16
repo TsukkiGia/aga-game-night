@@ -15,6 +15,8 @@ import nollywoodActors from '../rounds/nollywoodActors.js'
 import nameTheCountry from '../rounds/nameTheCountry.js'
 import slangBee         from '../rounds/slangBee.js'
 import thesisTranslator from '../rounds/thesisTranslator.js'
+import mixAndMatch from '../rounds/mixAndMatch.js'
+import africanInnovations from '../rounds/africanInnovations.js'
 
 const rounds = [
   guessTheLanguage,
@@ -34,6 +36,8 @@ const rounds = [
   thesisTranslator,
   guessTheSong,
   beforeTheyWereFamous,
+  mixAndMatch,
+  africanInnovations,
 ]
 
 export default rounds.map((r, i) => ({
